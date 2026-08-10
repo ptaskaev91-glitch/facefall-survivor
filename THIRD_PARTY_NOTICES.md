@@ -6,7 +6,16 @@ Facefall Survivor primarily contains original project code. Where a small compat
 
 Source: `https://github.com/ivanoskov/shooter`
 
-Used as a reference throughout the engine foundation. `src/physics/PlayerCapsule.ts` adapts portions of the capsule movement/collision-response approach from `src/core/Player.ts` (repository revision `70a7b9f7fc43d99db1e2833e0042b00da00d9cf0`). The implementation is modified for Facefall's fixed-step, camera-independent, mobile-first architecture.
+Used as a reference throughout the engine foundation.
+
+Direct adaptations:
+
+- `src/physics/PlayerCapsule.ts` adapts portions of the capsule movement/collision-response approach from `src/core/Player.ts`.
+- `src/world/LevelLoader.ts` / `src/world/AssetManager.ts` adapt the small `GLTFLoader → traverse meshes → prepare bounds/shadows → build static collision` loading pattern from `src/core/Game.ts`.
+
+Source revision for these adaptations: `70a7b9f7fc43d99db1e2833e0042b00da00d9cf0`.
+
+The implementations are modified for Facefall's fixed-step, camera-independent, mobile-first architecture and separated into dedicated services rather than copied as whole source files.
 
 MIT License
 
