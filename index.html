@@ -15,7 +15,7 @@
   <section id="start" class="overlay start-overlay">
     <div class="start-grid">
       <div class="hero-copy">
-        <div class="eyebrow"><i></i> FACEFALL // BUILD 0.4</div>
+        <div class="eyebrow"><i></i> FACEFALL // BUILD 0.4.1</div>
         <h1>FACEFALL<br><span>SURVIVOR</span></h1>
         <p>Два режима камеры, объёмный мир, трава, грязь, мокрый асфальт, дождь и заражённые. Загрузи фото — оно станет лицом героя.</p>
         <div class="feature-row">
@@ -35,7 +35,8 @@
           <button type="button" data-camera="third"><b>3RD</b><span>От третьего лица</span></button>
         </div>
 
-        <button id="play" class="play-btn" type="button"><span>НАЧАТЬ ВЫЖИВАНИЕ</span><i>→</i></button>
+        <button id="play" class="play-btn" type="button"><span>ЗАГРУЗКА 3D...</span><i>→</i></button>
+        <div id="engineStatus" class="engine-status" aria-live="polite">Инициализация игрового движка…</div>
         <p class="control-note"><b>ПК:</b> WASD · мышь · ЛКМ · 1/2/3 · R · C — камера<br><b>Телефон:</b> джойстик + огонь, автоприцеливание, кнопка камеры.</p>
       </div>
     </div>
@@ -85,6 +86,74 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
+
+  <script>
+    (() => {
+      const boot = window.FacefallBoot = {
+        selectedCamera: 'top',
+        pendingStart: false,
+        engineReady: false,
+        engineFailed: false
+      };
+      const play = document.getElementById('play');
+      const playText = play.querySelector('span');
+      const status = document.getElementById('engineStatus');
+      const cameraButtons = [...document.querySelectorAll('[data-camera]')];
+
+      function renderCamera(mode) {
+        boot.selectedCamera = mode;
+        cameraButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.camera === mode));
+        if (window.FacefallEngine?.setCamera) window.FacefallEngine.setCamera(mode, false);
+      }
+
+      cameraButtons.forEach(btn => btn.addEventListener('click', () => renderCamera(btn.dataset.camera)));
+
+      function requestStart() {
+        if (window.FacefallEngine?.start) {
+          boot.pendingStart = false;
+          window.FacefallEngine.setCamera?.(boot.selectedCamera, false);
+          window.FacefallEngine.start();
+          return;
+        }
+        boot.pendingStart = true;
+        if (boot.engineFailed) {
+          status.textContent = '3D-движок не загрузился. Нажми ещё раз для перезапуска страницы.';
+          playText.textContent = 'ПОВТОРИТЬ ЗАГРУЗКУ';
+          location.reload();
+          return;
+        }
+        playText.textContent = 'ЗАГРУЖАЕМ 3D...';
+        status.textContent = 'Движок ещё запускается. Игра начнётся автоматически.';
+      }
+
+      play.addEventListener('click', requestStart);
+      document.getElementById('again').addEventListener('click', requestStart);
+
+      window.addEventListener('facefall-engine-ready', () => {
+        boot.engineReady = true;
+        boot.engineFailed = false;
+        play.disabled = false;
+        playText.textContent = 'НАЧАТЬ ВЫЖИВАНИЕ';
+        status.textContent = '3D-движок готов';
+        renderCamera(boot.selectedCamera);
+        if (boot.pendingStart) requestStart();
+      });
+
+      window.addEventListener('facefall-engine-error', event => {
+        boot.engineFailed = true;
+        play.disabled = false;
+        playText.textContent = 'ПОВТОРИТЬ ЗАГРУЗКУ';
+        status.textContent = event.detail || 'Не удалось запустить 3D-движок.';
+      });
+
+      setTimeout(() => {
+        if (!boot.engineReady && !boot.engineFailed) {
+          status.textContent = '3D загружается дольше обычного…';
+          playText.textContent = 'ЗАПУСТИТЬ, КОГДА ГОТОВО';
+        }
+      }, 4500);
+    })();
+  </script>
   <script type="module" src="game.js"></script>
 </body>
 </html>
