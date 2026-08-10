@@ -34,6 +34,11 @@ export class ProjectileSystem {
     private readonly capacity = 48
   ) {}
 
+  reset(): void {
+    for (const projectile of this.projectiles) projectile.active = false;
+    this.nextId = 1;
+  }
+
   spawnFromShot(shot: ShotEvent): ProjectileState | null {
     const definition = WEAPONS[shot.weaponId];
     if (definition.fireModel !== 'projectile' || !definition.projectileSpeed) return null;
