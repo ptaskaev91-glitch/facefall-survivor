@@ -2,13 +2,14 @@
 
 Последняя актуализация: **2026-08-10**  
 Repository: `ptaskaev91-glitch/facefall-survivor`  
-Branch/source of truth: `main`  
+Source of truth: `main`  
 Production hosting: **Vercel only**  
 Production URL: `https://facefall-survivor-pavels-projects-0b29bb12.vercel.app`
 
 Текущая production-контрольная точка: **0.5 ALPHA — legacy runtime**  
-Текущий архитектурный этап: **0.5A — Engine Foundation / engine-next**  
-Текущий режим работы: **DOCUMENTATION FREEZE — код игры временно не развиваем, фиксируем архитектуру и roadmap.**
+Текущий активный этап: **0.5A — Engine Foundation / engine-next**  
+Текущий engine-next checkpoint: **PR #1 merged, commit `0a599032`**  
+Режим работы: **разработка возобновлена после Documentation Freeze**.
 
 Связанные документы:
 
@@ -20,1464 +21,597 @@ Production URL: `https://facefall-survivor-pavels-projects-0b29bb12.vercel.app`
 
 # 1. Цель проекта
 
-Facefall Survivor — браузерная mobile-first action-survival игра против заражённых.
+Facefall Survivor — mobile-first браузерная 3D action-survival игра против заражённых.
 
-Игровая формула:
+Обязательная игровая формула:
 
-- **Top-down / Diablo-like** режим;
-- **Third-person over-the-shoulder** режим;
-- один герой и одна simulation для обеих камер;
+- top-down / Diablo-like камера;
+- third-person over-the-shoulder камера;
+- одна simulation для обеих камер;
 - pistol / shotgun / bow;
-- несколько типов заражённых;
-- волны и постепенное увеличение сложности;
-- пользователь загружает фотографию, и лицо используется на герое;
-- реалистичное, мрачное и атмосферное окружение;
-- mobile и desktop управление;
-- основная реальная тестовая платформа — Android browser;
-- no mandatory backend для MVP.
+- Walker / Runner / Brute;
+- волны заражённых;
+- загружаемая фотография пользователя становится лицом героя;
+- реалистичное мрачное окружение;
+- desktop + touch управление;
+- стабильная работа на реальном Android;
+- Vercel production;
+- backend для MVP не обязателен.
 
 Главная продуктовая особенность:
 
-> Игрок загружает собственную фотографию и видит себя героем survival shooter.
-
-Главная техническая цель:
-
-> Достичь визуально убедительной 3D-игры без потери стабильности и производительности на мобильном браузере.
+> Игрок загружает свою фотографию и видит себя героем survival shooter.
 
 ---
 
-# 2. Definition of Success
+# 2. Архитектурное решение после трёх аудитов
 
-Версия 1.0 MVP считается успешной, если одновременно выполнено:
+Проведены подробные аудиты:
 
-- игра открывается по Vercel URL без бесконечной загрузки;
-- пользователь может загрузить/заменить лицо;
-- лицо хранится и обрабатывается локально;
-- top-down режим полностью играбелен;
-- third-person режим полностью играбелен;
-- переключение камеры не ломает simulation;
-- pistol / shotgun / bow ощущаются по-разному;
-- Walker / Runner / Brute визуально и поведенчески различаются;
-- есть полноценная authored локация `Abandoned Outskirts`;
-- есть collision с геометрией уровня;
-- заражённые обходят препятствия;
-- есть waves/spawning/difficulty curve;
-- есть полноценный combat feedback;
-- есть audio/ambient layer;
-- UI адаптирован под touch;
-- mobile quality profile обеспечивает целевые 30+ FPS на реальном Android в нормальном игровом сценарии;
-- desktop target — 60 FPS на обычном современном устройстве;
-- crash/loading failure показывает понятный fallback/error, а не бесконечный loader;
-- production build идёт через Vite, без runtime CDN зависимости от Three.js;
-- CI проверяет build/typecheck/tests;
-- все внешние assets имеют понятное происхождение и лицензию.
+1. `ivanoskov/shooter` — browser foundation;
+2. `Unvanquished/Unvanquished` — gameplay architecture;
+3. `redeclipse/base` — combat feel / FX / environment.
 
----
+Итоговая формула:
 
-# 3. Итог трёх архитектурных аудитов
+> **Three.js/Vite browser foundation + event/component gameplay architecture + data-driven combat + pooled FX + authored GLB levels + mobile-first performance.**
 
-## 3.1 `ivanoskov/shooter` — browser foundation
+Берём идеи, но не форкаем ни один из проектов.
 
-Используем как ориентир:
+Ключевые решения:
 
-- npm / Vite / TypeScript;
-- Three.js package dependency;
-- GLB loading;
-- static Octree;
-- Capsule collider;
-- modular Input / Camera / Physics / Game;
-- quality profiles;
-- debug tooling.
-
-Не переносим:
-
-- desktop-only Pointer Lock architecture;
-- FPS camera;
-- двойной physics update;
-- конкретную mouse sensitivity implementation;
-- dynamic Octree как crowd system;
-- проект как готовую shooter codebase.
-
-## 3.2 `Unvanquished/Unvanquished` — gameplay architecture
-
-Используем как ориентир:
-
-- simulation отдельно от presentation;
-- Damage → Hit → Kill event pipeline;
-- CombatFeedback отдельно от damage simulation;
-- data-driven weapons/enemies;
-- component-oriented entities;
-- projectile abstraction;
-- navmesh;
-- state/behavior-based enemy decision logic;
-- animation transitions/blending.
-
-Не переносим:
-
-- GPL game code напрямую;
-- Dæmon engine;
-- C++/CMake stack;
-- multiplayer prediction/networking;
-- тяжёлый CBSE code generator;
-- RTS/building systems.
-
-## 3.3 `redeclipse/base` — combat feel / FX / environment
-
-Используем как ориентир:
-
-- explicit weapon states;
-- recoil yaw/pitch/recovery;
-- movement-dependent spread;
-- head/torso/limb hit zones;
-- hitscan vs physical projectile;
-- composable FX recipe;
-- particles/light/sound/decal/wind/camera feedback;
-- bounded stains/decals;
-- grass culling/taper/budgets;
-- global + local wind;
-- level gameplay markers отдельно от geometry.
-
-Не переносим:
-
-- native renderer;
-- macro-heavy weapon implementation;
-- waypoint AI как основной navigation layer;
-- content assets без отдельной license check.
-
-## 3.4 Итог
-
-Целевая формула:
-
-> **Facefall = Three.js/Vite browser foundation + event/component gameplay architecture + data-driven combat + pooled presentation systems + authored GLB levels + mobile-first controls/performance.**
+- TypeScript strict + Vite + npm Three.js;
+- runtime CDN Three.js в целевой версии не используется;
+- один fixed timestep loop;
+- static collision → Octree;
+- player → Capsule;
+- crowd neighbours → SpatialHash/grid;
+- AI navigation → navmesh;
+- enemy decision logic → lightweight State Tree;
+- weapons/enemies → data-driven;
+- simulation отделена от presentation;
+- effects → recipes + pools + budgets;
+- levels → GLB geometry + LevelManifest + navmesh;
+- Android — обязательная реальная тестовая платформа.
 
 ---
 
-# 4. Зафиксированный технологический стек
+# 3. Технологический стек
 
-## Core
+## Runtime / build
 
-- TypeScript strict mode.
-- Vite.
-- npm.
-- Node 20 в CI на текущем этапе.
-- Three.js — WebGL renderer / scene graph.
-- glTF 2.0 / GLB — основной 3D asset format.
+- TypeScript strict mode;
+- Vite;
+- npm;
+- Node 20 в CI;
+- Three.js;
+- ES2020 baseline на текущем этапе.
 
 ## Rendering
 
-- Three.js `WebGLRenderer`.
-- `SRGBColorSpace`.
-- ACES Filmic tone mapping.
-- `MeshStandardMaterial` / `MeshPhysicalMaterial`.
-- dynamic lighting только в пределах budgets.
-- post-processing — только после profiling; не является обязательным фундаментом.
-
-## Physics
-
-- static world: Three.js Octree;
-- player: Capsule;
-- simple dynamic hit/collision shapes: capsule/sphere/AABB;
-- crowd lookup: spatial hash/grid;
-- general physics engine пока **не добавляем**.
-
-Причина: MVP не требует полноценной rigid-body simulation. Новый physics engine будет рассмотрен только если ragdoll/destructibles нельзя качественно реализовать облегчённым способом.
-
-## Navigation
-
-Цель:
-
-- Recast/Detour-style navmesh через browser-compatible JS/WASM integration;
-- NavMeshQuery;
-- local avoidance;
-- SpatialHash для соседей;
-- NavigationWorker при необходимости вынести path work из main thread.
-
-Конкретный npm package выбирается на этапе реализации после небольшого spike-test; архитектура не должна зависеть от одного wrapper package.
-
-## AI
-
-- lightweight State Tree;
-- не внедряем тяжёлый Behavior Tree framework до появления реальной сложности;
-- специальные заражённые смогут иметь дополнительные states/substates.
-
-Базовая схема:
-
-```text
-WANDER
-  ↓ sound/vision
-INVESTIGATE
-  ↓ target found
-CHASE
-  ↓ attack range
-ATTACK
-  ↓ hit/stun
-STAGGER
-  ↓ recover
-CHASE
-  ↓ hp <= 0
-DEAD
-```
-
-## UI
-
-- HTML + CSS overlay;
-- без React на текущем этапе;
-- touch UI и desktop UI используют один InputManager;
-- UI не содержит gameplay rules.
-
-## Face
-
-- Canvas 2D local image processing;
-- localStorage для lightweight profile;
-- возможный IndexedDB позже;
-- никакой обязательной отправки пользовательской фотографии на сервер.
-
-## Audio
-
-- Web Audio API;
-- Three.js positional audio там, где полезно;
-- AudioSystem подписывается на game events.
+- Three.js WebGLRenderer;
+- sRGB output;
+- ACES Filmic tone mapping;
+- Standard/Physical materials;
+- ограниченные dynamic lights;
+- post-processing только после profiling.
 
 ## Assets
 
-Основной pipeline:
+- glTF 2.0 / GLB;
+- Blender;
+- glTF optimization;
+- KTX2/Basis для texture compression там, где даёт реальный выигрыш;
+- Meshopt предпочтителен после проверки;
+- каждый внешний asset получает source/license/attribution запись.
 
-```text
-source asset / Blender
-       ↓
-cleanup + scale + naming + skeleton
-       ↓
-GLB export
-       ↓
-glTF optimization
-       ↓
-texture compression / KTX2 where useful
-       ↓
-asset budget validation
-       ↓
-public/assets
-```
+## Physics
 
-Предпочтение:
+- static Octree;
+- Capsule hero;
+- sphere/capsule/AABB для простых dynamic colliders;
+- полноценный physics engine пока не нужен.
 
-- KTX2/Basis для GPU textures;
-- Meshopt для geometry compression после тестирования;
-- Draco только когда реально оправдан.
+## Navigation
 
-## Hosting
+- browser-compatible Recast/Detour-style navmesh;
+- LocalAvoidance;
+- SpatialHash;
+- worker рассматривается, если pathfinding нагружает main thread.
 
-- GitHub source;
-- Vercel production/preview;
+## UI / persistence
+
+- DOM/CSS overlay;
+- React пока не нужен;
+- localStorage для настроек/face profile;
+- IndexedDB позже при необходимости progression/save.
+
+## Hosting / CI
+
+- GitHub `main` — canonical source;
+- GitHub Actions — typecheck/build/tests;
+- Vercel — preview/production;
 - GitHub Pages не используется.
 
 ---
 
-# 5. Инструменты разработки
+# 4. Архитектурные правила
 
-## Основные
-
-- GitHub — repository/version history/review;
-- Vercel — deployment;
-- GitHub Actions — CI;
-- npm / Node — dependencies/build tooling;
-- TypeScript compiler;
-- Vite;
-- browser DevTools;
-- real Android device test.
-
-## 3D / art
-
-- Blender — scene/character/environment preparation;
-- glTF Transform или эквивалент — optimization;
-- image generation / visual concept tools — для art direction и референсов, но не как замена технической asset pipeline;
-- texture authoring tools по необходимости.
-
-## Debugging
-
-Целевой `?debug=1` overlay:
-
-- FPS;
-- frame time;
-- draw calls;
-- triangles;
-- textures;
-- active enemies;
-- nav paths;
-- collision shapes;
-- particles;
-- decals;
-- lights;
-- grass cells/instances;
-- quality profile;
-- player coordinates;
-- selected weapon/state.
-
----
-
-# 6. Архитектурные правила
-
-1. `src/main.ts` — bootstrap, а не monolith.
+1. `src/main.ts` остаётся тонким bootstrap.
 2. Один fixed timestep simulation loop.
-3. Input читается один раз и нормализуется в action state.
-4. Simulation не создаёт particles/sounds/DOM напрямую.
-5. Presentation реагирует на events.
-6. Static collision и AI navigation — разные структуры.
-7. Octree не используется для crowd neighbour lookup.
-8. Weapons data-driven.
+3. Input нормализуется в единое action state.
+4. Simulation не запускает DOM/particle/audio напрямую.
+5. Presentation подписывается на events.
+6. Collision и navigation — разные системы.
+7. Octree не используется как crowd database.
+8. Weapon balance не размазывается magic numbers по update loop.
 9. Enemy archetypes data-driven.
 10. FX data-driven через recipes.
-11. Все runtime-spawned visuals имеют max count/TTL/pool.
-12. Camera system не дублирует Player simulation.
-13. Asset loading централизован в AssetManager.
-14. GLB level geometry не содержит всю gameplay logic.
-15. Level markers хранятся в LevelManifest.
-16. Все external assets имеют attribution/license record.
-17. Mobile budget проектируется сразу, а не после desktop версии.
-18. Нельзя переключать production на engine-next до functional parity и Android smoke-test.
-19. Любая крупная архитектурная смена отражается в `structure.md`.
-20. Любая крупная контрольная точка отражается в `history.md` и `dev.md`.
+11. Particles/decals/lights/projectiles имеют pool/budget/TTL.
+12. Обе камеры используют одну Player/World simulation.
+13. Asset loading централизуется в AssetManager.
+14. Level GLB не хранит всю gameplay logic.
+15. Level gameplay markers живут в LevelManifest.
+16. Mobile budget проектируется сразу.
+17. Production не переключается на engine-next до functional parity + Android smoke-test.
+18. После крупной контрольной точки обновляются `dev.md`, `history.md`, `structure.md`.
 
 ---
 
-# 7. Game state architecture
+# 5. Definition of Success для 1.0 MVP
 
-Целевые состояния приложения:
-
-```text
-BOOT
- ↓
-MENU
- ↓
-FACE_SETUP / SETTINGS
- ↓
-LOADING
- ↓
-PLAYING
- ↔ PAUSED
- ↓
-GAME_OVER
- ↓
-MENU / RESTART
-```
-
-Обязательное правило:
-
-- MENU должен оставаться рабочим даже если 3D loading закончился ошибкой;
-- loading имеет timeout/error state;
-- user никогда не должен видеть бесконечное «включается» без результата.
+- стабильная загрузка без бесконечного loader;
+- face upload/replace/local persistence;
+- полноценные TOP и 3RD режимы;
+- pistol/shotgun/bow ощущаются по-разному;
+- Walker/Runner/Brute различаются визуально и поведением;
+- authored `Abandoned Outskirts`;
+- collision уровня;
+- заражённые обходят препятствия;
+- waves/difficulty curve;
+- combat feedback;
+- audio/ambient;
+- mobile HUD/controls;
+- 30+ FPS target на реальном Android;
+- 60 FPS target desktop;
+- Vite production bundle без runtime Three.js CDN;
+- CI typecheck/build/tests;
+- лицензии assets зафиксированы.
 
 ---
 
-# 8. Runtime flow
-
-```text
-Browser
- ↓
-Bootstrap
- ↓
-GameApp
- ├── AssetManager
- ├── Renderer
- ├── InputManager
- ├── World
- ├── Physics
- ├── Navigation
- ├── Simulation
- ├── CameraDirector
- └── Presentation
-
-GameLoop fixed tick
- ↓
-Input snapshot
- ↓
-Player / Enemy / Weapon / Projectile simulation
- ↓
-Physics + Navigation
- ↓
-Events
- ↓
-Animation / FX / Audio / HUD
- ↓
-Camera
- ↓
-Render
-```
-
----
-
-# 9. Combat pipeline
-
-```text
-Input.fire
- ↓
-WeaponSystem
- ↓ validates ammo/state/cooldown
-ShotEvent
- ├── pistol → hitscan
- ├── shotgun → multi-hitscan
- └── bow → ProjectileSystem
-                ↓
-           collision query
-                ↓
-DamageEvent
- ↓
-DamageSystem / Health
- ├── HitEvent
- └── KillEvent
-       ↓
-CombatFeedback
- ├── animation reaction
- ├── blood particles
- ├── decal
- ├── audio
- ├── transient light
- ├── wind impulse
- ├── camera feedback
- └── optional damage indicator
-```
-
----
-
-# 10. Weapon design targets
-
-## Pistol
-
-Роль: надёжное базовое оружие.
-
-- hitscan;
-- высокая точность;
-- умеренная отдача;
-- быстрый reload;
-- умеренный damage;
-- headshot заметно полезен.
-
-## Shotgun
-
-Роль: close-range crowd control.
-
-- multi-hitscan pellets;
-- spread;
-- высокий impulse;
-- сильный recoil/camera kick;
-- мощный muzzle flash;
-- smoke;
-- заметный stagger/knockback;
-- медленнее reload/fire cycle.
-
-## Bow
-
-Роль: тяжёлый точный projectile weapon.
-
-- physical arrow;
-- gravity;
-- draw/release timing;
-- видимая trajectory feel;
-- высокая headshot reward;
-- arrow sticking рассматривается как presentation effect;
-- не должен ощущаться как reskinned pistol.
-
----
-
-# 11. Enemy design targets
-
-## Walker
-
-- стандартный pressure unit;
-- медленный;
-- среднее HP;
-- простая melee attack;
-- легко читаемый силуэт.
-
-## Runner
-
-- низкое/среднее HP;
-- высокая скорость;
-- быстрый chase;
-- агрессивная attack animation;
-- должен заставлять менять позицию.
-
-## Brute
-
-- большой размер;
-- высокое HP;
-- медленнее;
-- высокий stagger resistance;
-- сильный melee impact;
-- опасен в choke points.
-
-Позже:
-
-- special infected;
-- boss;
-- ranged infected — только после проверки, что core melee crowd работает.
-
----
-
-# 12. Camera design
-
-## Top-down
-
-Цель: modern Diablo/action-RPG readability.
-
-- диагональный угол;
-- smooth follow;
-- camera-relative movement;
-- pointer/touch aiming;
-- небольшая динамика zoom;
-- игрок читается на фоне;
-- толпа читается;
-- occlusion handling для высоких объектов позже.
-
-## Third-person
-
-Цель: полноценный over-the-shoulder shooter mode.
-
-- right shoulder offset;
-- camera collision;
-- auto push-in near wall;
-- look target из screen/crosshair;
-- player upper body/weapon aims at target;
-- FOV expands slightly during sprint;
-- controlled recoil;
-- mobile aim assist;
-- camera не должна занимать пол-экрана спиной героя.
-
----
-
-# 13. Face System 2.0
-
-Основная уникальная система продукта.
-
-## MVP
-
-- выбрать фото;
-- crop;
-- zoom;
-- pan;
-- oval/face mask;
-- brightness/contrast normalization;
-- сохранить локально;
-- применить к face region персонажа;
-- neutral fallback;
-- заменить фото из menu.
-
-## Advanced
-
-- local face detection;
-- automatic eye/nose alignment;
-- skin tone blending;
-- несколько head/hair presets;
-- optional face texture baking.
-
-Privacy rule:
-
-> face image local-first; server upload не является обязательным для базовой игры.
-
----
-
-# 14. Level 1 — Abandoned Outskirts
-
-Первая authored vertical-slice локация.
-
-## Visual composition
-
-- мокрая основная дорога;
-- грунтовая боковая дорога;
-- 2–3 здания;
-- гараж/сарай;
-- заборы;
-- ворота;
-- разбитый автомобиль;
-- street lamps;
-- utility poles;
-- деревья нескольких видов;
-- bushes;
-- tall/short grass;
-- rocks;
-- crates;
-- barrels;
-- road signs;
-- garbage;
-- puddles;
-- mud;
-- tyre tracks;
-- leaves/debris.
-
-## Gameplay layout
-
-- open combat field;
-- narrow passage;
-- choke point;
-- flank path;
-- retreat route;
-- visual landmark;
-- spawn zones вне прямой видимости;
-- loot points;
-- минимум один environment interaction позже.
-
-## Data layout
-
-```text
-level.glb
-level.manifest.json
-navmesh data
-preview image
-```
-
-Manifest:
-
-- player spawn;
-- enemy spawn zones;
-- light anchors;
-- audio zones;
-- wind zones;
-- loot points;
-- choke tags;
-- interactables;
-- event anchors;
-- navigation modifiers.
-
----
-
-# 15. Materials / terrain / vegetation
-
-## Materials target
-
-- wet asphalt;
-- dry asphalt;
-- dirt;
-- mud;
-- grass;
-- flattened grass;
-- gravel;
-- concrete;
-- wood;
-- painted metal;
-- rusty metal;
-- glass;
-- wet surfaces.
-
-## Vegetation
-
-- InstancedMesh / merged strategy;
-- clustered placement;
-- exclude road/building zones;
-- several grass variants;
-- distance culling;
-- taper/fade;
-- wind sway;
-- quality density;
-- no individual heavyweight mesh per blade.
-
----
-
-# 16. Lighting / atmosphere
-
-Ночь должна быть атмосферной, но читаемой.
-
-## Base
-
-- hemisphere/ambient fill;
-- moon directional light;
-- hero rim/readability light;
-- player flashlight;
-- emissive environment sources;
-- local lamps;
-- limited dynamic muzzle lights.
-
-## Atmosphere
-
-- fog;
-- ground haze approximation;
-- rain;
-- puddles/wetness;
-- occasional lightning;
-- smoke;
-- film grain/vignette очень умеренно;
-- no post-effect, который мешает видеть enemies.
-
----
-
-# 17. Effects System budgets
-
-Все значения — стартовые ориентиры и должны корректироваться profiling-ом.
-
-## Mobile low provisional targets
-
-- particle pool: порядка 256–384 concurrent particles/effect units;
-- decals: порядка 64 active;
-- physical projectiles: до 32–48;
-- transient dynamic lights: минимальный budget, без лишних shadow casters;
-- grass: примерно 600–1000 visible instances/clumps в зависимости от реализации;
-- rain: уменьшенная density;
-- DPR: примерно 1.0–1.2.
-
-## Mobile high
-
-- particle/decal/grass budget повышается;
-- ограниченные shadows;
-- DPR примерно до 1.4–1.5 при достаточной производительности.
-
-## Desktop high
-
-- richer shadows;
-- more grass;
-- richer particles;
-- more lighting detail;
-- DPR всё равно capped, чтобы 4K/HiDPI не уничтожил performance.
-
-Правило: budgets определяются не визуальным желанием, а frame-time profiling.
-
----
-
-# 18. Performance targets
-
-## Mobile
-
-Главная цель:
-
-- **30+ FPS** в реальном combat scenario;
-- frame time желательно ≤ 33.3 ms;
-- без длинных GC spikes;
-- старт без зависания;
-- manageable initial download.
-
-## Desktop
-
-- 60 FPS target;
-- frame time около 16.7 ms;
-- higher quality profile.
-
-## Provisional asset budgets для vertical slice
-
-- initial gameplay download желательно удерживать примерно в диапазоне 15–30 MB compressed;
-- environment textures преимущественно до 1K на mobile path;
-- hero/key character textures допускают более высокий detail только после profiling;
-- reused materials/atlases предпочтительнее большого числа уникальных textures;
-- LOD обязательнее, чем бесконечное повышение polygon count.
-
----
-
-# 19. Asset licensing policy
-
-Каждый внешний asset должен иметь:
-
-- source URL;
-- author/source name;
-- license;
-- modification note;
-- attribution requirement.
-
-Хранить сведения в:
-
-`public/assets/ATTRIBUTION.md`
-
-Предпочтение:
-
-1. собственные assets;
-2. CC0;
-3. permissive/compatible assets;
-4. другие варианты только после явной license check.
-
-Unvanquished GPL game code не копируется.
-
-Red Eclipse media не считается автоматически разрешённой только из-за открытого source repository.
-
----
-
-# 20. Testing strategy
-
-## Layer 1 — TypeScript
-
-- `tsc --noEmit`.
-
-## Layer 2 — build
-
-- clean npm install / `npm ci` после lockfile;
-- Vite production build.
-
-## Layer 3 — unit tests
-
-План: Vitest или лёгкий compatible runner.
-
-Первые test targets:
-
-- WeaponSystem state transitions;
-- reload/ammo;
-- DamageSystem;
-- hit multipliers;
-- Health death once-only;
-- Projectile integration;
-- State Tree transitions;
-- wave progression.
-
-## Layer 4 — browser smoke
-
-План: Playwright или эквивалент после стабилизации entrypoint.
-
-Проверить:
-
-- page boots;
-- menu interactive;
-- game starts;
-- no fatal console errors;
-- top camera;
-- third camera;
-- touch controls synthetic smoke where possible.
-
-## Layer 5 — real device
-
-Обязательный ручной Android test:
-
-- load/start;
-- buttons;
-- joystick;
-- fire/reload/swap;
-- camera switching;
-- face upload;
-- 5–10 минут play session;
-- thermals/performance субъективно;
-- no infinite loading;
-- orientation/safe area.
-
----
-
-# 21. CI / deployment process
-
-Целевая pipeline:
-
-```text
-feature work
- ↓
-GitHub
- ↓
-CI
- ├── npm ci
- ├── typecheck
- ├── unit tests
- ├── Vite build
- └── later: bundle budget / smoke test
- ↓
-preview deploy
- ↓
-manual verification
- ↓
-main
- ↓
-production Vercel
- ↓
-real Android verification
-```
-
-До переключения engine-next на production legacy build остаётся доступным как fallback checkpoint.
-
----
-
-# 22. Branch / commit discipline
-
-На следующих крупных этапах:
-
-- documentation / tiny safe fixes могут идти напрямую в `main`;
-- engine migration / major visual changes лучше вести отдельной branch;
-- после рабочей проверки — merge в `main`;
-- production milestone получает понятный version/tag позже;
-- каждый commit должен описывать один логический шаг;
-- не объединять asset dump, architecture change и unrelated UI fix в один commit.
-
----
-
-# 23. Статусы задач
-
-Обозначения:
-
-- `[x]` — реализовано/зафиксировано;
-- `[~]` — реализовано частично или prototype;
-- `[?]` — реализовано, но требует обязательной проверки;
+# 6. Статусы задач
+
+- `[x]` — выполнено;
+- `[~]` — prototype/частично;
+- `[?]` — реализовано, но требуется обязательная runtime/device проверка;
 - `[ ]` — не начато;
-- `[HOLD]` — сознательно отложено;
-- `[DROP]` — решено не делать.
+- `[HOLD]` — осознанно отложено.
 
 ---
 
-# 24. Этап D0 — Documentation & Architecture Freeze
+# 7. D0 — Documentation & Architecture Freeze
 
-**Статус: выполнено в текущем заходе.**
+**Статус: ЗАВЕРШЁН.**
 
-- [x] свести выводы `ivanoskov/shooter`;
-- [x] свести выводы `Unvanquished`;
-- [x] свести выводы `Red Eclipse`;
-- [x] определить итоговый technology stack;
-- [x] определить runtime/system boundaries;
-- [x] создать `structure.md`;
-- [x] зафиксировать current structure;
-- [x] зафиксировать target structure;
-- [x] создать `history.md`;
-- [x] восстановить хронологию ключевых решений;
-- [x] полностью актуализировать `dev.md`;
-- [x] зафиксировать asset strategy;
-- [x] зафиксировать CI/testing strategy;
-- [x] зафиксировать roadmap до 1.0;
-- [x] не изменять game runtime в рамках documentation freeze.
-
-### Exit criteria
-
-Документация достаточна, чтобы следующий чат мог продолжить проект без потери ключевых решений.
+- [x] три архитектурных аудита сведены;
+- [x] определён technology stack;
+- [x] создан `structure.md`;
+- [x] создан `history.md`;
+- [x] сформирован полный roadmap;
+- [x] зафиксирована asset/licensing strategy;
+- [x] зафиксирована CI/testing strategy;
+- [x] documentation freeze завершён и разработка возобновлена.
 
 ---
 
-# 25. Этап 0.5A — Engine Foundation
+# 8. 0.5A — Engine Foundation
 
-**Статус: частично реализован до documentation freeze.**
+**Статус: В РАБОТЕ.**
 
-## 25.1 Project/build foundation
+## 8.1 Build / CI
 
 - [x] `package.json`;
-- [x] npm Three.js 0.160.0;
-- [x] strict TypeScript config;
-- [x] Vite config;
-- [x] ES2020 build target;
-- [x] `engine-lab.html`;
+- [x] Three.js npm dependency;
+- [x] strict TypeScript;
+- [x] Vite build;
+- [x] ES2020 target;
+- [x] isolated `engine-lab.html`;
 - [x] GitHub Actions workflow;
-- [ ] создать/закрепить `package-lock.json` через clean install;
-- [?] получить фактически зелёный CI run;
-- [ ] устранить все TypeScript/build warnings/errors, если CI их покажет;
-- [ ] добавить lint только если он не создаёт лишний процессный шум;
+- [x] фактически подтверждён зелёный CI: install + typecheck + Vite build;
+- [ ] закрепить `package-lock.json`;
+- [ ] после lockfile перейти в CI с `npm install` на `npm ci`;
+- [ ] unit-test runner добавить после стабилизации core systems.
 
-## 25.2 Core runtime
+## 8.2 Core lifecycle
 
 - [x] fixed timestep `GameLoop`;
 - [x] typed `EventBus`;
-- [ ] `GameApp` lifecycle;
-- [ ] `GameState` state machine;
-- [ ] centralized dispose/cleanup lifecycle;
-- [ ] loading/error state;
-- [ ] pause/resume handling;
-- [ ] visibility/background-tab handling;
+- [x] `GameApp` lifecycle container;
+- [x] `GameStateController`;
+- [x] resilient `Bootstrap`;
+- [x] `src/main.ts` сокращён до bootstrap;
+- [x] centralized dispose foundation;
+- [x] pause/resume;
+- [x] visibility/background-tab handling;
+- [~] loading/error state foundation;
+- [ ] финальная MENU/LOADING/PLAYING/GAME_OVER state machine будет завершена на parity этапе.
 
-## 25.3 Input
+## 8.3 Input
 
 - [x] `InputManager` foundation;
 - [x] KeyboardMouse adapter;
-- [x] Touch adapter;
+- [x] TouchInput adapter;
+- [x] TouchInput теперь полностью detach-ится при cleanup;
 - [~] joystick/actions prototype;
-- [ ] unified action map;
+- [ ] unified action map/config;
 - [ ] pointer aim;
-- [ ] third-person look control;
+- [ ] third-person look;
 - [ ] mobile aim assist;
-- [ ] deadzone/sensitivity config;
-- [ ] touch safe-area tuning;
-- [ ] landscape handling;
+- [ ] deadzone/sensitivity settings;
+- [ ] landscape/safe-area tuning.
 
-## 25.4 Physics
+## 8.4 Physics
 
 - [x] static Octree foundation;
 - [x] Capsule player proof;
-- [ ] separate player collider class;
-- [ ] gravity/ground state if needed by final movement;
-- [ ] sliding along walls robustly;
-- [ ] steps/slopes policy;
-- [ ] dynamic obstacle primitives;
-- [ ] SpatialHash;
+- [ ] выделить `PlayerCapsule` abstraction;
+- [ ] robust wall sliding;
+- [ ] slopes/steps policy;
+- [ ] dynamic primitive colliders;
+- [ ] `SpatialHash`;
 - [ ] camera collision query;
-- [ ] projectile/world collision query;
+- [ ] projectile/world collision query.
 
-## 25.5 Cameras
+## 8.5 Cameras
 
-- [x] `DualCameraRig` proof;
-- [ ] split into `TopDownCamera` / `ThirdPersonCamera`;
-- [ ] `CameraDirector`;
-- [ ] third-person shoulder offset tuning;
-- [ ] third-person collision;
-- [ ] top-down zoom/follow;
+- [x] старый `DualCameraRig` proof;
+- [x] создан `TopDownCamera`;
+- [x] создан `ThirdPersonCamera`;
+- [x] создан `CameraDirector`;
+- [x] `DualCameraRig` оставлен временным compatibility shim;
+- [ ] перевести `GameApp` на прямой `CameraDirector` import и удалить shim;
+- [ ] third-person camera collision;
+- [ ] shoulder offset tuning;
+- [ ] top-down zoom/follow tuning;
 - [ ] camera-relative movement;
-- [ ] camera recoil interface;
-- [ ] transition between camera modes;
+- [ ] recoil/shake interface;
+- [ ] плавный переход при переключении камеры.
 
-## 25.6 Combat simulation
+## 8.6 Combat simulation
 
-- [x] combat type contracts;
-- [x] data-driven weapons;
-- [x] `WeaponSystem` foundation;
-- [x] ammo/cooldown/reload state;
-- [x] `Health` component;
-- [x] `DamageSystem` foundation;
+- [x] typed combat contracts;
+- [x] data-driven pistol/shotgun/bow;
+- [x] `WeaponSystem`;
+- [x] ammo/cooldown/reload;
+- [x] `Health`;
+- [x] `DamageSystem`;
 - [x] Hit/Kill event pipeline;
 - [~] pistol hitscan proof;
-- [~] shotgun multi-hit proof;
-- [x] ballistic `ProjectileSystem` foundation;
-- [ ] real world/enemy hit queries;
-- [ ] spread model;
-- [ ] recoil model application;
-- [ ] hit zones from character colliders;
+- [~] shotgun multi-hitscan proof;
+- [x] ballistic ProjectileSystem foundation для bow;
+- [ ] real world/enemy collision queries;
+- [ ] spread model tied to player state;
+- [ ] recoil application;
+- [ ] character hit zones;
 - [ ] bow draw/release state;
-- [ ] weapon switching transitions;
-- [ ] interrupt/reload rules;
+- [ ] switching/reload interrupt rules.
 
-## 25.7 Presentation/FX foundation
+## 8.7 Presentation / FX
 
-- [x] composable effect recipe data;
-- [x] bounded ParticlePool foundation;
-- [x] bounded DecalPool foundation;
-- [x] WindField foundation;
-- [x] CombatFeedback boundary;
-- [ ] EffectSystem orchestrator;
-- [ ] LightPool;
-- [ ] muzzle flash recipe;
-- [ ] muzzle smoke;
-- [ ] shell casing visuals;
-- [ ] flesh hit;
-- [ ] surface hit;
-- [ ] blood decal orientation;
+- [x] composable `recipes.ts`;
+- [x] bounded `ParticlePool` foundation;
+- [x] bounded/fading `DecalPool` foundation;
+- [x] `WindField`;
+- [x] `CombatFeedback` boundary;
+- [x] bounded `LightPool`;
+- [x] `EffectSystem` orchestrator создан;
+- [ ] подключить EffectSystem в реальный shot/hit pipeline;
+- [ ] concrete particle adapters;
+- [ ] concrete decal adapter;
+- [ ] muzzle flash/smoke;
+- [ ] flesh/surface hits;
 - [ ] camera shake;
-- [ ] hit-stop policy;
-- [ ] effect LOD/budgets by quality profile;
+- [ ] controlled hit-stop;
+- [ ] quality-dependent FX budgets.
 
-## 25.8 Quality/performance
+## 8.8 Quality / debug
 
-- [x] quality profile foundation;
+- [x] mobile-low/mobile-high/desktop-high profiles;
 - [x] clustered GrassField prototype;
-- [ ] Metrics/DebugOverlay;
+- [ ] `Metrics`;
+- [ ] `DebugOverlay ?debug=1`;
 - [ ] renderer stats;
 - [ ] frame-time moving average;
-- [ ] automatic default quality choice;
 - [ ] manual quality selector;
-- [ ] adaptive downgrade only if profiling proves useful;
+- [ ] automatic profile selection tuning.
 
 ### 0.5A Definition of Done
 
-- [ ] clean install works;
-- [ ] CI green;
-- [ ] engine-next boots from Vite bundle;
-- [ ] no runtime Three.js CDN;
-- [ ] fixed loop only one;
-- [ ] input desktop/mobile functional;
-- [ ] player collision functional;
-- [ ] both cameras functional;
-- [ ] all 3 weapons use unified systems;
-- [ ] basic hit/damage/kill pipeline functional;
-- [ ] pooled FX functional;
-- [ ] no production switch yet unless parity milestone also complete.
+- [ ] lockfile + clean reproducible install;
+- [x] CI green на текущем foundation;
+- [?] engine-next Vite bundle boots в реальном browser;
+- [x] Three.js bundled через npm/Vite architecture;
+- [x] один fixed loop;
+- [~] desktop/mobile input foundation;
+- [~] player collision foundation;
+- [~] обе камеры foundation;
+- [~] все три weapons используют unified data/system foundation;
+- [~] hit/damage/kill pipeline foundation;
+- [~] pooled FX foundation;
+- [ ] desktop browser smoke-test;
+- [ ] Android smoke-test.
 
 ---
 
-# 26. Этап 0.5B — Legacy Functional Parity
+# 9. 0.5B — Legacy Functional Parity
 
-Цель: engine-next умеет всё, что важно в legacy 0.5, до удаления старого runtime.
+Цель: engine-next воспроизводит весь необходимый функционал текущего 0.5 legacy runtime.
 
-## Menu / lifecycle
+## Lifecycle/UI
 
-- [ ] start menu;
+- [ ] menu;
 - [ ] face picker;
-- [ ] camera selection before game;
-- [ ] game start;
-- [ ] restart;
-- [ ] game over;
-- [ ] error/fallback UX.
+- [ ] pre-game camera choice;
+- [ ] loading/error UX;
+- [ ] start/restart/game over;
+- [ ] pause.
 
-## Gameplay parity
+## Gameplay
 
-- [ ] player movement desktop;
-- [ ] player movement touch;
+- [ ] movement desktop;
+- [ ] movement touch;
 - [ ] pistol;
 - [ ] shotgun;
 - [ ] bow;
-- [ ] reload;
-- [ ] weapon swap;
+- [ ] reload/swap;
 - [ ] waves;
 - [ ] kills/score;
 - [ ] Walker/Runner/Brute;
-- [ ] pickups: health/ammo;
+- [ ] health/ammo pickups;
 - [ ] face persistence;
-- [ ] top camera;
-- [ ] third camera;
-- [ ] camera switch in-game.
+- [ ] TOP/3RD switching.
 
-## Atmosphere parity
+## Atmosphere
 
 - [ ] rain;
 - [ ] fog;
-- [ ] lighting;
-- [ ] muzzle effects;
-- [ ] blood;
-- [ ] decals;
-- [ ] basic grass;
+- [ ] lights;
+- [ ] muzzle FX;
+- [ ] blood/decals;
+- [ ] grass.
 
 ## Validation
 
 - [ ] desktop smoke;
 - [ ] Android smoke;
 - [ ] no infinite loader;
-- [ ] production bundle loads from same origin;
-- [ ] compare feature checklist with legacy.
-
-### Exit
-
-Только после этого разрешается удалить CDN proxy и monolithic `game-v050.js` из production path.
+- [ ] feature comparison with legacy.
 
 ---
 
-# 27. Этап 0.5C — Production Migration
+# 10. 0.5C — Production Migration
 
-- [ ] Vite `index.html` становится production entrypoint;
-- [ ] Vercel config переводится с legacy proxies на normal static Vite deployment;
-- [ ] удалить Three.js/GLTFLoader runtime proxy;
-- [ ] `game-v050.js` перевести в archive branch/tag либо удалить после сохранённой Git history;
-- [ ] `styles-safe.css` интегрировать/перенести в новую UI структуру;
-- [ ] `engine-lab.html` оставить debug-only или удалить;
-- [ ] обновить README;
+- [ ] Vite index становится production entrypoint;
+- [ ] Vercel legacy proxy configuration удаляется/упрощается;
+- [ ] runtime Three.js/GLTFLoader proxy удаляется;
+- [ ] `game-v050.js` выводится из production path;
+- [ ] legacy CSS интегрируется в новую UI architecture;
+- [ ] `engine-lab.html` становится debug-only или удаляется;
+- [ ] README обновляется;
 - [ ] production deploy;
-- [ ] Android check;
-- [ ] зафиксировать checkpoint/tag.
+- [ ] Android verification;
+- [ ] version checkpoint/tag.
 
 ---
 
-# 28. Этап 0.6 — Visual Vertical Slice
+# 11. 0.6 — Visual Vertical Slice
 
-Цель: первый билд, который на скриншоте выглядит как настоящая игра.
+Цель: первый билд, который выглядит как настоящая игра на статичном скриншоте.
 
-## Hero
+## Hero / weapons
 
-- [ ] final-direction humanoid GLB;
-- [ ] clean skeleton;
-- [ ] correct scale;
-- [ ] outfit;
-- [ ] head suitable for FaceSystem;
+- [ ] качественный humanoid GLB;
+- [ ] skeleton/scale/outfit/head;
 - [ ] weapon sockets;
-- [ ] LOD if needed;
+- [ ] pistol/shotgun/bow/arrow GLB;
+- [ ] idle/walk/run;
+- [ ] aim/fire/reload;
+- [ ] hit/death;
+- [ ] animation crossfade.
 
-## Hero animations
+## Infected
 
-- [ ] idle;
-- [ ] walk;
-- [ ] run;
-- [ ] pistol aim;
-- [ ] shotgun aim;
-- [ ] bow aim;
-- [ ] pistol fire;
-- [ ] shotgun fire;
-- [ ] bow draw/release;
-- [ ] reload;
-- [ ] hit;
-- [ ] death;
-- [ ] crossfade state machine;
+- [ ] Walker GLB + animations;
+- [ ] Runner GLB + animations;
+- [ ] Brute GLB + animations;
+- [ ] силуэты читаются на расстоянии.
 
-## Weapons art
+## Abandoned Outskirts
 
-- [ ] pistol GLB;
-- [ ] shotgun GLB;
-- [ ] bow GLB;
-- [ ] arrow GLB;
-- [ ] correct sockets/hand alignment;
-
-## Infected art
-
-- [ ] Walker GLB;
-- [ ] Runner GLB;
-- [ ] Brute GLB;
-- [ ] visually distinct silhouettes;
-- [ ] idle/move/attack/stagger/death animations;
-
-## Level
-
-- [ ] authored Abandoned Outskirts geometry;
-- [ ] materials;
-- [ ] props;
-- [ ] collision;
+- [ ] wet asphalt road;
+- [ ] dirt road;
+- [ ] 2–3 buildings;
+- [ ] garage/barn;
+- [ ] fences/gates;
+- [ ] abandoned car;
+- [ ] lamps/poles;
+- [ ] trees/bushes/grass;
+- [ ] mud/puddles/debris;
+- [ ] collision geometry;
 - [ ] LevelManifest;
-- [ ] initial navmesh;
+- [ ] initial navmesh.
 
 ## Lighting
 
 - [ ] moon/fill;
-- [ ] player readability;
+- [ ] hero readability/rim;
 - [ ] flashlight;
 - [ ] street lamps;
 - [ ] wet material response;
-- [ ] readable darkness;
-
-### 0.6 Definition of Done
-
-На одном статичном скриншоте:
-
-- герой не procedural mannequin;
-- оружие читается;
-- заражённые читаются;
-- окружение имеет конкретное место/композицию;
-- grass/materials заметны;
-- ночь атмосферная, но gameplay читается.
+- [ ] тёмная, но читаемая сцена.
 
 ---
 
-# 29. Этап 0.7 — Navigation / Enemy Gameplay
+# 12. 0.7 — Navigation / Enemy Gameplay
 
-## Navigation
-
-- [ ] navmesh spike;
-- [ ] choose browser integration;
+- [ ] navmesh spike и выбор browser integration;
 - [ ] bake/load navmesh;
-- [ ] path query;
-- [ ] repath policy;
-- [ ] off-mesh decisions if needed;
+- [ ] path query/repath policy;
+- [ ] SpatialHash;
 - [ ] LocalAvoidance;
-- [ ] SpatialHash neighbour lookup;
-- [ ] navigation debug view;
-
-## EnemySystem
-
-- [ ] entity registry;
-- [ ] EnemySystem update batches;
+- [ ] EnemySystem;
 - [ ] EnemyBrain;
 - [ ] State Tree;
-- [ ] perception: sight;
-- [ ] perception: sound events;
-- [ ] chase;
-- [ ] attack;
-- [ ] stagger;
-- [ ] death cleanup;
-- [ ] pooling/reuse strategy;
-- [ ] LOD update frequency for distant enemies;
-
-## Archetype behavior
-
-### Walker
-- [ ] standard chase/melee;
-
-### Runner
-- [ ] faster pursue;
-- [ ] shorter reaction delay;
-- [ ] aggressive attack;
-
-### Brute
-- [ ] slower pathing;
-- [ ] stronger hit;
-- [ ] high stagger resistance;
-- [ ] collision/crowd mass feel.
+- [ ] sight/sound perception;
+- [ ] wander/investigate/chase/attack/stagger/death;
+- [ ] update frequency LOD;
+- [ ] navigation debug view.
 
 ---
 
-# 30. Этап 0.75 — Wave Director / Encounter Design
+# 13. 0.75 — Wave Director
 
-- [ ] WaveDirector;
 - [ ] spawn zones;
-- [ ] spawn out of immediate camera view;
-- [ ] composition rules by wave;
+- [ ] WaveDirector;
+- [ ] composition rules;
 - [ ] max active enemies by quality/performance;
-- [ ] difficulty scaling;
+- [ ] difficulty curve;
 - [ ] downtime between waves;
-- [ ] wave notifications;
-- [ ] mini-event hooks;
 - [ ] pickup/drop rules;
-- [ ] no unavoidable spawn directly on player.
+- [ ] mini-event hooks;
+- [ ] no unavoidable spawn on player.
 
 ---
 
-# 31. Этап 0.8 — Combat Feel / Effects / Audio
+# 14. 0.8 — Combat Feel / FX / Audio
 
-## Weapon feel
-
-- [ ] pistol recoil/audio/flash tuned;
-- [ ] shotgun high-impact recoil/audio/flash/smoke;
-- [ ] bow draw/release/audio/arrow feedback;
-
-## Hits
-
+- [ ] pistol feel;
+- [ ] shotgun heavy feel;
+- [ ] bow draw/release feel;
 - [ ] head/torso/limb reactions;
 - [ ] stagger;
-- [ ] impact sounds;
-- [ ] blood particles;
-- [ ] blood decals;
-- [ ] environmental sparks/dust;
-- [ ] optional damage numbers;
-- [ ] subtle strong-hit stop;
-
-## Death
-
-- [ ] death animation variants;
-- [ ] corpse lifetime;
-- [ ] corpse/decal budget;
-- [ ] ragdoll-lite only if feasible within mobile budget.
-
-## Audio
-
-- [ ] weapon shots;
-- [ ] reload;
-- [ ] bow;
+- [ ] blood/decal/sparks/dust;
+- [ ] death variants;
+- [ ] weapon/reload sounds;
 - [ ] footsteps by surface;
-- [ ] infected vocals;
-- [ ] melee impact;
-- [ ] rain;
-- [ ] wind;
-- [ ] thunder;
-- [ ] distant ambience;
-- [ ] UI sounds;
-- [ ] music/intensity layers later if justified.
+- [ ] infected sounds;
+- [ ] rain/wind/thunder/ambient;
+- [ ] optional music intensity layers.
 
 ---
 
-# 32. Этап 0.82 — Environment Reactivity
+# 15. 0.82 — Environment Reactivity
 
-- [ ] WindField connected to grass;
-- [ ] shotgun/explosion local wind impulses;
+- [ ] grass responds to WindField;
+- [ ] weapon/explosion local wind impulses;
 - [ ] destructible light prototype;
 - [ ] explosive barrel prototype;
-- [ ] hit decals on environment;
-- [ ] puddle/wet response polish;
-- [ ] interactive door only if it adds gameplay value;
-- [ ] small environmental debris feedback.
+- [ ] hit decals;
+- [ ] puddle/wet polish;
+- [ ] small debris feedback.
 
-Не превращать этап в full physics sandbox.
+Не превращать игру в full physics sandbox.
 
 ---
 
-# 33. Этап 0.85 — Face System 2.0
+# 16. 0.85 — Face System 2.0
 
-- [ ] dedicated face editor UI;
+- [ ] face editor;
 - [ ] crop/zoom/pan;
-- [ ] mask;
-- [ ] brightness/contrast;
+- [ ] oval mask;
+- [ ] brightness/contrast normalization;
 - [ ] local persistence;
-- [ ] actual head integration;
-- [ ] face mesh/decal avoids floating-card look;
+- [ ] integration into real hero head;
 - [ ] fallback head;
 - [ ] replace/remove photo;
-- [ ] test landscape/portrait source photos;
-- [ ] privacy copy in UI;
+- [ ] portrait/landscape photo tests;
+- [ ] privacy copy.
 
-Advanced only after MVP:
+Advanced:
 
-- [HOLD] local automatic face landmark detection;
+- [HOLD] automatic landmark detection;
 - [HOLD] advanced skin blending;
 - [HOLD] multiple hairstyles/heads.
 
 ---
 
-# 34. Этап 0.87 — HUD / UX
+# 17. 0.87 — HUD / UX
 
-## Mobile
-
-- [ ] compact HP;
-- [ ] ammo;
-- [ ] reload state;
-- [ ] FIRE button;
-- [ ] joystick;
-- [ ] weapon swap;
-- [ ] camera switch;
+- [ ] compact mobile HP/ammo;
+- [ ] joystick/FIRE/reload/swap/CAM;
 - [ ] safe areas;
-- [ ] no overlap with gameplay center;
-- [ ] opacity tuning;
-
-## Desktop
-
-- [ ] crosshair;
-- [ ] weapon slots;
-- [ ] ammo/HP;
-- [ ] contextual reload warning;
-- [ ] camera indicator minimal;
-
-## General
-
+- [ ] desktop crosshair/weapon slots;
 - [ ] settings;
 - [ ] quality selector;
-- [ ] sensitivity;
-- [ ] audio volume;
-- [ ] face replace;
+- [ ] sensitivity/audio;
 - [ ] pause;
-- [ ] clear loading progress/errors.
+- [ ] clear loading errors.
 
 ---
 
-# 35. Этап 0.9 — Performance / Optimization
-
-## Renderer
+# 18. 0.9 — Performance
 
 - [ ] draw-call audit;
-- [ ] texture memory audit;
-- [ ] geometry audit;
-- [ ] shadows audit;
-- [ ] dynamic lights audit;
-- [ ] material count audit;
-- [ ] pixel ratio tuning;
-
-## Assets
-
+- [ ] texture/geometry/material audit;
+- [ ] shadow/light audit;
+- [ ] DPR tuning;
 - [ ] GLB optimization;
 - [ ] texture compression;
 - [ ] mesh compression;
 - [ ] LOD;
-- [ ] remove unused animations/materials;
-- [ ] preload priorities;
-- [ ] lazy-load noncritical assets.
-
-## AI
-
-- [ ] update frequency LOD;
 - [ ] path query throttling;
-- [ ] local avoidance budget;
-- [ ] SpatialHash profiling;
+- [ ] no hot-path uncontrolled allocations;
+- [ ] restart/resource disposal leak test.
 
-## Effects
+Targets:
 
-- [ ] pools verified;
-- [ ] no uncontrolled allocations in hot path;
-- [ ] mobile limits tuned;
-
-## Memory
-
-- [ ] dispose old levels/assets correctly;
-- [ ] no duplicated textures/materials;
-- [ ] game restart does not leak scene resources.
+- mobile: 30+ FPS;
+- desktop: 60 FPS;
+- initial vertical-slice download желательно удерживать примерно в диапазоне 15–30 MB compressed.
 
 ---
 
-# 36. Этап 0.92 — QA / Stability
+# 19. 0.92 — QA / Stability
 
-Test matrix:
-
-- [ ] Android Chromium-class browser;
-- [ ] Android browser used for real user checks;
-- [ ] desktop Chrome;
-- [ ] desktop Edge/Chromium;
-- [ ] Safari/iOS later if available;
-- [ ] portrait mobile;
-- [ ] landscape mobile;
-- [ ] low-memory/reload scenarios;
-- [ ] network-throttled first load;
+- [ ] Android real browser;
+- [ ] desktop Chrome/Chromium;
+- [ ] portrait/landscape;
+- [ ] slow-network first load;
 - [ ] failed asset load;
-- [ ] face photo denied/cancelled;
-- [ ] restart repeatedly;
-- [ ] switch cameras repeatedly;
-- [ ] 15+ minute survival session;
+- [ ] cancelled/denied face upload;
+- [ ] repeated restart;
+- [ ] repeated camera switching;
+- [ ] 15+ minute session;
 - [ ] high-wave stress test.
 
 ---
 
-# 37. Этап 0.95 — Progression / Replay Loop
+# 20. 0.95 — Replay / Progression
 
 Только после стабильного combat vertical slice.
 
-MVP-минимум:
-
 - [ ] score;
+- [ ] best score;
 - [ ] wave progression;
-- [ ] basic run stats;
-- [ ] best score/local record;
-- [ ] simple weapon upgrade choices between milestones/waves OR другой лёгкий progression mechanic;
-- [ ] save local settings/progression.
+- [ ] run stats;
+- [ ] простой upgrade choice между волнами/этапами;
+- [ ] local persistence.
 
-Не строить сложный inventory/loot RPG до подтверждения core gameplay.
+Не строить сложный RPG inventory до подтверждения core gameplay.
 
 ---
 
-# 38. Этап 1.0 — MVP Release
+# 21. 1.0 — MVP Release
 
-## Must-have
+Must-have:
 
-- [ ] production Vite architecture;
-- [ ] one authored level;
+- [ ] Vite production architecture;
+- [ ] authored level;
 - [ ] dual camera;
-- [ ] face upload/integration;
-- [ ] three weapons;
-- [ ] three infected archetypes;
+- [ ] face integration;
+- [ ] 3 weapons;
+- [ ] 3 infected archetypes;
 - [ ] navigation;
 - [ ] waves;
 - [ ] combat feedback;
@@ -1490,111 +624,80 @@ MVP-минимум:
 - [ ] asset attribution;
 - [ ] Android performance target;
 - [ ] production deploy;
-- [ ] final README/docs.
+- [ ] final docs.
 
 ---
 
-# 39. Post-1.0 backlog
-
-Не входит в текущий обязательный MVP.
-
-## Gameplay
+# 22. Post-1.0 backlog
 
 - special infected;
 - bosses;
-- multiple levels;
-- doors/interactions;
-- richer pickups;
-- perks;
-- XP;
-- weapon upgrades;
+- multiple maps;
+- interiors;
+- perks/XP;
+- richer weapon upgrades;
 - inventory;
-- dodge;
-- stamina;
-- sprint enhancements;
+- dodge/stamina;
 - environmental traps;
 - mini-events;
-- challenge modes.
-
-## Face/customization
-
 - auto face alignment;
-- hairstyles;
-- clothing variants;
-- multiple body/head presets.
-
-## Content
-
-- additional maps;
-- interiors;
-- weather variants;
-- day/night variants;
-- narrative fragments.
-
-## Platform
-
-- PWA/offline cache — evaluate separately;
+- hairstyles/clothing presets;
+- PWA evaluation;
 - gamepad;
-- richer iOS support.
+- richer iOS validation.
 
-## Explicitly not planned for MVP
+Не планируется для MVP:
 
 - multiplayer/networking;
 - dedicated server;
 - MMO/backend architecture;
-- full rigid-body destruction sandbox;
-- native engine rewrite.
+- native engine rewrite;
+- full destruction sandbox.
 
 ---
 
-# 40. Known technical debt / inconsistencies
+# 23. Known technical debt
 
-- [ ] `README.md` отражает более старую build description и должен быть обновлён после documentation freeze / следующего milestone;
-- [ ] legacy `vercel.json` содержит proxy Three.js/GLTF/hero model и должен исчезнуть из целевой production architecture;
-- [ ] current test Soldier GLB — pipeline proof, не final asset;
-- [ ] current procedural weapon geometry — temporary;
-- [ ] current legacy scene is not the final authored level;
-- [ ] CI workflow создан, но фактический green run должен быть подтверждён;
-- [ ] package lockfile необходимо закрепить;
-- [ ] asset licensing registry ещё не создан;
-- [ ] `src/main.ts` engine lab пока слишком много делает и должен быть decomposed;
-- [ ] target navigation implementation ещё не выбрана/не протестирована;
-- [ ] no automated browser smoke test yet.
-
----
-
-# 41. Следующий шаг после documentation freeze
-
-**Не начинать визуальный polish сразу.**
-
-Следующий рабочий порядок:
-
-1. Проверить/починить CI и clean Vite build.
-2. Закрепить package lock.
-3. Создать `GameApp`/GameState lifecycle и разгрузить `src/main.ts`.
-4. Довести unified input.
-5. Довести physics/camera foundation.
-6. Довести Weapon/Damage/Projectile pipeline.
-7. Подключить real EffectSystem к pools/recipes.
-8. Добавить AssetManager/LevelLoader/LevelManifest.
-9. Достичь legacy functional parity.
-10. Провести desktop + Android smoke-test.
-11. Переключить production на Vite engine-next.
-12. Только после этого начать полноценный visual vertical slice 0.6 с authored assets.
-
-Это является **официальным следующим порядком разработки** до следующей актуализации `dev.md`.
+- [ ] package lockfile отсутствует;
+- [ ] CI пока использует `npm install`, а не `npm ci`;
+- [ ] `DualCameraRig.ts` остаётся compatibility shim;
+- [ ] EffectSystem создан, но ещё не подключён к реальному combat pipeline;
+- [ ] current Soldier GLB — pipeline proof, не final asset;
+- [ ] procedural weapons — temporary;
+- [ ] current legacy scene — не authored level;
+- [ ] asset attribution registry ещё не создан;
+- [ ] navigation package/integration ещё не выбран;
+- [ ] automated browser smoke test отсутствует;
+- [ ] engine-next ещё не проверен на реальном Android;
+- [ ] README описывает старое состояние и обновляется при следующем production milestone.
 
 ---
 
-# 42. Правило ведения `dev.md`
+# 24. Следующий рабочий блок
+
+Официальная очередь после checkpoint `0a599032`:
+
+1. Закрепить package lock и воспроизводимую CI installation.
+2. Перевести `GameApp` напрямую на `CameraDirector`, удалить compatibility shim.
+3. Выделить `PlayerCapsule` и `SpatialHash` foundations.
+4. Добавить camera/world collision query.
+5. Довести unified input: pointer-look/aim + mobile aim.
+6. Подключить `EffectSystem` к shot/hit events и существующим pools.
+7. Добавить AssetManager / LevelLoader / LevelManifest.
+8. Начать 0.5B functional parity.
+9. Desktop smoke-test.
+10. Android smoke-test.
+11. Только после parity — production migration.
+
+---
+
+# 25. Правило ведения dev.md
 
 После каждого рабочего захода:
 
-1. выполненные задачи `[ ] → [x]`;
-2. частичные `[~]`;
-3. задачи, требующие проверки `[?]`;
-4. добавить выявленный technical debt;
-5. обновить текущий active milestone;
-6. записать ключевой результат в `history.md`;
-7. если менялась архитектура — обновить `structure.md`;
-8. только после проверки на production считать milestone закрытым.
+1. обновить статусы `[ ]/[~]/[?]/[x]`;
+2. записать новый technical debt;
+3. обновить active milestone/checkpoint;
+4. добавить запись в `history.md`;
+5. если менялась архитектура — обновить `structure.md`;
+6. milestone считается закрытым только после соответствующей проверки.
