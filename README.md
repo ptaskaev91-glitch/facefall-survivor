@@ -1,22 +1,24 @@
 # Facefall Survivor
 
-Browser-based cinematic top-down zombie survival shooter. Upload a photo and the game uses it as the hero's face locally in the browser.
+Browser-based cinematic zombie survival shooter. Upload a photo and the game uses it as the hero's face locally in the browser.
 
-## Current build — 0.3 Cinematic
+## Current build — 0.4 Dual Camera 3D
 
-- top-down survival combat
+- WebGL / Three.js 3D scene
+- switchable top-down Diablo-style camera and third-person camera
 - pistol, shotgun and bow
-- three infected archetypes: walkers, runners and brutes
+- walkers, runners and brutes
 - infinite wave progression
-- dynamic darkness and local light sources
-- rain, fog, lightning, wet-road ambience and film grain
-- muzzle flash, smoke, shell casings, hit particles and camera recoil
-- blood decals, corpses, damage numbers and loot drops
-- abandoned cars, lamps, trees, debris, fences, crates and barrels
-- medkit and ammo pickups
-- face upload processed locally in the browser
+- procedural grass, dirt and asphalt textures
+- instanced 3D grass for performance
+- puddles, wet-road look, fog and rain
+- 3D trees, rocks, crates, abandoned cars and street lamps
+- dynamic lighting, shadows, muzzle light and camera recoil
+- blood decals, sparks, pickups and obstacle collision
+- face upload processed locally in the browser and applied to the 3D hero
 - desktop WASD + mouse controls
 - mobile touch controls with assisted aiming
+- camera can be switched during gameplay with C / CAM
 - no backend required
 
 ## Hosting
@@ -27,12 +29,13 @@ Production URL:
 
 `https://facefall-survivor-pavels-projects-0b29bb12.vercel.app`
 
-## Roadmap
+## Next quality pass
 
-1. Sprite/asset-based realistic characters and animation states.
-2. Real collision, buildings, doors and destructible cover.
-3. Inventory, crafting and weapon upgrades.
-4. Character progression and persistent runs.
-5. Bosses, special infected and mini-events.
-6. Better face fitting, masking and head animation.
-7. PWA/offline support and save system.
+1. Replace placeholder geometry with authored GLB character, weapon and zombie models.
+2. Skeletal walk/run/attack/death/reload animations.
+3. Buildings, interiors, doors and stronger collision/camera collision.
+4. Higher-detail ground blending, decals, footprints and vegetation variation.
+5. Destructible props, exploding barrels and environmental combat.
+6. Bosses, special infected and mini-events.
+7. Better face fitting/masking and head animation.
+8. Inventory, upgrades, progression and save system.
