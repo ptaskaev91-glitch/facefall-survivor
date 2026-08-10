@@ -16,6 +16,7 @@ export class TouchInput {
   private joystickCenterY = 0;
   private readonly maxRadius = 46;
   private attached = false;
+  private readonly actionCleanups: Array<() => void> = [];
 
   constructor(private readonly input: InputManager, private readonly elements: TouchInputElements) {}
 
@@ -41,24 +42,37 @@ export class TouchInput {
     window.removeEventListener('pointermove', this.onPointerMove);
     window.removeEventListener('pointerup', this.onPointerUp);
     window.removeEventListener('pointercancel', this.onPointerUp);
+    for (const cleanup of this.actionCleanups.splice(0)) cleanup();
     this.resetJoystick();
+    this.input.reset();
   }
 
   private bindAction(element: HTMLElement | undefined, action: InputAction): void {
     if (!element) return;
     element.style.touchAction = 'none';
-    element.addEventListener('pointerdown', (event) => {
+
+    const press = (event: PointerEvent): void => {
       event.preventDefault();
       element.setPointerCapture?.(event.pointerId);
       this.input.setAction(action, true);
-    });
-    const release = (event: PointerEvent) => {
+    };
+
+    const release = (event: PointerEvent): void => {
       event.preventDefault();
       this.input.setAction(action, false);
     };
+
+    element.addEventListener('pointerdown', press);
     element.addEventListener('pointerup', release);
     element.addEventListener('pointercancel', release);
     element.addEventListener('lostpointercapture', release);
+
+    this.actionCleanups.push(() => {
+      element.removeEventListener('pointerdown', press);
+      element.removeEventListener('pointerup', release);
+      element.removeEventListener('pointercancel', release);
+      element.removeEventListener('lostpointercapture', release);
+    });
   }
 
   private onJoystickDown = (event: PointerEvent): void => {
