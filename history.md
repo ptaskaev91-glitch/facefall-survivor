@@ -399,22 +399,77 @@ Production root remains the stable legacy 0.5 ALPHA until parity is complete.
 
 ---
 
-# 17. Next order
+# 17. 2026-08-10 — PR #5 / первый полноценный 0.5B gameplay loop
 
-1. Commit reproducible package lock and move CI to `npm ci`.
-2. Begin 0.5B product parity: menu/start/pause/restart/game-over.
-3. Move face upload/local persistence into engine-next.
-4. Implement EnemySystem + player damage + WaveDirector using manifest spawn zones.
-5. Complete third-person aim, mobile aim assist, recoil/spread/bow states.
-6. Add atmosphere parity: rain/ambient.
-7. Continue decomposing GameApp into target systems.
-8. Desktop browser smoke-test.
-9. Real Android smoke-test.
-10. Only after parity and smoke-test switch production `/` to Vite engine-next.
+После команды пользователя «Продолжай» начат этап **0.5B Functional Parity**.
+
+Branch: `engine-next/0.5b-gameplay-loop`.  
+PR: **#5**.  
+Squash merge checkpoint: `dcdee8b058726743ba2e518602e2b8cce458f0d1`.
+
+Добавлено:
+
+- новый `EnemySystem`;
+- реальные runtime Walker / Runner / Brute spawn instances;
+- движение заражённых к герою;
+- melee attack range/cooldown/damage из data-driven archetypes;
+- moving enemy SpatialHash update;
+- player зарегистрирован в общем `DamageSystem`;
+- Player Health = 100;
+- новый `WaveDirector`;
+- wave composition растёт по сложности;
+- spawn идёт из `enemy-spawn` markers `LevelManifest`;
+- max active infected зависит от quality profile;
+- kills и score;
+- `gameover` state;
+- restart без reload страницы;
+- reset weapons/projectiles/health/enemies между забегами;
+- engine-lab HUD: HP / WAVE / KILLS / SCORE;
+- engine-lab game-over overlay и кнопка restart;
+- engine-lab label поднят до `ENGINE NEXT 0.5B`.
+
+CI для PR #5 полностью green:
+
+- dependencies install — success;
+- strict TypeScript — success;
+- combined Vercel bundle — success;
+- artifact upload — success.
+
+Это первая engine-next версия, где есть не только технический combat proof, а замкнутый gameplay loop:
+
+```text
+wave spawn
+→ infected chase
+→ infected melee damage
+→ player shoots
+→ damage/kill
+→ score/kills
+→ next wave
+→ player death
+→ game over
+→ restart
+```
+
+Ограничение: enemy navigation пока прямолинейная и ещё не использует navmesh/obstacle avoidance, поэтому это functional parity foundation, а не финальный AI.
 
 ---
 
-# 18. Future history format
+# 18. Next order
+
+1. Обновить Vercel test build для engine-next 0.5B и проверить его в браузере/Android.
+2. Перенести face upload/local persistence в engine-next.
+3. Добавить полноценный menu/start flow вместо lab-only auto-start.
+4. Довести third-person aim/crosshair/mobile aim assist.
+5. Добавить rain/ambient atmosphere parity.
+6. Начать navmesh spike + EnemyState/avoidance.
+7. Декомпозировать GameApp дальше после стабилизации 0.5B.
+8. Desktop browser smoke-test.
+9. Real Android smoke-test.
+10. Только после parity + smoke-test переключить production `/` на Vite engine-next.
+
+---
+
+# 19. Future history format
 
 For each large pass:
 
