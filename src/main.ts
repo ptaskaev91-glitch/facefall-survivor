@@ -86,20 +86,26 @@ for (const [x, z, sx, sz] of [
 const collisionWorld = new CollisionWorld();
 collisionWorld.rebuild(staticWorld);
 
-const player = new THREE.Group();
-const body = new THREE.Mesh(
-  new THREE.CapsuleGeometry(0.36, 0.85, 6, 10),
-  new THREE.MeshStandardMaterial({ color: 0x8d9c8d, roughness: 0.72 })
-);
-body.position.y = 0.9;
-body.castShadow = quality.shadows;
-player.add(body);
+function makeCapsuleMarker(radius: number, bodyLength: number, color: number): THREE.Group {
+  const group = new THREE.Group();
+  const material = new THREE.MeshStandardMaterial({ color, roughness: 0.78 });
+  const cylinder = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, bodyLength, 10), material);
+  cylinder.position.y = bodyLength / 2 + radius;
+  const lower = new THREE.Mesh(new THREE.SphereGeometry(radius, 10, 8), material);
+  lower.position.y = radius;
+  const upper = new THREE.Mesh(new THREE.SphereGeometry(radius, 10, 8), material);
+  upper.position.y = bodyLength + radius;
+  for (const mesh of [cylinder, lower, upper]) mesh.castShadow = quality.shadows;
+  group.add(cylinder, lower, upper);
+  return group;
+}
 
+const player = makeCapsuleMarker(0.36, 0.85, 0x8d9c8d);
 const weapon = new THREE.Mesh(
   new THREE.BoxGeometry(0.12, 0.1, 0.85),
   new THREE.MeshStandardMaterial({ color: 0x1f2421, roughness: 0.32, metalness: 0.65 })
 );
-weapon.position.set(0.32, 1.2, -0.52);
+weapon.position.set(0.32, 1.18, -0.52);
 player.add(weapon);
 scene.add(player);
 
@@ -112,17 +118,14 @@ const playerCapsule = new Capsule(
 const grass = new GrassField(quality);
 scene.add(grass.group);
 
-const infectedMaterial = new THREE.MeshStandardMaterial({ color: 0x6a5147, roughness: 0.92 });
 const enemyMeshes: THREE.Object3D[] = [];
 for (const [i, enemy] of Object.values(ENEMY_ARCHETYPES).entries()) {
-  const mesh = new THREE.Mesh(
-    new THREE.CapsuleGeometry(enemy.id === 'brute' ? 0.55 : 0.34, enemy.id === 'brute' ? 1.15 : 0.82, 5, 8),
-    infectedMaterial
-  );
-  mesh.position.set(-4 + i * 4.2, enemy.id === 'brute' ? 1.1 : 0.85, -8 - i * 2.5);
+  const radius = enemy.id === 'brute' ? 0.55 : 0.34;
+  const length = enemy.id === 'brute' ? 1.15 : 0.82;
+  const mesh = makeCapsuleMarker(radius, length, enemy.id === 'brute' ? 0x765246 : enemy.id === 'runner' ? 0x725b4a : 0x66564d);
+  mesh.position.set(-4 + i * 4.2, 0, -8 - i * 2.5);
   const scale = enemy.id === 'runner' ? 0.88 : enemy.id === 'brute' ? 1.18 : 1;
   mesh.scale.setScalar(scale);
-  mesh.castShadow = quality.shadows;
   scene.add(mesh);
   enemyMeshes.push(mesh);
 }
@@ -137,6 +140,7 @@ function setCameraMode(mode: CameraMode): void {
   cameraRig.setMode(mode);
   topButton.dataset.active = String(mode === 'top');
   thirdButton.dataset.active = String(mode === 'third');
+  refreshStatus();
 }
 
 topButton.addEventListener('click', () => setCameraMode('top'));
@@ -186,17 +190,20 @@ const loop = new GameLoop({
   maxSubSteps: 5
 });
 
-loop.start();
+function refreshStatus(): void {
+  status.textContent = [
+    'ENGINE NEXT готов',
+    `quality=${quality.id}`,
+    `camera=${cameraMode}`,
+    `weapons=${Object.keys(WEAPONS).length}`,
+    `enemy archetypes=${enemyMeshes.length}`,
+    `fx recipes=${Object.keys(EFFECTS).length}`,
+    'Three.js bundled via npm'
+  ].join(' · ');
+}
 
-status.textContent = [
-  `ENGINE NEXT готов`,
-  `quality=${quality.id}`,
-  `camera=${cameraMode}`,
-  `weapons=${Object.keys(WEAPONS).length}`,
-  `enemy archetypes=${enemyMeshes.length}`,
-  `fx recipes=${Object.keys(EFFECTS).length}`,
-  `Three.js bundled via npm`
-].join(' · ');
+refreshStatus();
+loop.start();
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
