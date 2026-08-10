@@ -1,11 +1,12 @@
 {
   "name": "facefall-survivor",
-  "version": "0.5.0-alpha.1",
+  "version": "0.5.0-alpha.2",
   "private": true,
   "type": "module",
   "scripts": {
     "dev:next": "vite --config vite.config.ts",
     "build:next": "vite build --config vite.config.ts",
+    "build:deploy": "npm run build:next && node scripts/copy-legacy.mjs",
     "preview:next": "vite preview --config vite.config.ts",
     "typecheck": "tsc --noEmit"
   },
