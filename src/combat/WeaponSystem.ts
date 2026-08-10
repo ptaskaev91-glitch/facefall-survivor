@@ -18,6 +18,11 @@ export class WeaponSystem {
   selected: WeaponId = 'pistol';
 
   constructor(private readonly events: EventBus<FacefallEvents>) {
+    this.reset();
+  }
+
+  reset(): void {
+    this.runtimes.clear();
     for (const definition of Object.values(WEAPONS)) {
       this.runtimes.set(definition.id, {
         id: definition.id,
@@ -27,6 +32,7 @@ export class WeaponSystem {
         stateTime: 0
       });
     }
+    this.selected = 'pistol';
   }
 
   update(dt: number): void {

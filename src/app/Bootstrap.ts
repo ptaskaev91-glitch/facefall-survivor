@@ -16,6 +16,13 @@ export function resolveGameAppDom(): GameAppDom {
     status: required<HTMLDivElement>('#status'),
     topButton: required<HTMLButtonElement>('#camTop'),
     thirdButton: required<HTMLButtonElement>('#camThird'),
+    hp: optional<HTMLElement>('#runHp'),
+    wave: optional<HTMLElement>('#runWave'),
+    kills: optional<HTMLElement>('#runKills'),
+    score: optional<HTMLElement>('#runScore'),
+    gameOver: optional<HTMLElement>('#gameOver'),
+    gameOverStats: optional<HTMLElement>('#gameOverStats'),
+    restart: optional<HTMLButtonElement>('#restartRun'),
     joystick: optional<HTMLElement>('#joy'),
     stick: optional<HTMLElement>('#stick'),
     touchFire: optional<HTMLElement>('#touchFire'),
@@ -35,7 +42,6 @@ export async function bootstrapEngineNext(): Promise<GameApp | null> {
     app = new GameApp(dom);
     await app.start();
 
-    // Helpful for manual engine-lab debugging; not used by gameplay systems.
     (window as Window & { __facefallApp?: GameApp }).__facefallApp = app;
     return app;
   } catch (error) {
