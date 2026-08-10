@@ -1,4 +1,5 @@
 import type { PerspectiveCamera, Vector3 } from 'three';
+import type { CameraCollision } from './CameraCollision';
 import { ThirdPersonCamera } from './ThirdPersonCamera';
 import { TopDownCamera } from './TopDownCamera';
 
@@ -8,6 +9,7 @@ export class CameraDirector {
   mode: CameraMode = 'top';
   readonly topDown: TopDownCamera;
   readonly thirdPerson: ThirdPersonCamera;
+  private collision: CameraCollision | undefined;
 
   constructor(
     private readonly camera: PerspectiveCamera,
@@ -22,6 +24,10 @@ export class CameraDirector {
     this.mode = mode;
   }
 
+  setCollision(collision: CameraCollision | undefined): void {
+    this.collision = collision;
+  }
+
   toggle(): CameraMode {
     this.mode = this.mode === 'top' ? 'third' : 'top';
     return this.mode;
@@ -29,7 +35,7 @@ export class CameraDirector {
 
   update(target: Vector3, facing: Vector3, dt: number): void {
     if (this.mode === 'third') {
-      this.thirdPerson.update(this.camera, target, facing, dt);
+      this.thirdPerson.update(this.camera, target, facing, dt, this.collision);
       return;
     }
     this.topDown.update(this.camera, target, dt);

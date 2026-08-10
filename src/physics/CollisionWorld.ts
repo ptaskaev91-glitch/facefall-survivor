@@ -1,6 +1,6 @@
-import { Object3D, Vector3 } from 'three';
-import { Octree } from 'three/addons/math/Octree.js';
+import { Object3D, Ray, Vector3 } from 'three';
 import { Capsule } from 'three/addons/math/Capsule.js';
+import { Octree } from 'three/addons/math/Octree.js';
 
 export interface CollisionResult {
   collided: boolean;
@@ -9,8 +9,14 @@ export interface CollisionResult {
   depth: number;
 }
 
+export interface WorldRayHit {
+  distance: number;
+  position: Vector3;
+}
+
 export class CollisionWorld {
   private staticTree = new Octree();
+  private readonly ray = new Ray();
 
   rebuild(root: Object3D): void {
     this.staticTree = new Octree();
@@ -33,6 +39,24 @@ export class CollisionWorld {
       normal,
       depth
     };
+  }
+
+  raycast(origin: Vector3, direction: Vector3, maxDistance = Infinity): WorldRayHit | null {
+    this.ray.origin.copy(origin);
+    this.ray.direction.copy(direction).normalize();
+    const hit = this.staticTree.rayIntersect(this.ray);
+    if (!hit || hit.distance > maxDistance) return null;
+    return {
+      distance: hit.distance,
+      position: hit.position.clone()
+    };
+  }
+
+  segmentCast(start: Vector3, end: Vector3): WorldRayHit | null {
+    const direction = end.clone().sub(start);
+    const distance = direction.length();
+    if (distance <= 1e-6) return null;
+    return this.raycast(start, direction.multiplyScalar(1 / distance), distance);
   }
 
   get octree(): Octree {

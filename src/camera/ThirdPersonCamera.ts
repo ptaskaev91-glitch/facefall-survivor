@@ -1,4 +1,5 @@
 import { MathUtils, PerspectiveCamera, Vector3 } from 'three';
+import type { CameraCollision } from './CameraCollision';
 
 export interface ThirdPersonCameraSettings {
   distance: number;
@@ -24,12 +25,19 @@ export class ThirdPersonCamera {
   private readonly right = new Vector3(1, 0, 0);
   private readonly desired = new Vector3();
   private readonly lookTarget = new Vector3();
+  private readonly collisionAnchor = new Vector3();
 
   constructor(settings: Partial<ThirdPersonCameraSettings> = {}) {
     this.settings = { ...DEFAULTS, ...settings };
   }
 
-  update(camera: PerspectiveCamera, target: Vector3, facing: Vector3, dt: number): void {
+  update(
+    camera: PerspectiveCamera,
+    target: Vector3,
+    facing: Vector3,
+    dt: number,
+    collision?: CameraCollision
+  ): void {
     this.forward.copy(facing).setY(0);
     if (this.forward.lengthSq() < 1e-6) this.forward.set(0, 0, -1);
     this.forward.normalize();
@@ -41,6 +49,11 @@ export class ThirdPersonCamera {
     this.desired.y += this.settings.height;
 
     this.lookTarget.set(target.x, target.y + this.settings.lookHeight, target.z);
+
+    if (collision) {
+      this.collisionAnchor.copy(this.lookTarget);
+      collision.resolve(this.collisionAnchor, this.desired, this.desired);
+    }
 
     const alpha = 1 - Math.exp(-this.settings.smoothing * dt);
     camera.position.lerp(this.desired, alpha);

@@ -4,6 +4,7 @@ export interface TouchInputElements {
   joystick: HTMLElement;
   stick: HTMLElement;
   fire: HTMLElement;
+  aimSurface?: HTMLElement;
   reload?: HTMLElement;
   switchWeapon?: HTMLElement;
   toggleCamera?: HTMLElement;
@@ -12,8 +13,11 @@ export interface TouchInputElements {
 
 export class TouchInput {
   private joystickPointer: number | null = null;
+  private aimPointer: number | null = null;
   private joystickCenterX = 0;
   private joystickCenterY = 0;
+  private aimLastX = 0;
+  private aimLastY = 0;
   private readonly maxRadius = 46;
   private attached = false;
   private readonly actionCleanups: Array<() => void> = [];
@@ -24,6 +28,7 @@ export class TouchInput {
     if (this.attached) return;
     this.attached = true;
     this.elements.joystick.addEventListener('pointerdown', this.onJoystickDown);
+    this.elements.aimSurface?.addEventListener('pointerdown', this.onAimDown);
     window.addEventListener('pointermove', this.onPointerMove, { passive: false });
     window.addEventListener('pointerup', this.onPointerUp);
     window.addEventListener('pointercancel', this.onPointerUp);
@@ -39,11 +44,13 @@ export class TouchInput {
     if (!this.attached) return;
     this.attached = false;
     this.elements.joystick.removeEventListener('pointerdown', this.onJoystickDown);
+    this.elements.aimSurface?.removeEventListener('pointerdown', this.onAimDown);
     window.removeEventListener('pointermove', this.onPointerMove);
     window.removeEventListener('pointerup', this.onPointerUp);
     window.removeEventListener('pointercancel', this.onPointerUp);
     for (const cleanup of this.actionCleanups.splice(0)) cleanup();
     this.resetJoystick();
+    this.aimPointer = null;
     this.input.reset();
   }
 
@@ -86,15 +93,35 @@ export class TouchInput {
     this.updateJoystick(event.clientX, event.clientY);
   };
 
-  private onPointerMove = (event: PointerEvent): void => {
-    if (event.pointerId !== this.joystickPointer) return;
+  private onAimDown = (event: PointerEvent): void => {
+    if (this.aimPointer !== null || event.pointerId === this.joystickPointer) return;
     event.preventDefault();
-    this.updateJoystick(event.clientX, event.clientY);
+    this.aimPointer = event.pointerId;
+    this.aimLastX = event.clientX;
+    this.aimLastY = event.clientY;
+    this.elements.aimSurface?.setPointerCapture?.(event.pointerId);
+    this.updatePointerNdc(event.clientX, event.clientY);
+  };
+
+  private onPointerMove = (event: PointerEvent): void => {
+    if (event.pointerId === this.joystickPointer) {
+      event.preventDefault();
+      this.updateJoystick(event.clientX, event.clientY);
+      return;
+    }
+
+    if (event.pointerId === this.aimPointer) {
+      event.preventDefault();
+      this.input.setAimDelta(event.clientX - this.aimLastX, event.clientY - this.aimLastY);
+      this.aimLastX = event.clientX;
+      this.aimLastY = event.clientY;
+      this.updatePointerNdc(event.clientX, event.clientY);
+    }
   };
 
   private onPointerUp = (event: PointerEvent): void => {
-    if (event.pointerId !== this.joystickPointer) return;
-    this.resetJoystick();
+    if (event.pointerId === this.joystickPointer) this.resetJoystick();
+    if (event.pointerId === this.aimPointer) this.aimPointer = null;
   };
 
   private updateJoystick(clientX: number, clientY: number): void {
@@ -108,6 +135,12 @@ export class TouchInput {
     }
     this.elements.stick.style.transform = `translate(${dx}px, ${dy}px)`;
     this.input.setMove(dx / this.maxRadius, dy / this.maxRadius);
+  }
+
+  private updatePointerNdc(clientX: number, clientY: number): void {
+    const width = Math.max(1, window.innerWidth);
+    const height = Math.max(1, window.innerHeight);
+    this.input.setPointerNdc(clientX / width * 2 - 1, -(clientY / height * 2 - 1));
   }
 
   private resetJoystick(): void {
