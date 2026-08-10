@@ -3,91 +3,88 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <meta name="theme-color" content="#070a08">
-  <meta name="description" content="Facefall Survivor — cinematic top-down zombie survival shooter with your face on the hero.">
+  <meta name="theme-color" content="#050806">
+  <meta name="description" content="Facefall Survivor — cinematic 3D zombie survival shooter with top-down and third-person cameras.">
   <title>Facefall Survivor</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <canvas id="game" aria-label="Игровое поле Facefall Survivor"></canvas>
+  <div id="stage" aria-label="Игровая сцена Facefall Survivor"></div>
+  <div class="grain"></div>
 
   <section id="start" class="overlay start-overlay">
-    <div class="start-shell">
-      <div class="brand-line"><span class="brand-dot"></span><b>FACEFALL</b><span>BUILD 0.3 // CINEMATIC</span></div>
-      <div class="start-copy">
-        <h1>FACEFALL<br><em>SURVIVOR</em></h1>
-        <p>Твое лицо. Одна ночь. Всё, что осталось между тобой и заражёнными — оружие, свет и несколько секунд на решение.</p>
-      </div>
-
-      <div class="setup-row">
-        <label class="face-picker" for="face">
-          <span class="face-frame"><img id="preview" alt="Лицо героя"><b id="plus">+</b></span>
-          <span class="face-copy"><strong>ЛИЦО ГЕРОЯ</strong><small>Нажми, чтобы выбрать фото</small><i>Фото остаётся только на устройстве</i></span>
-          <input id="face" type="file" accept="image/*" capture="user">
-        </label>
-        <div class="start-meta">
-          <span><b>3</b> вида оружия</span><span><b>∞</b> волн</span><span><b>3</b> типа заражённых</span>
+    <div class="start-grid">
+      <div class="hero-copy">
+        <div class="eyebrow"><i></i> FACEFALL // BUILD 0.4</div>
+        <h1>FACEFALL<br><span>SURVIVOR</span></h1>
+        <p>Два режима камеры, объёмный мир, трава, грязь, мокрый асфальт, дождь и заражённые. Загрузи фото — оно станет лицом героя.</p>
+        <div class="feature-row">
+          <span>3D WORLD</span><span>DUAL CAMERA</span><span>LOCAL FACE</span>
         </div>
       </div>
 
-      <button id="play" class="primary"><span>ВОЙТИ В НОЧЬ</span><b>→</b></button>
-      <div class="desktop-help"><span>WASD — движение</span><span>мышь — прицел</span><span>ЛКМ — огонь</span><span>1 / 2 / 3 — оружие</span><span>R — перезарядка</span></div>
-      <div class="mobile-help">На телефоне: левый стик — движение, FIRE — огонь, ⇄ — смена оружия. Прицел автоматически цепляется за ближайшую угрозу.</div>
+      <div class="setup-card">
+        <label class="face-picker" for="face">
+          <div class="face-frame"><img id="preview" alt="Предпросмотр лица"><b id="plus">+</b></div>
+          <div><strong>ЛИЦО ГЕРОЯ</strong><span>Выбрать фото</span><small>Обработка только на устройстве</small></div>
+          <input id="face" type="file" accept="image/*" capture="user">
+        </label>
+
+        <div class="camera-choice" role="group" aria-label="Выбор камеры">
+          <button type="button" data-camera="top" class="active"><b>TOP</b><span>Вид сверху</span></button>
+          <button type="button" data-camera="third"><b>3RD</b><span>От третьего лица</span></button>
+        </div>
+
+        <button id="play" class="play-btn" type="button"><span>НАЧАТЬ ВЫЖИВАНИЕ</span><i>→</i></button>
+        <p class="control-note"><b>ПК:</b> WASD · мышь · ЛКМ · 1/2/3 · R · C — камера<br><b>Телефон:</b> джойстик + огонь, автоприцеливание, кнопка камеры.</p>
+      </div>
     </div>
   </section>
 
   <section id="over" class="overlay hidden">
-    <div class="over-panel">
-      <div class="brand-line"><span class="brand-dot danger"></span><b>RUN ENDED</b><span>Ночь тебя забрала</span></div>
-      <h2>ТЕБЯ<br>ОКРУЖИЛИ</h2>
-      <div class="results">
-        <div><small>СЧЁТ</small><b id="finalScore">0</b></div>
-        <div><small>УБИЙСТВА</small><b id="finalKills">0</b></div>
-        <div><small>ВОЛНА</small><b id="finalWave">1</b></div>
-      </div>
-      <button id="again" class="primary"><span>ЕЩЁ ОДНА НОЧЬ</span><b>↻</b></button>
+    <div class="end-card">
+      <div class="eyebrow"><i></i> RUN ENDED</div>
+      <h2>ТЕБЯ ОКРУЖИЛИ</h2>
+      <div class="results"><div><small>СЧЁТ</small><b id="finalScore">0</b></div><div><small>УБИЙСТВА</small><b id="finalKills">0</b></div><div><small>ВОЛНА</small><b id="finalWave">1</b></div></div>
+      <button id="again" type="button">ЕЩЁ РАЗ</button>
     </div>
   </section>
 
   <div id="hud" class="hud hidden">
-    <div class="status glass">
-      <img id="portrait" alt="Портрет героя">
-      <div class="status-body">
-        <div class="status-top"><span>HEALTH</span><b id="hp">100</b></div>
+    <div class="player-card glass">
+      <img id="portrait" alt="Лицо героя">
+      <div class="vitals">
+        <div class="vitals-line"><span>HEALTH</span><b id="hp">100</b></div>
         <div class="hpbar"><i id="hpFill"></i></div>
-        <div class="status-bottom"><span>ВОЛНА <b id="wave">1</b></span><span>УБИЙСТВА <b id="kills">0</b></span></div>
+        <small>WAVE <b id="wave">1</b> · KILLS <b id="kills">0</b></small>
       </div>
     </div>
 
-    <div class="weapon glass">
-      <div><small id="weaponName">ПИСТОЛЕТ</small><b><span id="ammo">12</span><em id="reserve"> / 72</em></b></div>
-      <span id="weaponIcon" class="weapon-icon">⌁</span>
-    </div>
+    <div class="weapon-card glass"><small id="weaponName">PISTOL</small><b><span id="ammo">12</span><em id="reserve"> / 84</em></b></div>
+    <div class="camera-badge glass"><span id="cameraLabel">TOP-DOWN</span><small>C — CAMERA</small></div>
+    <button id="cameraToggle" class="camera-toggle" type="button" aria-label="Сменить камеру">CAM</button>
 
-    <div class="wave-chip glass"><span>WAVE</span><b id="waveBig">1</b></div>
-    <div class="score">SCORE <b id="score">000000</b></div>
-    <div id="dangerText" class="danger-text hidden">ОПАСНОСТЬ</div>
+    <div class="score-line">SCORE <b id="score">000000</b></div>
+    <div id="danger" class="danger hidden">⚠ CONTACT</div>
+    <div id="waveBanner" class="wave-banner hidden"><small>WAVE</small><b>1</b><span>INCOMING</span></div>
 
     <div class="slots">
-      <button data-w="pistol" class="active"><b>1</b><span>Пистолет</span></button>
-      <button data-w="shotgun"><b>2</b><span>Дробовик</span></button>
-      <button data-w="bow"><b>3</b><span>Лук</span></button>
+      <button data-w="pistol" class="active">1 <span>PISTOL</span></button>
+      <button data-w="shotgun">2 <span>SHOTGUN</span></button>
+      <button data-w="bow">3 <span>BOW</span></button>
     </div>
   </div>
 
   <div id="touch" class="touch hidden">
     <div id="joy" class="joy"><i id="stick"></i></div>
     <div class="touch-actions">
-      <button id="swap" aria-label="Сменить оружие">⇄</button>
-      <button id="reload" aria-label="Перезарядка">R</button>
-      <button id="fire" aria-label="Огонь"><span>FIRE</span><i></i></button>
+      <button id="swap" type="button" aria-label="Сменить оружие">⇄</button>
+      <button id="reload" type="button" aria-label="Перезарядка">R</button>
+      <button id="fire" type="button">FIRE</button>
     </div>
   </div>
 
-  <div id="waveBanner" class="wave-banner hidden"><small>INCOMING</small><b>ВОЛНА <span>1</span></b></div>
   <div id="toast" class="toast hidden"></div>
-  <div class="grain" aria-hidden="true"></div>
-
-  <script src="game.js"></script>
+  <script type="module" src="game.js"></script>
 </body>
 </html>
