@@ -1,25 +1,23 @@
-export type EventMap = Record<string, unknown>;
-
 type Listener<T> = (payload: T) => void;
 
-export class EventBus<Events extends EventMap> {
-  private listeners = new Map<keyof Events, Set<Listener<Events[keyof Events]>>>();
+export class EventBus<Events extends object> {
+  private listeners = new Map<keyof Events, Set<Listener<unknown>>>();
 
   on<K extends keyof Events>(event: K, listener: Listener<Events[K]>): () => void {
-    const set = (this.listeners.get(event) ?? new Set()) as Set<Listener<Events[K]>>;
-    set.add(listener);
-    this.listeners.set(event, set as Set<Listener<Events[keyof Events]>>);
+    const set = this.listeners.get(event) ?? new Set<Listener<unknown>>();
+    set.add(listener as Listener<unknown>);
+    this.listeners.set(event, set);
     return () => this.off(event, listener);
   }
 
   off<K extends keyof Events>(event: K, listener: Listener<Events[K]>): void {
-    const set = this.listeners.get(event) as Set<Listener<Events[K]>> | undefined;
-    set?.delete(listener);
+    const set = this.listeners.get(event);
+    set?.delete(listener as Listener<unknown>);
     if (set?.size === 0) this.listeners.delete(event);
   }
 
   emit<K extends keyof Events>(event: K, payload: Events[K]): void {
-    const set = this.listeners.get(event) as Set<Listener<Events[K]>> | undefined;
+    const set = this.listeners.get(event);
     if (!set) return;
     for (const listener of [...set]) listener(payload);
   }
