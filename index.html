@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#090d0b">
+  <meta name="description" content="Facefall Survivor — top-down zombie survival shooter with your face on the hero.">
+  <title>Facefall Survivor</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <section id="start" class="overlay">
+    <div class="panel intro">
+      <div class="eyebrow">FACEFALL // SURVIVAL PROTOTYPE</div>
+      <h1>FACEFALL<br><span>SURVIVOR</span></h1>
+      <p>Загрузи фото — оно станет лицом героя. Переживай волны заражённых, меняй оружие и не дай себя окружить.</p>
+      <div class="setup">
+        <label class="face-picker">
+          <div class="face-frame"><img id="preview" alt=""><b id="plus">+</b></div>
+          <div><strong>Лицо героя</strong><small>JPG / PNG · остаётся в браузере</small></div>
+          <input id="face" type="file" accept="image/*" capture="user">
+        </label>
+        <div class="keys"><strong>Управление</strong><span>WASD — движение</span><span>мышь — прицел</span><span>ЛКМ — огонь</span><span>1 / 2 / 3 — оружие</span><span>R — перезарядка</span></div>
+      </div>
+      <button id="play">ВОЙТИ В НОЧЬ</button>
+      <small class="note">Без фото используется нейтральный аватар. На телефоне включится сенсорное управление.</small>
+    </div>
+  </section>
+
+  <section id="over" class="overlay hidden">
+    <div class="panel over-panel">
+      <div class="eyebrow">RUN ENDED</div>
+      <h2>ТЕБЯ ОКРУЖИЛИ</h2>
+      <div class="results"><div><small>СЧЁТ</small><b id="finalScore">0</b></div><div><small>УБИЙСТВА</small><b id="finalKills">0</b></div><div><small>ВОЛНА</small><b id="finalWave">1</b></div></div>
+      <button id="again">ЕЩЁ РАЗ</button>
+    </div>
+  </section>
+
+  <div id="hud" class="hud hidden">
+    <div class="status card"><img id="portrait" alt=""><div><div class="line"><span>HP</span><b id="hp">100</b></div><div class="hpbar"><i id="hpFill"></i></div><small>ВОЛНА <b id="wave">1</b> · УБИЙСТВА <b id="kills">0</b></small></div></div>
+    <div class="weapon card"><div><small id="weaponName">ПИСТОЛЕТ</small><b><span id="ammo">12</span><em id="reserve"> / 72</em></b></div><span id="weaponIcon">⌁</span></div>
+    <div class="score">SCORE <b id="score">000000</b></div>
+    <div class="slots"><button data-w="pistol" class="active">1 <span>Пистолет</span></button><button data-w="shotgun">2 <span>Дробовик</span></button><button data-w="bow">3 <span>Лук</span></button></div>
+  </div>
+
+  <div id="touch" class="touch hidden"><div id="joy" class="joy"><i id="stick"></i></div><div class="touch-actions"><button id="swap">⇄</button><button id="reload">R</button><button id="fire">FIRE</button></div></div>
+  <div id="toast" class="toast hidden"></div>
+  <script src="game.js"></script>
+</body>
+</html>
