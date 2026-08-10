@@ -25,17 +25,20 @@ export class LevelLoader {
     private readonly collisionWorld?: CollisionWorld
   ) {}
 
+  async loadManifest(manifestUrl: string): Promise<LevelManifest> {
+    const response = await fetch(manifestUrl, { cache: 'no-cache' });
+    if (!response.ok) {
+      throw new Error(`Level manifest failed: ${response.status} ${response.statusText}`);
+    }
+    return parseLevelManifest(await response.json());
+  }
+
   async load(request: LevelLoadRequest): Promise<LoadedLevel> {
-    const [gltf, manifestResponse] = await Promise.all([
+    const [gltf, manifest] = await Promise.all([
       this.assets.loadGLB(request.glbUrl),
-      fetch(request.manifestUrl, { cache: 'no-cache' })
+      this.loadManifest(request.manifestUrl)
     ]);
 
-    if (!manifestResponse.ok) {
-      throw new Error(`Level manifest failed: ${manifestResponse.status} ${manifestResponse.statusText}`);
-    }
-
-    const manifest = parseLevelManifest(await manifestResponse.json());
     const root = gltf.scene;
     AssetManager.prepareRenderable(root, request.shadows);
     this.collisionWorld?.rebuild(root);

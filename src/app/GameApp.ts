@@ -3,6 +3,8 @@ import { CameraCollision } from '../camera/CameraCollision';
 import { CameraDirector, type CameraMode } from '../camera/CameraDirector';
 import { DamageSystem } from '../combat/DamageSystem';
 import { Health } from '../combat/Health';
+import { ProjectileSystem, type ProjectileCollision } from '../combat/ProjectileSystem';
+import { ProjectileVisuals } from '../combat/ProjectileVisuals';
 import type { FacefallEvents, HitZone } from '../combat/types';
 import { WEAPONS } from '../combat/weapons';
 import { WeaponSystem } from '../combat/WeaponSystem';
@@ -11,6 +13,7 @@ import { GameLoop } from '../core/GameLoop';
 import { EffectSystem } from '../effects/EffectSystem';
 import { LightPool } from '../effects/LightPool';
 import { EFFECTS } from '../effects/recipes';
+import { RuntimeFx } from '../effects/RuntimeFx';
 import { ENEMY_ARCHETYPES } from '../enemies/archetypes';
 import { detectQuality, type QualityProfile } from '../graphics/quality';
 import { InputManager } from '../input/InputManager';
@@ -19,7 +22,10 @@ import { TouchInput } from '../input/TouchInput';
 import { CollisionWorld } from '../physics/CollisionWorld';
 import { PlayerCapsule } from '../physics/PlayerCapsule';
 import { SpatialHash, type SpatialHashItem } from '../physics/SpatialHash';
+import { AssetManager } from '../world/AssetManager';
 import { GrassField } from '../world/GrassField';
+import { LevelLoader } from '../world/LevelLoader';
+import type { LevelManifest } from '../world/LevelManifest';
 import { GameStateController } from './GameState';
 
 export interface GameAppDom {
@@ -51,6 +57,8 @@ export class GameApp {
   private readonly collisionWorld = new CollisionWorld();
   private readonly playerController = new PlayerCapsule();
   private readonly grass: GrassField;
+  private readonly assets = new AssetManager();
+  private readonly levelLoader = new LevelLoader(this.assets, this.collisionWorld);
 
   private readonly events = new EventBus<FacefallEvents>();
   private readonly weaponSystem = new WeaponSystem(this.events);
@@ -60,7 +68,10 @@ export class GameApp {
   private touch: TouchInput | null = null;
 
   private readonly lightPool: LightPool;
+  private readonly runtimeFx: RuntimeFx;
   private readonly effects: EffectSystem;
+  private readonly projectileSystem: ProjectileSystem;
+  private readonly projectileVisuals: ProjectileVisuals;
   private readonly enemySpatial = new SpatialHash<EnemySpatialItem>(4);
   private readonly enemySpatialItems = new Map<string, EnemySpatialItem>();
 
@@ -84,6 +95,7 @@ export class GameApp {
   private cameraMode: CameraMode = 'top';
   private statusRefresh = 0;
   private disposed = false;
+  private levelId = 'lab-fallback';
 
   constructor(private readonly dom: GameAppDom) {
     this.quality = detectQuality();
@@ -94,7 +106,13 @@ export class GameApp {
     this.grass = new GrassField(this.quality);
     this.keyboard = new KeyboardMouseInput(this.input);
     this.lightPool = new LightPool(this.scene, Math.max(1, this.quality.maxDynamicLights));
+    this.runtimeFx = new RuntimeFx(
+      this.scene,
+      this.quality.id === 'mobile-low' ? 220 : 360,
+      this.quality.id === 'mobile-low' ? 48 : 80
+    );
     this.effects = new EffectSystem({
+      ...this.runtimeFx.adapters,
       spawnLight: (recipe, context) => {
         this.lightPool.spawn({
           color: recipe.color,
@@ -105,6 +123,12 @@ export class GameApp {
         });
       }
     });
+    this.projectileSystem = new ProjectileSystem(
+      this.damageSystem,
+      (from, to) => this.queryProjectileCollision(from, to),
+      this.quality.id === 'mobile-low' ? 32 : 48
+    );
+    this.projectileVisuals = new ProjectileVisuals(this.scene, this.quality.id === 'mobile-low' ? 32 : 48);
 
     this.configureScene();
     this.createWorldGeometry();
@@ -128,9 +152,10 @@ export class GameApp {
     if (!this.state.is('boot') && !this.state.is('error')) return;
 
     this.state.transition('loading');
-    this.dom.status.textContent = 'ENGINE NEXT · запуск модульного runtime…';
+    this.dom.status.textContent = 'ENGINE NEXT · загружаем manifest уровня…';
 
     try {
+      await this.loadLevelManifest();
       this.keyboard.attach();
       this.attachTouchInput();
       window.addEventListener('resize', this.onResize);
@@ -172,8 +197,11 @@ export class GameApp {
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
     for (const unsubscribe of this.unsubscribeEvents.splice(0)) unsubscribe();
 
+    this.projectileVisuals.dispose();
+    this.runtimeFx.dispose();
     this.lightPool.dispose();
     this.enemySpatial.clear();
+    this.assets.clearCache();
     this.scene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       object.geometry.dispose();
@@ -212,10 +240,6 @@ export class GameApp {
     moon.castShadow = this.quality.shadows;
     moon.shadow.mapSize.set(this.quality.shadowMapSize, this.quality.shadowMapSize);
     this.scene.add(moon);
-
-    const warm = new THREE.PointLight(0xffc56e, 8, 16, 2);
-    warm.position.set(9, 4.2, -5);
-    this.scene.add(warm);
 
     this.scene.add(this.staticWorld);
     this.scene.add(this.grass.group);
@@ -293,7 +317,10 @@ export class GameApp {
       this.effects.play(`${shot.weaponId}-shot`, { origin: shot.origin, direction: shot.direction });
 
       const definition = WEAPONS[shot.weaponId];
-      if (definition.fireModel !== 'hitscan') return;
+      if (definition.fireModel === 'projectile') {
+        this.projectileSystem.spawnFromShot(shot);
+        return;
+      }
 
       for (let pellet = 0; pellet < definition.pellets; pellet++) {
         const direction = this.spreadDirection(shot.direction, definition.spread);
@@ -331,7 +358,8 @@ export class GameApp {
     this.unsubscribeEvents.push(this.events.on('hit', (hit) => {
       this.effects.play(hit.critical || hit.amount >= 60 ? 'flesh-hit-heavy' : 'flesh-hit', {
         origin: hit.hitPoint,
-        direction: hit.direction
+        direction: hit.direction,
+        parent: this.scene
       });
       this.dom.status.dataset.lastEvent = `${hit.hitZone.toUpperCase()} ${Math.round(hit.amount)} DMG`;
       this.refreshStatus();
@@ -395,7 +423,9 @@ export class GameApp {
     this.player.rotation.y = Math.atan2(-this.facing.x, -this.facing.z);
 
     this.weaponSystem.update(dt);
+    this.projectileSystem.update(dt);
     this.effects.update(dt);
+    this.runtimeFx.update(dt);
     this.lightPool.update(dt);
 
     if (this.input.consumePressed('toggleCamera')) this.setCameraMode(this.cameraMode === 'top' ? 'third' : 'top');
@@ -413,10 +443,7 @@ export class GameApp {
     }
   }
 
-  private updateAim(
-    controls: ReturnType<InputManager['snapshot']>,
-    dt: number
-  ): void {
+  private updateAim(controls: ReturnType<InputManager['snapshot']>, dt: number): void {
     if (this.cameraMode === 'third') {
       if (Math.abs(controls.aimX) > 0.001) {
         this.facing.applyAxisAngle(this.up, -controls.aimX * 0.0045).normalize();
@@ -438,8 +465,91 @@ export class GameApp {
 
   private render(frameDt: number): void {
     this.cameraRig.update(this.player.position, this.facing, frameDt);
+    this.runtimeFx.cameraImpulse.apply(this.camera, frameDt);
+    this.projectileVisuals.sync(this.projectileSystem.active());
     this.grass.update(this.camera.position);
     this.renderer.render(this.scene, this.camera);
+  }
+
+  private async loadLevelManifest(): Promise<void> {
+    try {
+      const manifest = await this.levelLoader.loadManifest('/assets/levels/abandoned-outskirts/level.manifest.json');
+      this.applyLevelManifest(manifest);
+      this.levelId = manifest.id;
+    } catch (error) {
+      console.warn('Facefall: manifest load failed, keeping procedural fallback', error);
+      this.levelId = 'lab-fallback';
+    }
+  }
+
+  private applyLevelManifest(manifest: LevelManifest): void {
+    const playerSpawn = manifest.markers.find((marker) => marker.kind === 'player-spawn');
+    if (playerSpawn) {
+      this.playerController.teleport(new THREE.Vector3(
+        playerSpawn.position.x,
+        playerSpawn.position.y + 0.35,
+        playerSpawn.position.z
+      ));
+      if (typeof playerSpawn.rotationY === 'number') {
+        this.facing.set(-Math.sin(playerSpawn.rotationY), 0, -Math.cos(playerSpawn.rotationY)).normalize();
+      }
+    }
+
+    const enemySpawns = manifest.markers.filter((marker) => marker.kind === 'enemy-spawn');
+    const roots = [...this.enemyRoots.values()];
+    roots.forEach((root, index) => {
+      const marker = enemySpawns[index % Math.max(1, enemySpawns.length)];
+      if (!marker) return;
+      const spread = marker.radius ?? 3;
+      root.position.set(
+        marker.position.x + (index - 1) * Math.min(2.5, spread * 0.4),
+        marker.position.y,
+        marker.position.z + index * 1.2
+      );
+    });
+    this.rebuildEnemySpatial();
+
+    for (const marker of manifest.markers.filter((item) => item.kind === 'light')) {
+      const intensity = typeof marker.data?.intensity === 'number' ? marker.data.intensity : 6;
+      const distance = typeof marker.data?.distance === 'number' ? marker.data.distance : 14;
+      const warm = marker.data?.warm === true;
+      const light = new THREE.PointLight(warm ? 0xffc56e : 0xcbd8ff, intensity, distance, 2);
+      light.position.set(marker.position.x, marker.position.y, marker.position.z);
+      this.scene.add(light);
+    }
+  }
+
+  private rebuildEnemySpatial(): void {
+    this.enemySpatial.clear();
+    for (const item of this.enemySpatialItems.values()) this.enemySpatial.insert(item);
+  }
+
+  private queryProjectileCollision(from: THREE.Vector3, to: THREE.Vector3): ProjectileCollision | null {
+    const direction = this.temp.copy(to).sub(from);
+    const distance = direction.length();
+    if (distance <= 1e-6) return null;
+    direction.multiplyScalar(1 / distance);
+
+    this.raycaster.set(from, direction);
+    this.raycaster.far = distance;
+    const enemyHit = this.raycaster.intersectObjects(this.enemyMeshes, true)
+      .find((entry) => entry.object.visible && entry.object.userData.damageTargetId);
+    const worldHit = this.collisionWorld.segmentCast(from, to);
+
+    if (enemyHit && (!worldHit || enemyHit.distance <= worldHit.distance)) {
+      return {
+        targetId: enemyHit.object.userData.damageTargetId as string,
+        point: enemyHit.point.clone(),
+        hitZone: this.getHitZone(enemyHit.object, enemyHit.point)
+      };
+    }
+
+    if (worldHit) {
+      this.effects.play('surface-hit', { origin: worldHit.position, direction });
+      return { point: worldHit.position, hitZone: 'torso' };
+    }
+
+    return null;
   }
 
   private setCameraMode(mode: CameraMode): void {
@@ -487,10 +597,12 @@ export class GameApp {
     const lastEvent = this.dom.status.dataset.lastEvent ? ` · ${this.dom.status.dataset.lastEvent}` : '';
     this.dom.status.textContent = [
       `state=${this.state.current}`,
+      `level=${this.levelId}`,
       `quality=${this.quality.id}`,
       `camera=${this.cameraMode}`,
       `${WEAPONS[this.weaponSystem.selected].label} ${runtime.magazine}/${runtime.reserve}`,
       `enemies=${this.enemyMeshes.filter((enemy) => enemy.visible).length}`,
+      `arrows=${this.projectileSystem.active().length}`,
       `spatialCells=${this.enemySpatial.occupiedCellCount}`,
       `fx=${Object.keys(EFFECTS).length}`,
       `lights=${this.lightPool.activeCount}`,
