@@ -3,13 +3,27 @@
     {
       "source": "/vendor/three.js",
       "destination": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js"
+    },
+    {
+      "source": "/vendor/GLTFLoader.js",
+      "destination": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js"
+    },
+    {
+      "source": "/assets/models/hero.glb",
+      "destination": "https://threejs.org/examples/models/gltf/Soldier.glb"
     }
   ],
   "headers": [
     {
-      "source": "/vendor/three.js",
+      "source": "/vendor/:path*",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/assets/models/:path*",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=86400" }
       ]
     }
   ]
