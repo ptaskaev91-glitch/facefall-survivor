@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/vendor/three.js",
+      "destination": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/vendor/three.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    }
+  ]
+}
