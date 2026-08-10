@@ -68,7 +68,11 @@ export class KeyboardMouseInput {
   };
 
   private onMouseMove = (event: MouseEvent): void => {
-    if (event.buttons !== 0) this.input.setAimDelta(event.movementX, event.movementY);
+    this.input.setAimDelta(event.movementX, event.movementY);
+    this.input.setPointerNdc(
+      event.clientX / Math.max(1, this.target.innerWidth) * 2 - 1,
+      -(event.clientY / Math.max(1, this.target.innerHeight) * 2 - 1)
+    );
   };
 
   private onMouseDown = (event: MouseEvent): void => {
