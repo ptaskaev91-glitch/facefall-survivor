@@ -7,15 +7,15 @@ Hosting: **Vercel only**
 Production alias: `https://facefall-survivor-pavels-projects-0b29bb12.vercel.app`
 
 Production game: **legacy 0.5 ALPHA remains active by design**.  
-Engine-next: **0.5A Foundation — large block completed**.  
-Code checkpoint: **PR #3 → `bec7b5f8`**.  
+Engine-next: **0.5B Functional Parity — gameplay loop started and working in code**.  
+Latest engine-next checkpoint: **PR #5 → `dcdee8b058726743ba2e518602e2b8cce458f0d1`**.  
 Release-tooling checkpoint: **PR #4 → `6d051dae`**.  
-Latest requested Vercel deployment: **`dpl_2SmWVpkqFmuZL2BBrpQ7v2UbRcEb`**. Vercel accepted it targeting production and assigned the primary aliases; connector status/log polling currently returns its known `404 not_found` inconsistency, so READY is not assumed without browser verification.
+Latest known production deployment request: **`dpl_2SmWVpkqFmuZL2BBrpQ7v2UbRcEb`**; Vercel connector polling for fresh deployment IDs remains unreliable, therefore READY is never assumed without verification.
 
 Related source-of-truth files:
 
 - `structure.md` — current/target architecture;
-- `history.md` — project decisions and checkpoints;
+- `history.md` — project decisions/checkpoints;
 - `THIRD_PARTY_NOTICES.md` — direct source-code reuse notices;
 - `public/assets/ATTRIBUTION.md` — media licensing registry.
 
@@ -67,7 +67,7 @@ Direct MIT adaptations already recorded:
 - Capsule/Octree collision-response pattern → `PlayerCapsule.ts`;
 - GLTF loading/traverse preparation → `AssetManager.ts` / `LevelLoader.ts`.
 
-Facefall-specific systems such as SpatialHash, CameraCollision, touch/pointer aim, LevelManifest and current combat/FX orchestration are original project implementations.
+Facefall-specific systems such as SpatialHash, CameraCollision, touch/pointer aim, LevelManifest, EnemySystem, WaveDirector and current combat/FX orchestration are original project implementations.
 
 ---
 
@@ -117,7 +117,7 @@ Facefall-specific systems such as SpatialHash, CameraCollision, touch/pointer ai
 
 # 6. 0.5A — Engine Foundation
 
-**STATUS: functionally far advanced; remaining work is reproducibility/debug/verification and decomposition.**
+**STATUS: architecture foundation largely complete; remaining work is reproducibility/debug/verification and decomposition.**
 
 ## Build / release
 
@@ -129,7 +129,7 @@ Facefall-specific systems such as SpatialHash, CameraCollision, touch/pointer ai
 - [x] GitHub Actions typecheck/build;
 - [x] repeated green CI;
 - [x] combined deploy command: Vite engine-next + stable legacy root in `dist-next`;
-- [x] CI artifact `facefall-dist-next` uploaded and verified in PR #4;
+- [x] CI artifact upload;
 - [x] Vercel repository config knows `build:deploy` / `dist-next`;
 - [ ] commit `package-lock.json`;
 - [ ] then change installation from `npm install` to `npm ci`;
@@ -144,8 +144,9 @@ Facefall-specific systems such as SpatialHash, CameraCollision, touch/pointer ai
 - [x] resilient Bootstrap;
 - [x] pause/resume/background handling;
 - [x] cleanup/dispose foundation;
+- [x] `gameover` state added;
 - [~] loading/error states;
-- [ ] final MENU / FACE_SETUP / GAME_OVER product states.
+- [ ] final MENU / FACE_SETUP product states.
 
 ## Input / cameras
 
@@ -173,17 +174,19 @@ Facefall-specific systems such as SpatialHash, CameraCollision, touch/pointer ai
 - [x] world raycast;
 - [x] world segment cast;
 - [x] SpatialHash;
-- [x] enemy insertion/removal proof;
+- [x] moving enemies now update SpatialHash cells;
 - [~] wall sliding;
 - [ ] slopes/steps policy;
 - [ ] dynamic colliders;
-- [ ] SpatialHash movement update once EnemySystem begins moving crowds.
+- [ ] local crowd avoidance.
 
 ## Combat
 
 - [x] data-driven pistol/shotgun/bow;
 - [x] WeaponSystem ammo/cooldown/reload/switch foundation;
+- [x] WeaponSystem reset between runs;
 - [x] Health / DamageSystem;
+- [x] player Health registered in the same DamageSystem;
 - [x] Hit/Kill events;
 - [x] pistol hitscan;
 - [x] shotgun multi-hitscan;
@@ -193,6 +196,7 @@ Facefall-specific systems such as SpatialHash, CameraCollision, touch/pointer ai
 - [x] projectile segment collision against world/enemy;
 - [x] projectile damage enters DamageSystem;
 - [x] pooled visible arrow meshes;
+- [x] projectile reset between runs;
 - [~] primitive head/torso/limb hit-zone proof;
 - [ ] bow draw/release state;
 - [ ] movement-dependent spread;
@@ -212,7 +216,7 @@ Facefall-specific systems such as SpatialHash, CameraCollision, touch/pointer ai
 - [x] concrete bounded decal adapter;
 - [x] transient muzzle lights;
 - [x] camera impulse/shake implementation;
-- [x] smoke/casing/blood/debris/spark recipes can now create visible runtime effects;
+- [x] smoke/casing/blood/debris/spark runtime effects;
 - [x] world surface-hit recipe;
 - [ ] improve decal surface orientation;
 - [ ] controlled hit-stop integration into the loop;
@@ -228,7 +232,7 @@ Facefall-specific systems such as SpatialHash, CameraCollision, touch/pointer ai
 - [x] Abandoned Outskirts manifest skeleton;
 - [x] manifest-first runtime loading;
 - [x] player spawn comes from manifest;
-- [x] prototype enemy positions come from enemy-spawn markers;
+- [x] wave spawn zones come from enemy-spawn markers;
 - [x] prototype level lights come from manifest;
 - [x] fallback procedural geometry remains if authored GLB is not yet present;
 - [ ] actual `level.glb`;
@@ -254,9 +258,9 @@ Facefall-specific systems such as SpatialHash, CameraCollision, touch/pointer ai
 
 # 7. 0.5B — Legacy Functional Parity
 
-**NEXT ACTIVE MILESTONE.**
+**ACTIVE MILESTONE. PR #5 established the first complete engine-next run loop.**
 
-The goal is not visual polish yet; engine-next must first reproduce all important capabilities of the working 0.5 legacy build.
+The goal is not visual polish yet; engine-next must reproduce all important capabilities of the working 0.5 legacy build.
 
 ## Lifecycle / UI
 
@@ -264,10 +268,11 @@ The goal is not visual polish yet; engine-next must first reproduce all importan
 - [ ] face picker;
 - [ ] pre-game camera selection;
 - [ ] clear loading/error progress;
-- [ ] start;
-- [ ] pause;
-- [ ] restart;
-- [ ] game over.
+- [~] start currently auto-starts engine-lab after bootstrap;
+- [x] pause state foundation;
+- [x] restart from game-over without page reload;
+- [x] game-over state + overlay;
+- [x] engine-lab run HUD for HP/WAVE/KILLS/SCORE.
 
 ## Player / controls
 
@@ -283,14 +288,20 @@ The goal is not visual polish yet; engine-next must first reproduce all importan
 - [~] pistol;
 - [~] shotgun;
 - [~] bow;
-- [ ] actual enemy movement/attacks;
-- [ ] WaveDirector;
-- [ ] wave spawn runtime from manifest zones;
-- [ ] kills / score;
-- [ ] HP/damage to player;
+- [x] EnemySystem runtime;
+- [x] Walker / Runner / Brute runtime spawning;
+- [x] infected direct chase movement;
+- [x] infected melee attacks with archetype range/damage/cooldown;
+- [x] player HP / damage / death;
+- [x] WaveDirector;
+- [x] wave spawn runtime from manifest zones;
+- [x] wave composition scaling;
+- [x] quality-dependent max-active enemy budget;
+- [x] kills / score;
+- [x] restart resets HP/weapons/projectiles/enemies/wave/run stats;
 - [ ] health/ammo pickups;
-- [ ] difficulty scaling;
-- [ ] restart resets all state cleanly.
+- [~] difficulty scaling foundation from wave composition;
+- [ ] navmesh/obstacle-aware movement — belongs to 0.7, direct chase is parity foundation only.
 
 ## Face parity
 
@@ -311,6 +322,7 @@ The goal is not visual polish yet; engine-next must first reproduce all importan
 
 ## Validation
 
+- [ ] dedicated Vercel engine-next 0.5B test link;
 - [ ] desktop browser smoke;
 - [ ] Android browser smoke;
 - [ ] no infinite loader;
@@ -361,11 +373,12 @@ Definition: a still screenshot must look like a game rather than a procedural en
 - [ ] navmesh bake/load/query;
 - [ ] LocalAvoidance;
 - [x] SpatialHash foundation;
-- [ ] EnemySystem;
-- [ ] EnemyBrain;
+- [x] EnemySystem runtime foundation;
+- [ ] EnemyBrain separation;
 - [ ] lightweight State Tree;
 - [ ] sight/sound perception;
-- [ ] wander/investigate/chase/attack/stagger/death;
+- [~] chase/attack foundation exists without navmesh;
+- [ ] wander/investigate/stagger/death behavior states;
 - [ ] AI update LOD;
 - [ ] navigation debug view.
 
@@ -375,11 +388,12 @@ Definition: a still screenshot must look like a game rather than a procedural en
 
 ## 0.75 Wave Director
 
-- spawn zones from manifest;
-- composition rules;
-- active-enemy budget;
-- difficulty curve;
-- downtime/pickups/mini-events.
+- [x] manifest spawn zones;
+- [x] initial composition rules;
+- [x] active-enemy budget;
+- [~] difficulty curve foundation;
+- [~] inter-wave downtime foundation;
+- [ ] pickups/mini-events.
 
 ## 0.8 Combat feel + audio
 
@@ -437,10 +451,11 @@ Definition: a still screenshot must look like a game rather than a procedural en
 
 ## 0.95 Replay loop
 
-- score/best score;
-- wave progression/run stats;
-- lightweight upgrade choices;
-- local persistence.
+- [x] run score foundation;
+- [x] wave progression/run stats foundation;
+- [ ] best score;
+- [ ] lightweight upgrade choices;
+- [ ] local persistence.
 
 ---
 
@@ -472,14 +487,15 @@ Not MVP: multiplayer, dedicated server, MMO backend, native-engine rewrite, full
 
 - [ ] no committed package lock yet;
 - [ ] CI still installs with `npm install`;
-- [ ] GameApp still owns too much lab integration wiring;
+- [ ] GameApp still owns too much integration wiring;
+- [ ] EnemySystem direct-chases through conceptual obstacles until navmesh/local avoidance is added;
 - [ ] fallback procedural world remains until `level.glb`;
 - [ ] Soldier GLB is only a pipeline proof;
 - [ ] legacy production still depends on same-origin CDN proxies;
 - [ ] navmesh integration not selected;
 - [ ] automated browser smoke test absent;
 - [ ] engine-next not yet manually verified on Android;
-- [ ] Vercel deployment polling connector is unreliable (fresh deployment IDs may return 404).
+- [ ] Vercel deployment polling connector is unreliable for some fresh deployment IDs.
 
 Closed debt in recent checkpoints:
 
@@ -489,24 +505,25 @@ Closed debt in recent checkpoints:
 - [x] concrete particles/decals/camera shake added;
 - [x] ballistic bow connected to collision/damage and visible arrow pool;
 - [x] AssetManager/LevelLoader/LevelManifest exist;
-- [x] manifest drives prototype runtime markers;
+- [x] manifest drives runtime spawn markers/lights;
 - [x] combined deployment artifact generated by CI;
-- [x] code/media attribution registries created.
+- [x] code/media attribution registries created;
+- [x] EnemySystem/WaveDirector/player damage/game-over/restart foundation added.
 
 ---
 
 # 14. Official next block
 
-1. Obtain and commit reproducible `package-lock.json`, switch CI to `npm ci`.
-2. Begin **0.5B parity**, starting with product GameState/menu/start/restart/game-over rather than more engine-lab visuals.
-3. Move face upload/local storage into engine-next.
-4. Implement actual EnemySystem + player damage + WaveDirector using manifest spawn zones.
-5. Complete bow/recoil/spread and touch aim behavior.
-6. Add rain/atmosphere parity.
-7. Split remaining world/combat integration out of GameApp.
-8. Desktop smoke-test.
-9. Android smoke-test.
-10. Only then activate engine-next at production `/`.
+1. Publish and verify a dedicated **engine-next 0.5B Vercel test URL**.
+2. Move face upload/local storage/fallback face into engine-next.
+3. Add actual menu/start/pre-game camera flow instead of lab auto-start.
+4. Complete 3RD crosshair/pitch and mobile aim assist.
+5. Add rain + ambient atmosphere parity.
+6. Obtain and commit reproducible `package-lock.json`, then CI → `npm ci`.
+7. Add browser smoke automation.
+8. Begin navmesh spike / obstacle-aware enemy movement.
+9. Desktop + real Android smoke-test.
+10. Only after parity + smoke-test activate engine-next at production `/`.
 
 ---
 
