@@ -70,6 +70,11 @@ export class GameApp {
   private readonly desired = new THREE.Vector3();
   private readonly temp = new THREE.Vector3();
   private readonly muzzle = new THREE.Vector3();
+  private readonly aimPoint = new THREE.Vector3();
+  private readonly aimDirection = new THREE.Vector3();
+  private readonly up = new THREE.Vector3(0, 1, 0);
+  private readonly aimNdc = new THREE.Vector2();
+  private readonly aimPlane = new THREE.Plane(this.up, 0);
   private readonly raycaster = new THREE.Raycaster();
   private readonly enemyMeshes: THREE.Object3D[] = [];
   private readonly enemyRoots = new Map<string, THREE.Object3D>();
@@ -355,6 +360,7 @@ export class GameApp {
       joystick,
       stick,
       fire: touchFire,
+      aimSurface: this.renderer.domElement,
       reload: this.dom.touchReload,
       switchWeapon: this.dom.touchWeapon,
       toggleCamera: this.dom.touchCamera
@@ -368,12 +374,15 @@ export class GameApp {
     const controls = this.input.snapshot();
     this.desired.set(controls.moveX, 0, controls.moveY);
 
-    if (this.desired.lengthSq() > 0) {
+    this.updateAim(controls, dt);
+
+    if (this.cameraMode === 'top' && !controls.hasPointer && this.desired.lengthSq() > 0) {
       this.desired.normalize();
       this.facing.lerp(this.temp.copy(this.desired), 1 - Math.exp(-dt * 12)).normalize();
     }
 
     const targetSpeed = this.desired.lengthSq() > 0 ? (controls.sprint ? 7.1 : 5.0) : 0;
+    if (this.desired.lengthSq() > 0) this.desired.normalize();
     this.move.copy(this.desired).multiplyScalar(targetSpeed);
     this.playerController.moveToward(this.move, dt);
     this.playerController.integrate(dt, this.collisionWorld);
@@ -402,6 +411,29 @@ export class GameApp {
       this.statusRefresh = 0.2;
       this.refreshStatus();
     }
+  }
+
+  private updateAim(
+    controls: ReturnType<InputManager['snapshot']>,
+    dt: number
+  ): void {
+    if (this.cameraMode === 'third') {
+      if (Math.abs(controls.aimX) > 0.001) {
+        this.facing.applyAxisAngle(this.up, -controls.aimX * 0.0045).normalize();
+      }
+      return;
+    }
+
+    if (!controls.hasPointer) return;
+    this.aimNdc.set(controls.pointerX, controls.pointerY);
+    this.raycaster.setFromCamera(this.aimNdc, this.camera);
+    const hit = this.raycaster.ray.intersectPlane(this.aimPlane, this.aimPoint);
+    if (!hit) return;
+
+    this.aimDirection.copy(hit).sub(this.player.position).setY(0);
+    if (this.aimDirection.lengthSq() <= 1e-5) return;
+    this.aimDirection.normalize();
+    this.facing.lerp(this.aimDirection, 1 - Math.exp(-dt * 18)).normalize();
   }
 
   private render(frameDt: number): void {
