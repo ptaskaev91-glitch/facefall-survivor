@@ -1,0 +1,19 @@
+{
+  "name": "facefall-survivor",
+  "version": "0.5.0-alpha.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:next": "vite --config vite.config.ts",
+    "build:next": "vite build --config vite.config.ts",
+    "preview:next": "vite preview --config vite.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "0.160.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vite": "^5.4.0"
+  }
+}
