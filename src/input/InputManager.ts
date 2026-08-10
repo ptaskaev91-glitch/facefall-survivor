@@ -5,6 +5,9 @@ export interface InputSnapshot {
   moveY: number;
   aimX: number;
   aimY: number;
+  pointerX: number;
+  pointerY: number;
+  hasPointer: boolean;
   fire: boolean;
   sprint: boolean;
 }
@@ -14,6 +17,9 @@ export class InputManager {
   private moveY = 0;
   private aimX = 0;
   private aimY = 0;
+  private pointerX = 0;
+  private pointerY = 0;
+  private hasPointer = false;
   private held = new Set<InputAction>();
   private pressed = new Set<InputAction>();
 
@@ -27,6 +33,16 @@ export class InputManager {
   setAimDelta(x: number, y: number): void {
     this.aimX += x;
     this.aimY += y;
+  }
+
+  setPointerNdc(x: number, y: number): void {
+    this.pointerX = Math.max(-1, Math.min(1, x));
+    this.pointerY = Math.max(-1, Math.min(1, y));
+    this.hasPointer = true;
+  }
+
+  clearPointer(): void {
+    this.hasPointer = false;
   }
 
   setAction(action: InputAction, down: boolean): void {
@@ -54,6 +70,9 @@ export class InputManager {
       moveY: this.moveY,
       aimX: this.aimX,
       aimY: this.aimY,
+      pointerX: this.pointerX,
+      pointerY: this.pointerY,
+      hasPointer: this.hasPointer,
       fire: this.held.has('fire'),
       sprint: this.held.has('sprint')
     };
@@ -64,6 +83,7 @@ export class InputManager {
 
   reset(): void {
     this.moveX = this.moveY = this.aimX = this.aimY = 0;
+    this.hasPointer = false;
     this.held.clear();
     this.pressed.clear();
   }
