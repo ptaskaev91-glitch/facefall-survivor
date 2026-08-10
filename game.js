@@ -5,6 +5,7 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const TAU=Math.PI*2, clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), lerp=(a,b,t)=>a+(b-a)*t;
 const rnd=(a,b)=>a+Math.random()*(b-a), irnd=(a,b)=>Math.floor(rnd(a,b+1));
 const canvas=$('#game'), ctx=canvas.getContext('2d',{alpha:false});
+const lightCanvas=document.createElement('canvas'), lctx=lightCanvas.getContext('2d');
 const ui={
  start:$('#start'), over:$('#over'), hud:$('#hud'), touch:$('#touch'), preview:$('#preview'), plus:$('#plus'), portrait:$('#portrait'),
  hp:$('#hp'), hpFill:$('#hpFill'), wave:$('#wave'), waveBig:$('#waveBig'), kills:$('#kills'), score:$('#score'),
@@ -16,6 +17,7 @@ const isTouch=matchMedia('(hover:none),(pointer:coarse)').matches;
 let DPR=1,W=innerWidth,H=innerHeight,last=performance.now(),running=false,faceImg=null,toastTimer=0,bannerTimer=0;
 let player,enemies=[],shots=[],particles=[],decals=[],props=[],lights=[],pickups=[],floaters=[],wave=1,kills=0,score=0,nextWave=0,spawnLeft=0,spawnTimer=0;
 let camera={x:0,y:0,shake:0,kickX:0,kickY:0}, storm={flash:0,next:rnd(12,28)};
+let rain=[],fog=[];
 const keys=new Set(),mouse={x:W/2,y:H/2,down:false,moved:false},moveTouch={x:0,y:0},aimTouch={x:1,y:0};
 const WORLD={w:3000,h:2200};
 
@@ -28,7 +30,7 @@ const WEAPONS={
 function resize(){
  DPR=Math.min(isTouch?1.45:2,devicePixelRatio||1);W=innerWidth;H=innerHeight;
  canvas.width=Math.floor(W*DPR);canvas.height=Math.floor(H*DPR);canvas.style.width=W+'px';canvas.style.height=H+'px';
- ctx.setTransform(DPR,0,0,DPR,0,0);initWeather();
+ lightCanvas.width=canvas.width;lightCanvas.height=canvas.height;ctx.setTransform(DPR,0,0,DPR,0,0);initWeather();
 }
 addEventListener('resize',resize);resize();
 
@@ -52,7 +54,6 @@ function banner(n){clearTimeout(bannerTimer);ui.waveBanner.querySelector('span')
 function norm(x,y){const m=Math.hypot(x,y)||1;return{x:x/m,y:y/m}}
 function distance(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
 
-let rain=[],fog=[];
 function initWeather(){
  rain=Array.from({length:Math.min(170,Math.floor(W*H/5000))},()=>({x:rnd(0,W),y:rnd(0,H),l:rnd(10,28),s:rnd(480,820),a:rnd(.08,.24)}));
  fog=Array.from({length:12},()=>({x:rnd(-W*.2,W*1.2),y:rnd(-H*.1,H*1.1),r:rnd(100,260),vx:rnd(2,8),a:rnd(.015,.045)}));
@@ -215,15 +216,16 @@ function drawFloater(f){ctx.save();ctx.globalAlpha=clamp(f.life/f.max,0,1);ctx.f
 
 function lighting(shx=0,shy=0){
  const px=player.x-camera.x+shx,py=player.y-camera.y+shy;
- ctx.save();ctx.fillStyle='rgba(2,5,3,.59)';ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation='destination-out';
- cutLight(px,py,Math.max(245,Math.min(W,H)*.43),.98);
- for(const l of lights){const x=l.x-camera.x+shx,y=l.y-camera.y+shy;if(x<-l.r||y<-l.r||x>W+l.r||y>H+l.r)continue;const flick=1+Math.sin(performance.now()*.003+l.flick)*.04;cutLight(x,y,l.r*flick,l.a*3.6)}
- ctx.restore();
+ lctx.setTransform(1,0,0,1,0,0);lctx.clearRect(0,0,lightCanvas.width,lightCanvas.height);lctx.setTransform(DPR,0,0,DPR,0,0);
+ lctx.fillStyle='rgba(2,5,3,.59)';lctx.fillRect(0,0,W,H);lctx.globalCompositeOperation='destination-out';
+ cutLight(lctx,px,py,Math.max(245,Math.min(W,H)*.43),.98);
+ for(const l of lights){const x=l.x-camera.x+shx,y=l.y-camera.y+shy;if(x<-l.r||y<-l.r||x>W+l.r||y>H+l.r)continue;const flick=1+Math.sin(performance.now()*.003+l.flick)*.04;cutLight(lctx,x,y,l.r*flick,l.a*3.6)}
+ lctx.globalCompositeOperation='source-over';ctx.drawImage(lightCanvas,0,0,W,H);
  ctx.save();ctx.globalCompositeOperation='screen';for(const l of lights){const x=l.x-camera.x+shx,y=l.y-camera.y+shy;if(x<-l.r||y<-l.r||x>W+l.r||y>H+l.r)continue;const g=ctx.createRadialGradient(x,y,0,x,y,l.r*.55);g.addColorStop(0,'rgba(210,224,166,.07)');g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.fillRect(x-l.r,y-l.r,l.r*2,l.r*2)}
  if(player.muzzle>0){const mx=px+Math.cos(player.angle)*55,my=py+Math.sin(player.angle)*55,r=80*player.muzzle;const g=ctx.createRadialGradient(mx,my,0,mx,my,r);g.addColorStop(0,'rgba(255,226,143,.55)');g.addColorStop(.25,'rgba(255,162,72,.18)');g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.fillRect(mx-r,my-r,r*2,r*2);ctx.fillStyle='rgba(255,226,160,.48)';ctx.beginPath();ctx.moveTo(px+Math.cos(player.angle)*38,py+Math.sin(player.angle)*38);ctx.lineTo(px+Math.cos(player.angle+.18)*95,py+Math.sin(player.angle+.18)*95);ctx.lineTo(px+Math.cos(player.angle-.18)*95,py+Math.sin(player.angle-.18)*95);ctx.closePath();ctx.fill()}
  ctx.restore();
 }
-function cutLight(x,y,r,strength){const g=ctx.createRadialGradient(x,y,10,x,y,r);g.addColorStop(0,`rgba(0,0,0,${strength})`);g.addColorStop(.55,`rgba(0,0,0,${strength*.72})`);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.fillRect(x-r,y-r,r*2,r*2)}
+function cutLight(c,x,y,r,strength){const g=c.createRadialGradient(x,y,10,x,y,r);g.addColorStop(0,`rgba(0,0,0,${strength})`);g.addColorStop(.55,`rgba(0,0,0,${strength*.72})`);g.addColorStop(1,'rgba(0,0,0,0)');c.fillStyle=g;c.fillRect(x-r,y-r,r*2,r*2)}
 function drawFog(){ctx.save();ctx.globalCompositeOperation='screen';for(const f of fog){const g=ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,f.r);g.addColorStop(0,`rgba(130,150,136,${f.a})`);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.fillRect(f.x-f.r,f.y-f.r,f.r*2,f.r*2)}ctx.restore()}
 function drawRain(){ctx.save();ctx.strokeStyle='#c7d3cc';ctx.lineWidth=.7;for(const r of rain){ctx.globalAlpha=r.a;ctx.beginPath();ctx.moveTo(r.x,r.y);ctx.lineTo(r.x-r.l*.18,r.y+r.l);ctx.stroke()}ctx.restore();ctx.globalAlpha=1}
 function screenFX(){
