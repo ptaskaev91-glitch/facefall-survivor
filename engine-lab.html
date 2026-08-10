@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+  <title>Facefall Engine Next</title>
+  <style>
+    html,body,#app{width:100%;height:100%;margin:0;overflow:hidden;background:#060a08;color:#e8eee9;font-family:Inter,system-ui,sans-serif}
+    canvas{display:block;width:100%;height:100%;touch-action:none}
+    .lab-ui{position:fixed;inset:0;pointer-events:none}
+    .lab-badge{position:absolute;left:max(12px,env(safe-area-inset-left));top:max(12px,env(safe-area-inset-top));padding:8px 10px;border:1px solid rgba(255,255,255,.12);background:rgba(4,9,7,.7);backdrop-filter:blur(10px);font-size:11px;letter-spacing:.12em}
+    .lab-controls{position:absolute;right:max(12px,env(safe-area-inset-right));top:max(12px,env(safe-area-inset-top));display:flex;gap:8px;pointer-events:auto}
+    button{border:1px solid rgba(255,255,255,.16);background:rgba(8,15,11,.8);color:#e8eee9;padding:9px 12px;border-radius:10px;font:600 11px/1 system-ui;letter-spacing:.09em}
+    button[data-active="true"]{background:#d9f27d;color:#12180d;border-color:#d9f27d}
+    .lab-status{position:absolute;left:max(12px,env(safe-area-inset-left));bottom:max(12px,env(safe-area-inset-bottom));max-width:min(580px,calc(100vw - 24px));padding:8px 10px;border:1px solid rgba(255,255,255,.1);background:rgba(4,9,7,.68);font-size:11px;color:#aebbb2}
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div class="lab-ui">
+    <div class="lab-badge">FACEFALL // ENGINE NEXT 0.5A</div>
+    <div class="lab-controls">
+      <button id="camTop" data-active="true">TOP</button>
+      <button id="camThird" data-active="false">3RD</button>
+    </div>
+    <div class="lab-status" id="status">Инициализация модульного движка…</div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
