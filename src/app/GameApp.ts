@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { Capsule } from 'three/addons/math/Capsule.js';
-import { DualCameraRig, type CameraMode } from '../camera/DualCameraRig';
+import { CameraCollision } from '../camera/CameraCollision';
+import { CameraDirector, type CameraMode } from '../camera/CameraDirector';
 import { DamageSystem } from '../combat/DamageSystem';
 import { Health } from '../combat/Health';
 import type { FacefallEvents, HitZone } from '../combat/types';
@@ -8,6 +8,8 @@ import { WEAPONS } from '../combat/weapons';
 import { WeaponSystem } from '../combat/WeaponSystem';
 import { EventBus } from '../core/EventBus';
 import { GameLoop } from '../core/GameLoop';
+import { EffectSystem } from '../effects/EffectSystem';
+import { LightPool } from '../effects/LightPool';
 import { EFFECTS } from '../effects/recipes';
 import { ENEMY_ARCHETYPES } from '../enemies/archetypes';
 import { detectQuality, type QualityProfile } from '../graphics/quality';
@@ -15,6 +17,8 @@ import { InputManager } from '../input/InputManager';
 import { KeyboardMouseInput } from '../input/KeyboardMouseInput';
 import { TouchInput } from '../input/TouchInput';
 import { CollisionWorld } from '../physics/CollisionWorld';
+import { PlayerCapsule } from '../physics/PlayerCapsule';
+import { SpatialHash, type SpatialHashItem } from '../physics/SpatialHash';
 import { GrassField } from '../world/GrassField';
 import { GameStateController } from './GameState';
 
@@ -31,6 +35,10 @@ export interface GameAppDom {
   touchCamera?: HTMLElement;
 }
 
+interface EnemySpatialItem extends SpatialHashItem {
+  root: THREE.Object3D;
+}
+
 export class GameApp {
   readonly state = new GameStateController();
 
@@ -38,9 +46,10 @@ export class GameApp {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
   private readonly camera: THREE.PerspectiveCamera;
-  private readonly cameraRig: DualCameraRig;
+  private readonly cameraRig: CameraDirector;
   private readonly staticWorld = new THREE.Group();
   private readonly collisionWorld = new CollisionWorld();
+  private readonly playerController = new PlayerCapsule();
   private readonly grass: GrassField;
 
   private readonly events = new EventBus<FacefallEvents>();
@@ -50,17 +59,15 @@ export class GameApp {
   private readonly keyboard: KeyboardMouseInput;
   private touch: TouchInput | null = null;
 
-  private readonly player = new THREE.Group();
-  private readonly playerCapsule = new Capsule(
-    new THREE.Vector3(0, 0.35, 0),
-    new THREE.Vector3(0, 1.35, 0),
-    0.35
-  );
+  private readonly lightPool: LightPool;
+  private readonly effects: EffectSystem;
+  private readonly enemySpatial = new SpatialHash<EnemySpatialItem>(4);
+  private readonly enemySpatialItems = new Map<string, EnemySpatialItem>();
 
+  private readonly player = new THREE.Group();
   private readonly facing = new THREE.Vector3(0, 0, -1);
   private readonly move = new THREE.Vector3();
   private readonly desired = new THREE.Vector3();
-  private readonly velocity = new THREE.Vector3();
   private readonly temp = new THREE.Vector3();
   private readonly muzzle = new THREE.Vector3();
   private readonly raycaster = new THREE.Raycaster();
@@ -77,9 +84,22 @@ export class GameApp {
     this.quality = detectQuality();
     this.renderer = this.createRenderer();
     this.camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.08, 220);
-    this.cameraRig = new DualCameraRig(this.camera);
+    this.cameraRig = new CameraDirector(this.camera);
+    this.cameraRig.setCollision(new CameraCollision(this.collisionWorld));
     this.grass = new GrassField(this.quality);
     this.keyboard = new KeyboardMouseInput(this.input);
+    this.lightPool = new LightPool(this.scene, Math.max(1, this.quality.maxDynamicLights));
+    this.effects = new EffectSystem({
+      spawnLight: (recipe, context) => {
+        this.lightPool.spawn({
+          color: recipe.color,
+          intensity: recipe.intensity,
+          distance: recipe.distance,
+          lifetime: recipe.lifetime,
+          position: context.origin
+        });
+      }
+    });
 
     this.configureScene();
     this.createWorldGeometry();
@@ -147,6 +167,8 @@ export class GameApp {
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
     for (const unsubscribe of this.unsubscribeEvents.splice(0)) unsubscribe();
 
+    this.lightPool.dispose();
+    this.enemySpatial.clear();
     this.scene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       object.geometry.dispose();
@@ -254,11 +276,17 @@ export class GameApp {
       this.enemyMeshes.push(mesh);
       this.enemyRoots.set(id, mesh);
       this.damageSystem.register({ id, health: new Health(enemy.health) });
+
+      const spatialItem: EnemySpatialItem = { id, position: mesh.position, root: mesh };
+      this.enemySpatialItems.set(id, spatialItem);
+      this.enemySpatial.insert(spatialItem);
     }
   }
 
   private bindCombatEvents(): void {
     this.unsubscribeEvents.push(this.events.on('shot', (shot) => {
+      this.effects.play(`${shot.weaponId}-shot`, { origin: shot.origin, direction: shot.direction });
+
       const definition = WEAPONS[shot.weaponId];
       if (definition.fireModel !== 'hitscan') return;
 
@@ -269,6 +297,9 @@ export class GameApp {
         const intersections = this.raycaster.intersectObjects(this.enemyMeshes, true);
         const intersection = intersections.find((entry) => entry.object.visible && entry.object.userData.damageTargetId);
         if (!intersection) continue;
+
+        const worldHit = this.collisionWorld.raycast(shot.origin, direction, intersection.distance);
+        if (worldHit && worldHit.distance < intersection.distance) continue;
 
         const targetId = intersection.object.userData.damageTargetId as string;
         const hitZone = this.getHitZone(intersection.object, intersection.point);
@@ -293,6 +324,10 @@ export class GameApp {
     }));
 
     this.unsubscribeEvents.push(this.events.on('hit', (hit) => {
+      this.effects.play(hit.critical || hit.amount >= 60 ? 'flesh-hit-heavy' : 'flesh-hit', {
+        origin: hit.hitPoint,
+        direction: hit.direction
+      });
       this.dom.status.dataset.lastEvent = `${hit.hitZone.toUpperCase()} ${Math.round(hit.amount)} DMG`;
       this.refreshStatus();
     }));
@@ -300,6 +335,8 @@ export class GameApp {
     this.unsubscribeEvents.push(this.events.on('kill', (hit) => {
       const root = this.enemyRoots.get(hit.targetId);
       if (root) root.visible = false;
+      const spatial = this.enemySpatialItems.get(hit.targetId);
+      if (spatial) this.enemySpatial.remove(spatial);
       this.dom.status.dataset.lastEvent = `KILL ${hit.targetId}`;
       this.refreshStatus();
     }));
@@ -338,29 +375,25 @@ export class GameApp {
 
     const targetSpeed = this.desired.lengthSq() > 0 ? (controls.sprint ? 7.1 : 5.0) : 0;
     this.move.copy(this.desired).multiplyScalar(targetSpeed);
-    this.velocity.lerp(this.move, 1 - Math.exp(-dt * 10));
-
-    const displacement = this.temp.copy(this.velocity).multiplyScalar(dt);
-    this.playerCapsule.translate(displacement);
-    const result = this.collisionWorld.resolveCapsule(this.playerCapsule);
-    if (result.collided) {
-      const intoWall = this.velocity.dot(result.normal);
-      if (intoWall < 0) this.velocity.addScaledVector(result.normal, -intoWall);
-    }
+    this.playerController.moveToward(this.move, dt);
+    this.playerController.integrate(dt, this.collisionWorld);
 
     this.player.position.set(
-      this.playerCapsule.start.x,
-      this.playerCapsule.start.y - 0.35,
-      this.playerCapsule.start.z
+      this.playerController.position.x,
+      this.playerController.position.y - 0.35,
+      this.playerController.position.z
     );
     this.player.rotation.y = Math.atan2(-this.facing.x, -this.facing.z);
 
     this.weaponSystem.update(dt);
+    this.effects.update(dt);
+    this.lightPool.update(dt);
+
     if (this.input.consumePressed('toggleCamera')) this.setCameraMode(this.cameraMode === 'top' ? 'third' : 'top');
     if (this.input.consumePressed('switchWeapon')) this.weaponSystem.cycle();
     if (this.input.consumePressed('reload')) this.weaponSystem.reload();
     if (controls.fire) {
-      this.muzzle.copy(this.player.position).add(new THREE.Vector3(0, 1.15, 0)).addScaledVector(this.facing, 0.5);
+      this.muzzle.copy(this.player.position).add(this.temp.set(0, 1.15, 0)).addScaledVector(this.facing, 0.5);
       this.weaponSystem.fire('player', this.muzzle, this.facing);
     }
 
@@ -426,7 +459,9 @@ export class GameApp {
       `camera=${this.cameraMode}`,
       `${WEAPONS[this.weaponSystem.selected].label} ${runtime.magazine}/${runtime.reserve}`,
       `enemies=${this.enemyMeshes.filter((enemy) => enemy.visible).length}`,
-      `fx recipes=${Object.keys(EFFECTS).length}`,
+      `spatialCells=${this.enemySpatial.occupiedCellCount}`,
+      `fx=${Object.keys(EFFECTS).length}`,
+      `lights=${this.lightPool.activeCount}`,
       'Three.js=bundled'
     ].join(' · ') + lastEvent;
   }
