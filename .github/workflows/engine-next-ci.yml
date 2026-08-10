@@ -29,6 +29,7 @@ on:
       - 'tsconfig.json'
       - 'vite.config.ts'
       - 'vercel.json'
+      - '.github/workflows/engine-next-ci.yml'
 
 jobs:
   build:
@@ -45,3 +46,10 @@ jobs:
         run: npm run typecheck
       - name: Build combined Vercel bundle
         run: npm run build:deploy
+      - name: Upload combined deploy artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: facefall-dist-next
+          path: dist-next
+          if-no-files-found: error
+          retention-days: 3
