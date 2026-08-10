@@ -7,6 +7,9 @@
   <meta name="description" content="Facefall Survivor — cinematic 3D zombie survival shooter with top-down and third-person cameras.">
   <title>Facefall Survivor</title>
   <link rel="stylesheet" href="styles-safe.css">
+  <script type="importmap">
+    {"imports":{"three":"/vendor/three.js"}}
+  </script>
 </head>
 <body>
   <div id="stage" aria-label="Игровая сцена Facefall Survivor"></div>
@@ -15,11 +18,11 @@
   <section id="start" class="overlay start-overlay">
     <div class="start-grid">
       <div class="hero-copy">
-        <div class="eyebrow"><i></i> FACEFALL // BUILD 0.4.2</div>
+        <div class="eyebrow"><i></i> FACEFALL // BUILD 0.5 ALPHA</div>
         <h1>FACEFALL<br><span>SURVIVOR</span></h1>
-        <p>Два режима камеры, объёмный мир, трава, грязь, мокрый асфальт, дождь и заражённые. Загрузи фото — оно станет лицом героя.</p>
+        <p>Первый Character Quality Pass: анимированный humanoid-герой, настоящее оружие, улучшенная камера за плечом, более читаемый свет и три типа заражённых.</p>
         <div class="feature-row">
-          <span>3D WORLD</span><span>DUAL CAMERA</span><span>LOCAL FACE</span>
+          <span>ANIMATED HERO</span><span>DUAL CAMERA</span><span>LOCAL FACE</span>
         </div>
       </div>
 
@@ -36,8 +39,8 @@
         </div>
 
         <button id="play" class="play-btn" type="button"><span>ЗАГРУЗКА 3D...</span><i>→</i></button>
-        <div id="engineStatus" class="engine-status" aria-live="polite">Инициализация игрового движка…</div>
-        <p class="control-note"><b>ПК:</b> WASD · мышь · ЛКМ · 1/2/3 · R · C — камера<br><b>Телефон:</b> джойстик + огонь, автоприцеливание, кнопка камеры.</p>
+        <div id="engineStatus" class="engine-status" aria-live="polite">Загружаем 3D и модель героя…</div>
+        <p class="control-note"><b>ПК:</b> WASD · Shift — бег · мышь · ЛКМ · 1/2/3 · C — камера<br><b>Телефон:</b> джойстик + огонь, автоприцеливание, кнопка камеры.</p>
       </div>
     </div>
   </section>
@@ -89,78 +92,19 @@
 
   <script>
     (() => {
-      const boot = window.FacefallBoot = {
-        selectedCamera: 'top',
-        pendingStart: false,
-        engineReady: false,
-        engineFailed: false
-      };
-      const play = document.getElementById('play');
-      const playText = play.querySelector('span');
-      const status = document.getElementById('engineStatus');
-      const cameraButtons = [...document.querySelectorAll('[data-camera]')];
-
-      function renderCamera(mode) {
-        boot.selectedCamera = mode;
-        cameraButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.camera === mode));
-        if (window.FacefallEngine?.setCamera) window.FacefallEngine.setCamera(mode, false);
-      }
-
-      cameraButtons.forEach(btn => btn.addEventListener('click', () => renderCamera(btn.dataset.camera)));
-
-      function requestStart() {
-        if (window.FacefallEngine?.start) {
-          boot.pendingStart = false;
-          window.FacefallEngine.setCamera?.(boot.selectedCamera, false);
-          window.FacefallEngine.start();
-          return;
-        }
-        boot.pendingStart = true;
-        if (boot.engineFailed) {
-          status.textContent = '3D-движок не загрузился. Обнови страницу для новой попытки.';
-          playText.textContent = 'ПОВТОРИТЬ ЗАГРУЗКУ';
-          location.reload();
-          return;
-        }
-        playText.textContent = 'ЗАГРУЖАЕМ 3D...';
-        status.textContent = 'Движок запускается. Максимальное ожидание — около 16 секунд.';
-      }
-
-      play.addEventListener('click', requestStart);
-      document.getElementById('again').addEventListener('click', requestStart);
-
-      window.addEventListener('facefall-engine-ready', () => {
-        boot.engineReady = true;
-        boot.engineFailed = false;
-        play.disabled = false;
-        playText.textContent = 'НАЧАТЬ ВЫЖИВАНИЕ';
-        status.textContent = '3D-движок готов';
-        renderCamera(boot.selectedCamera);
-        if (boot.pendingStart) requestStart();
-      });
-
-      window.addEventListener('facefall-engine-error', event => {
-        boot.engineFailed = true;
-        play.disabled = false;
-        playText.textContent = 'ПОВТОРИТЬ ЗАГРУЗКУ';
-        status.textContent = event.detail || 'Не удалось запустить 3D-движок.';
-      });
-
-      setTimeout(() => {
-        if (!boot.engineReady && !boot.engineFailed) {
-          status.textContent = '3D ещё загружается через Vercel…';
-          playText.textContent = 'ОЖИДАЕМ 3D...';
-        }
-      }, 4500);
-      setTimeout(() => {
-        if (!boot.engineReady && !boot.engineFailed) {
-          boot.engineFailed = true;
-          status.textContent = '3D не ответил за 18 секунд. Нажми для повторной попытки.';
-          playText.textContent = 'ПОВТОРИТЬ ЗАГРУЗКУ';
-        }
-      }, 18000);
+      const boot = window.FacefallBoot = {selectedCamera:'top',pendingStart:false,engineReady:false,engineFailed:false};
+      const play=document.getElementById('play'),playText=play.querySelector('span'),status=document.getElementById('engineStatus');
+      const cameraButtons=[...document.querySelectorAll('[data-camera]')];
+      function renderCamera(mode){boot.selectedCamera=mode;cameraButtons.forEach(btn=>btn.classList.toggle('active',btn.dataset.camera===mode));window.FacefallEngine?.setCamera?.(mode,false);}
+      cameraButtons.forEach(btn=>btn.addEventListener('click',()=>renderCamera(btn.dataset.camera)));
+      function requestStart(){if(window.FacefallEngine?.start){boot.pendingStart=false;window.FacefallEngine.setCamera?.(boot.selectedCamera,false);window.FacefallEngine.start();return;}boot.pendingStart=true;if(boot.engineFailed){location.reload();return;}playText.textContent='ЗАГРУЖАЕМ 0.5...';status.textContent='Движок и модель героя ещё запускаются.';}
+      play.addEventListener('click',requestStart);document.getElementById('again').addEventListener('click',requestStart);
+      window.addEventListener('facefall-engine-ready',()=>{boot.engineReady=true;boot.engineFailed=false;play.disabled=false;playText.textContent='НАЧАТЬ ВЫЖИВАНИЕ';status.textContent=window.FacefallEngine?.heroGLB?'Humanoid GLB загружен · 0.5 готова':'Fallback-модель · 0.5 готова';renderCamera(boot.selectedCamera);if(boot.pendingStart)requestStart();});
+      window.addEventListener('facefall-engine-error',event=>{boot.engineFailed=true;play.disabled=false;playText.textContent='ПОВТОРИТЬ ЗАГРУЗКУ';status.textContent=event.detail||'Не удалось запустить 0.5.';});
+      setTimeout(()=>{if(!boot.engineReady&&!boot.engineFailed){status.textContent='Модель загружается дольше обычного…';playText.textContent='ОЖИДАЕМ 0.5...';}},6500);
+      setTimeout(()=>{if(!boot.engineReady&&!boot.engineFailed){boot.engineFailed=true;status.textContent='0.5 не ответила за 24 секунды. Нажми для повторной попытки.';playText.textContent='ПОВТОРИТЬ ЗАГРУЗКУ';}},24000);
     })();
   </script>
-  <script type="module" src="game-safe2.js"></script>
+  <script type="module" src="game-v050.js"></script>
 </body>
 </html>
