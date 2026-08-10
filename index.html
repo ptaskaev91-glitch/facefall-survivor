@@ -15,7 +15,7 @@
   <section id="start" class="overlay start-overlay">
     <div class="start-grid">
       <div class="hero-copy">
-        <div class="eyebrow"><i></i> FACEFALL // BUILD 0.4.1</div>
+        <div class="eyebrow"><i></i> FACEFALL // BUILD 0.4.2</div>
         <h1>FACEFALL<br><span>SURVIVOR</span></h1>
         <p>Два режима камеры, объёмный мир, трава, грязь, мокрый асфальт, дождь и заражённые. Загрузи фото — оно станет лицом героя.</p>
         <div class="feature-row">
@@ -117,13 +117,13 @@
         }
         boot.pendingStart = true;
         if (boot.engineFailed) {
-          status.textContent = '3D-движок не загрузился. Нажми ещё раз для перезапуска страницы.';
+          status.textContent = '3D-движок не загрузился. Обнови страницу для новой попытки.';
           playText.textContent = 'ПОВТОРИТЬ ЗАГРУЗКУ';
           location.reload();
           return;
         }
         playText.textContent = 'ЗАГРУЖАЕМ 3D...';
-        status.textContent = 'Движок ещё запускается. Игра начнётся автоматически.';
+        status.textContent = 'Движок запускается. Максимальное ожидание — около 16 секунд.';
       }
 
       play.addEventListener('click', requestStart);
@@ -148,12 +148,19 @@
 
       setTimeout(() => {
         if (!boot.engineReady && !boot.engineFailed) {
-          status.textContent = '3D загружается дольше обычного…';
-          playText.textContent = 'ЗАПУСТИТЬ, КОГДА ГОТОВО';
+          status.textContent = '3D ещё загружается через Vercel…';
+          playText.textContent = 'ОЖИДАЕМ 3D...';
         }
       }, 4500);
+      setTimeout(() => {
+        if (!boot.engineReady && !boot.engineFailed) {
+          boot.engineFailed = true;
+          status.textContent = '3D не ответил за 18 секунд. Нажми для повторной попытки.';
+          playText.textContent = 'ПОВТОРИТЬ ЗАГРУЗКУ';
+        }
+      }, 18000);
     })();
   </script>
-  <script type="module" src="game-safe.js"></script>
+  <script type="module" src="game-safe2.js"></script>
 </body>
 </html>
