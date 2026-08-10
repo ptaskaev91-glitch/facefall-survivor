@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { DamageSystem } from '../combat/DamageSystem';
 import { Health } from '../combat/Health';
-import type { SpatialHash, SpatialHashItem } from '../physics/SpatialHash';
+import { SpatialHash, type SpatialHashItem } from '../physics/SpatialHash';
 import { ENEMY_ARCHETYPES, type EnemyArchetype, type EnemyId } from './archetypes';
 
 interface EnemySpatialItem extends SpatialHashItem {
@@ -22,11 +22,13 @@ export interface EnemyActor {
 export interface EnemySystemOptions {
   shadows: boolean;
   maxActive: number;
+  spatialCellSize?: number;
 }
 
 export class EnemySystem {
   private readonly actors = new Map<string, EnemyActor>();
   private readonly hitMeshes: THREE.Object3D[] = [];
+  private readonly spatial: SpatialHash<EnemySpatialItem>;
   private nextId = 1;
   private readonly desired = new THREE.Vector3();
   private readonly offset = new THREE.Vector3();
@@ -34,9 +36,10 @@ export class EnemySystem {
   constructor(
     private readonly scene: THREE.Scene,
     private readonly damage: DamageSystem,
-    private readonly spatial: SpatialHash<EnemySpatialItem>,
     private readonly options: EnemySystemOptions
-  ) {}
+  ) {
+    this.spatial = new SpatialHash<EnemySpatialItem>(options.spatialCellSize ?? 4);
+  }
 
   spawn(type: EnemyId, position: THREE.Vector3): EnemyActor | null {
     if (this.activeCount >= this.options.maxActive) return null;
@@ -120,6 +123,7 @@ export class EnemySystem {
     }
     this.actors.clear();
     this.hitMeshes.length = 0;
+    this.spatial.clear();
   }
 
   rootFor(id: string): THREE.Object3D | undefined {
@@ -134,6 +138,10 @@ export class EnemySystem {
     let count = 0;
     for (const actor of this.actors.values()) if (actor.alive && actor.root.visible) count++;
     return count;
+  }
+
+  get occupiedCellCount(): number {
+    return this.spatial.occupiedCellCount;
   }
 
   private makeCapsuleMarker(radius: number, bodyLength: number, color: number): THREE.Group {
