@@ -3,14 +3,16 @@ export type GameState =
   | 'loading'
   | 'playing'
   | 'paused'
+  | 'gameover'
   | 'error'
   | 'disposed';
 
 const ALLOWED_TRANSITIONS: Record<GameState, readonly GameState[]> = {
   boot: ['loading', 'error', 'disposed'],
   loading: ['playing', 'error', 'disposed'],
-  playing: ['paused', 'error', 'disposed'],
-  paused: ['playing', 'error', 'disposed'],
+  playing: ['paused', 'gameover', 'error', 'disposed'],
+  paused: ['playing', 'gameover', 'error', 'disposed'],
+  gameover: ['loading', 'disposed'],
   error: ['loading', 'disposed'],
   disposed: []
 };
