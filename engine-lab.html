@@ -10,9 +10,16 @@
     .lab-ui{position:fixed;inset:0;pointer-events:none}
     .lab-badge{position:absolute;left:max(12px,env(safe-area-inset-left));top:max(12px,env(safe-area-inset-top));padding:8px 10px;border:1px solid rgba(255,255,255,.12);background:rgba(4,9,7,.7);backdrop-filter:blur(10px);font-size:11px;letter-spacing:.12em}
     .lab-controls{position:absolute;right:max(12px,env(safe-area-inset-right));top:max(12px,env(safe-area-inset-top));display:flex;gap:8px;pointer-events:auto}
-    button{border:1px solid rgba(255,255,255,.16);background:rgba(8,15,11,.8);color:#e8eee9;padding:9px 12px;border-radius:10px;font:600 11px/1 system-ui;letter-spacing:.09em}
+    button{border:1px solid rgba(255,255,255,.16);background:rgba(8,15,11,.8);color:#e8eee9;padding:9px 12px;border-radius:10px;font:600 11px/1 system-ui;letter-spacing:.09em;touch-action:none}
     button[data-active="true"]{background:#d9f27d;color:#12180d;border-color:#d9f27d}
     .lab-status{position:absolute;left:max(12px,env(safe-area-inset-left));bottom:max(12px,env(safe-area-inset-bottom));max-width:min(580px,calc(100vw - 24px));padding:8px 10px;border:1px solid rgba(255,255,255,.1);background:rgba(4,9,7,.68);font-size:11px;color:#aebbb2}
+    .touch{display:none;position:absolute;inset:0;pointer-events:none}
+    .joy{position:absolute;left:max(22px,env(safe-area-inset-left));bottom:max(64px,calc(env(safe-area-inset-bottom) + 34px));width:112px;height:112px;border-radius:50%;border:1px solid rgba(255,255,255,.16);background:rgba(7,14,10,.3);pointer-events:auto;touch-action:none}
+    .stick{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px;border-radius:50%;background:rgba(217,242,125,.3);border:1px solid rgba(217,242,125,.6);will-change:transform}
+    .actions{position:absolute;right:max(18px,env(safe-area-inset-right));bottom:max(58px,calc(env(safe-area-inset-bottom) + 28px));display:grid;grid-template-columns:repeat(2,72px);gap:10px;pointer-events:auto}
+    .actions button{height:54px;border-radius:18px;background:rgba(7,14,10,.62)}
+    .actions .fire{grid-row:span 2;height:118px;border-radius:36px;border-color:rgba(217,242,125,.5);background:rgba(115,142,54,.34)}
+    @media (hover:none),(pointer:coarse){.touch{display:block}.lab-status{bottom:max(12px,env(safe-area-inset-bottom));font-size:9px;max-width:calc(100vw - 24px)}}
   </style>
 </head>
 <body>
@@ -22,6 +29,15 @@
     <div class="lab-controls">
       <button id="camTop" data-active="true">TOP</button>
       <button id="camThird" data-active="false">3RD</button>
+    </div>
+    <div class="touch">
+      <div class="joy" id="joy"><div class="stick" id="stick"></div></div>
+      <div class="actions">
+        <button class="fire" id="touchFire">FIRE</button>
+        <button id="touchReload">R</button>
+        <button id="touchWeapon">WEAP</button>
+        <button id="touchCamera">CAM</button>
+      </div>
     </div>
     <div class="lab-status" id="status">Инициализация модульного движка…</div>
   </div>
