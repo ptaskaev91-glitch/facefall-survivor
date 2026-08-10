@@ -4,7 +4,7 @@
 Repository: `ptaskaev91-glitch/facefall-survivor`  
 Source of truth: `main`  
 Production root: **legacy 0.5 ALPHA on Vercel**  
-Engine-next code checkpoint: **PR #3 / `bec7b5f8`**  
+Engine-next gameplay checkpoint: **PR #5 / `dcdee8b058726743ba2e518602e2b8cce458f0d1`**  
 Release tooling checkpoint: **PR #4 / `6d051dae`**
 
 ---
@@ -99,7 +99,11 @@ facefall-survivor/
 │   │   └── CombatFeedback.ts
 │   │
 │   ├── enemies/
-│   │   └── archetypes.ts
+│   │   ├── archetypes.ts
+│   │   └── EnemySystem.ts
+│   │
+│   ├── waves/
+│   │   └── WaveDirector.ts
 │   │
 │   ├── effects/
 │   │   ├── recipes.ts
@@ -122,7 +126,7 @@ facefall-survivor/
 ├── index.html                  # stable legacy production root
 ├── game-v050.js                # stable legacy runtime
 ├── styles-safe.css             # stable legacy UI
-├── engine-lab.html             # Vite engine-next entrypoint
+├── engine-lab.html             # Vite engine-next 0.5B test entrypoint
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
@@ -141,7 +145,7 @@ dist-next/
 ├── index.html                  # copied stable legacy root
 ├── game-v050.js
 ├── styles-safe.css
-├── engine-lab.html             # compiled Vite lab
+├── engine-lab.html             # compiled Vite engine-next
 ├── assets/...                  # bundled engine-next + Three.js + public assets
 ```
 
@@ -160,12 +164,14 @@ Current lifecycle:
 ```text
 boot → loading → playing ↔ paused
                    ↓
-                  error
+                gameover
                    ↓
-                disposed
+                 loading → playing
+
+error / disposed remain terminal/error branches
 ```
 
-Product parity later expands this to menu / face setup / game over.
+`restart()` resets run state in place rather than reloading the whole browser page.
 
 ## GameLoop
 
@@ -174,13 +180,13 @@ One fixed timestep:
 ```text
 Input snapshot
   ↓
-Simulation update
+Player / Weapon / Enemy / Wave simulation
   ↓
-Physics / projectiles
+Physics / projectiles / SpatialHash updates
   ↓
 Events
   ↓
-Presentation / animation / FX
+Presentation / FX / HUD
   ↓
 Camera
   ↓
@@ -221,10 +227,12 @@ Static geometry → CollisionWorld / Octree
                          ↑
                    PlayerCapsule
 
-Dynamic entities → SpatialHash
+EnemySystem → moving EnemySpatialItems → SpatialHash
 ```
 
-World queries now include raycast and segment cast; they are used by camera collision, hitscan occlusion and ballistic projectiles.
+World queries include raycast and segment cast; they are used by camera collision, hitscan occlusion and ballistic projectiles.
+
+`EnemySystem` currently performs direct chase movement and updates SpatialHash as actors move. This is intentionally a functional-parity layer, not final navigation.
 
 Target navigation remains separate:
 
@@ -265,11 +273,52 @@ ShotEvent
                            Hit / Kill events
 ```
 
-Bow is now structurally different from firearm hitscan: it has velocity, gravity, lifetime, continuous segment collision and visible pooled arrow objects.
+Player uses the same `DamageSystem` as infected:
+
+```text
+EnemySystem melee attack
+  ↓
+DamageSystem target=player
+  ↓
+Health
+  ↓
+Hit / Kill
+  ↓
+GameApp run state → gameover
+```
+
+Bow is structurally different from firearm hitscan: it has velocity, gravity, lifetime, continuous segment collision and visible pooled arrow objects.
 
 ---
 
-# 8. Presentation / FX
+# 8. Enemy / wave architecture
+
+Current 0.5B runtime:
+
+```text
+LevelManifest enemy-spawn markers
+  ↓
+WaveDirector
+  ├── wave number
+  ├── composition rules
+  ├── intermission
+  └── quality-dependent active cap
+       ↓
+EnemySystem.spawn(Walker/Runner/Brute)
+       ↓
+EnemySystem.update
+  ├── chase player
+  ├── attack range
+  ├── attack cooldown
+  ├── melee damage
+  └── SpatialHash update
+```
+
+Current `EnemySystem` deliberately does not own navmesh logic yet. The future `EnemyBrain/NavMeshQuery/LocalAvoidance` layer will replace direct chase without changing `WaveDirector` or DamageSystem contracts.
+
+---
+
+# 9. Presentation / FX
 
 ```text
 Hit/Shot event
@@ -286,9 +335,17 @@ Current visible recipe primitives include smoke, casing, blood, debris, sparks, 
 
 All transient visual systems are bounded by capacity/TTL. Audio becomes another adapter rather than entering simulation code.
 
+Engine-lab now also exposes basic run HUD:
+
+```text
+HP / WAVE / KILLS / SCORE
+```
+
+and a game-over/restart overlay.
+
 ---
 
-# 9. World / level architecture
+# 10. World / level architecture
 
 Target format:
 
@@ -306,11 +363,11 @@ Responsibilities:
 - manifest → player/enemy spawns, lights, loot, wind/audio zones, choke points, interactables/events;
 - navmesh → infected traversal.
 
-Current runtime already loads the manifest. It drives prototype player spawn, enemy spawn positions and lights. Until `level.glb` exists, procedural geometry remains the collision/visual fallback.
+Current runtime already loads the manifest. It drives player spawn, WaveDirector enemy-spawn zones and level lights. Until `level.glb` exists, procedural geometry remains the collision/visual fallback.
 
 ---
 
-# 10. Release architecture
+# 11. Release architecture
 
 Repository build:
 
@@ -332,13 +389,13 @@ install
 This intentionally supports two tracks:
 
 - `/` stays stable legacy until parity + Android smoke;
-- engine-next continues to develop and build independently.
+- `/engine-lab.html` represents engine-next test surface when deployed from combined bundle.
 
-`vercel.json` in source is prepared for `build:deploy` with `dist-next` as target output. The manual Vercel connector used in this chat cannot upload the CI zip as one deployment input, so the latest production refresh keeps the stable root rather than prematurely activating engine-next.
+`vercel.json` in source is prepared for `build:deploy` with `dist-next` as target output.
 
 ---
 
-# 11. Legacy / temporary pieces
+# 12. Legacy / temporary pieces
 
 Temporary:
 
@@ -346,14 +403,15 @@ Temporary:
 - legacy `index.html` / `styles-safe.css` root;
 - legacy runtime Three.js/GLTFLoader same-origin proxies;
 - Soldier GLB pipeline proof;
-- procedural lab player/enemies/world;
+- procedural lab player/world;
+- direct-chase enemy movement;
 - procedural fallback world in engine-next.
 
 They are removed only after functional parity, desktop smoke and Android smoke.
 
 ---
 
-# 12. Target structure
+# 13. Target structure
 
 ```text
 src/
@@ -383,11 +441,11 @@ src/
 └── debug/
 ```
 
-The remaining major decomposition task is to move temporary world/combat/enemy wiring out of `GameApp` into those target systems as 0.5B is implemented.
+The remaining major decomposition task is to move temporary player/world/combat/run UI wiring out of `GameApp` into those target systems as 0.5B stabilizes.
 
 ---
 
-# 13. Change rules
+# 14. Change rules
 
 1. Do not grow `main.ts` or `GameApp` into monoliths.
 2. Simulation never directly owns DOM/audio/visual-effect creation.
