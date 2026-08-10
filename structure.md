@@ -3,73 +3,46 @@
 Последняя актуализация: **2026-08-10**  
 Repository: `ptaskaev91-glitch/facefall-survivor`  
 Source of truth: `main`  
-Production: **legacy 0.5 ALPHA on Vercel**  
-Engine-next checkpoint: **PR #2 merged, `29008e7d`**
+Production root: **legacy 0.5 ALPHA on Vercel**  
+Engine-next code checkpoint: **PR #3 / `bec7b5f8`**  
+Release tooling checkpoint: **PR #4 / `6d051dae`**
 
 ---
 
-# 1. Назначение файла
+# 1. Назначение
 
-`structure.md` — источник истины по текущей и целевой структуре Facefall Survivor.
+`structure.md` фиксирует текущую и целевую архитектуру. Он должен показывать:
 
-Файл отвечает на четыре вопроса:
+- что существует сейчас;
+- что является legacy/fallback;
+- к какой структуре идём;
+- responsibility каждой system boundary.
 
-1. Что реально существует сейчас.
-2. Что является legacy/temporary.
-3. К какой архитектуре идём.
-4. Как разделены responsibility между systems.
-
-После крупного architecture checkpoint файл обновляется вместе с `dev.md` и `history.md`.
+После крупных architecture changes файл обновляется вместе с `dev.md` и `history.md`.
 
 ---
 
-# 2. Продуктовая архитектура
+# 2. Product architecture
 
-Facefall — browser/mobile-first 3D action-survival:
+Facefall Survivor — browser/mobile-first 3D action-survival:
 
-- TOP / Diablo-like camera;
-- third-person over-the-shoulder camera;
+- TOP / Diablo-like and third-person over-the-shoulder cameras;
 - pistol / shotgun / bow;
 - Walker / Runner / Brute;
 - waves;
-- пользовательское лицо на герое;
+- local user-face integration;
 - authored GLB environment;
-- touch + desktop input;
-- Android как обязательная тестовая платформа;
+- desktop + touch input;
+- Android mandatory validation;
 - GitHub `main` → Vercel.
 
----
+Final technical formula:
 
-# 3. Итог трёх аудитов и reuse policy
-
-Architectural references:
-
-- `ivanoskov/shooter` → browser/Three.js foundation;
-- `Unvanquished/Unvanquished` → gameplay/system separation;
-- `redeclipse/base` → weapons/FX/environment principles.
-
-Итоговая технология:
-
-> **Vite + TypeScript + npm Three.js + static Octree/Capsule + navmesh AI + data-driven combat + event-based simulation + pooled presentation + GLB/manifest levels.**
-
-Политика переиспользования:
-
-- изолированный код из permissive-compatible source можно адаптировать напрямую;
-- источник и лицензия фиксируются в `THIRD_PARTY_NOTICES.md`;
-- GPL/несовместимый код не копируется;
-- engine-specific native C++ решения переписываются под Facefall;
-- внешние media assets отдельно фиксируются в `public/assets/ATTRIBUTION.md`.
-
-На текущем checkpoint прямо адаптированы из MIT `ivanoskov/shooter`:
-
-- capsule/Octree collision-response pattern → `PlayerCapsule.ts`;
-- GLTF load/traverse preparation pattern → `AssetManager.ts` / `LevelLoader.ts`.
-
-Остальные новые системы текущего checkpoint написаны под Facefall с нуля.
+> **TypeScript + Vite + Three.js + Octree/Capsule + SpatialHash + navmesh AI + data-driven simulation + event-driven presentation + pooled FX + GLB/manifest levels.**
 
 ---
 
-# 4. Текущая файловая структура
+# 3. Current repository structure
 
 ```text
 facefall-survivor/
@@ -84,61 +57,76 @@ facefall-survivor/
 │           └── abandoned-outskirts/
 │               └── level.manifest.json
 │
+├── scripts/
+│   └── copy-legacy.mjs
+│
 ├── src/
 │   ├── main.ts
+│   │
 │   ├── app/
 │   │   ├── Bootstrap.ts
 │   │   ├── GameApp.ts
 │   │   └── GameState.ts
+│   │
 │   ├── core/
 │   │   ├── EventBus.ts
 │   │   └── GameLoop.ts
+│   │
 │   ├── input/
 │   │   ├── InputManager.ts
 │   │   ├── KeyboardMouseInput.ts
 │   │   └── TouchInput.ts
+│   │
 │   ├── physics/
 │   │   ├── CollisionWorld.ts
 │   │   ├── PlayerCapsule.ts
 │   │   └── SpatialHash.ts
+│   │
 │   ├── camera/
-│   │   ├── CameraDirector.ts
 │   │   ├── CameraCollision.ts
+│   │   ├── CameraDirector.ts
 │   │   ├── TopDownCamera.ts
 │   │   └── ThirdPersonCamera.ts
+│   │
 │   ├── combat/
 │   │   ├── types.ts
 │   │   ├── weapons.ts
 │   │   ├── Health.ts
-│   │   ├── WeaponSystem.ts
 │   │   ├── DamageSystem.ts
+│   │   ├── WeaponSystem.ts
 │   │   ├── ProjectileSystem.ts
+│   │   ├── ProjectileVisuals.ts
 │   │   └── CombatFeedback.ts
+│   │
 │   ├── enemies/
 │   │   └── archetypes.ts
+│   │
 │   ├── effects/
 │   │   ├── recipes.ts
 │   │   ├── EffectSystem.ts
+│   │   ├── RuntimeFx.ts
 │   │   ├── ParticlePool.ts
 │   │   ├── DecalPool.ts
 │   │   ├── LightPool.ts
 │   │   └── WindField.ts
+│   │
 │   ├── graphics/
 │   │   └── quality.ts
+│   │
 │   └── world/
 │       ├── AssetManager.ts
 │       ├── LevelLoader.ts
 │       ├── LevelManifest.ts
 │       └── GrassField.ts
 │
-├── index.html                     # legacy production entrypoint
-├── styles-safe.css                # legacy production UI/CSS
-├── game-v050.js                   # legacy monolithic runtime
-├── engine-lab.html                # isolated engine-next page
-├── vercel.json                    # legacy proxy/config
+├── index.html                  # stable legacy production root
+├── game-v050.js                # stable legacy runtime
+├── styles-safe.css             # stable legacy UI
+├── engine-lab.html             # Vite engine-next entrypoint
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
+├── vercel.json
 ├── THIRD_PARTY_NOTICES.md
 ├── README.md
 ├── dev.md
@@ -146,278 +134,235 @@ facefall-survivor/
 └── history.md
 ```
 
----
-
-# 5. Что является legacy
-
-Пока сохраняются:
-
-- `index.html` как текущий production entrypoint;
-- `game-v050.js`;
-- `styles-safe.css`;
-- Vercel rewrites для legacy Three.js/GLTF/hero model;
-- тестовый Soldier GLB pipeline;
-- procedural hero/enemy/weapon geometry.
-
-`DualCameraRig.ts` больше не является legacy debt — compatibility shim удалён после перехода `GameApp` на прямой `CameraDirector`.
-
-Legacy production удаляется только после functional parity + desktop smoke + Android smoke.
-
----
-
-# 6. Core lifecycle
+Generated by CI/build but **not committed as source**:
 
 ```text
-src/main.ts
-  ↓
-Bootstrap
-  ↓
-GameApp
-  ↓
-GameState + GameLoop + systems
+dist-next/
+├── index.html                  # copied stable legacy root
+├── game-v050.js
+├── styles-safe.css
+├── engine-lab.html             # compiled Vite lab
+├── assets/...                  # bundled engine-next + Three.js + public assets
 ```
 
-`src/main.ts` остаётся thin bootstrap.
-
-`GameApp` — integration/lifecycle container, но не должен становиться новым monolith.
-
-Единственный fixed loop:
-
-```text
-input snapshot
- ↓
-fixed simulation
- ↓
-presentation
- ↓
-camera
- ↓
-render
-```
+GitHub Actions uploads this output as artifact `facefall-dist-next`.
 
 ---
 
-# 7. Input / aim architecture
+# 4. Runtime boundaries
+
+## Bootstrap / GameApp
+
+`src/main.ts` only calls bootstrap. `GameApp` is currently the integration container, not a destination for all future logic.
+
+Current lifecycle:
+
+```text
+boot → loading → playing ↔ paused
+                   ↓
+                  error
+                   ↓
+                disposed
+```
+
+Product parity later expands this to menu / face setup / game over.
+
+## GameLoop
+
+One fixed timestep:
+
+```text
+Input snapshot
+  ↓
+Simulation update
+  ↓
+Physics / projectiles
+  ↓
+Events
+  ↓
+Presentation / animation / FX
+  ↓
+Camera
+  ↓
+Render
+```
+
+A second gameplay/physics loop is forbidden.
+
+---
+
+# 5. Input / camera
 
 ```text
 KeyboardMouseInput ─┐
-                    ├→ InputManager → normalized movement/aim/actions
+                    ├→ InputManager → normalized actions/aim → simulation
 TouchInput ─────────┘
 ```
 
-Сейчас InputManager поддерживает:
-
-- normalized movement;
-- held/pressed actions;
-- aim delta;
-- pointer/touch NDC point.
-
-TOP:
-
-- cursor/touch point проецируется raycast-ом на ground plane;
-- hero facing следует aim point.
-
-3RD:
-
-- mouse/touch look delta вращает facing;
-- дальнейший pitch/crosshair/aim-assist остаётся отдельным этапом.
-
----
-
-# 8. Camera architecture
+Cameras:
 
 ```text
 CameraDirector
 ├── TopDownCamera
 └── ThirdPersonCamera
-     └── CameraCollision
+      └── CameraCollision → CollisionWorld
 ```
 
-`CameraCollision` делает static-world ray query и автоматически приближает third-person camera перед стеной.
-
-Обе камеры используют одну Player/World simulation.
+Both cameras consume one player/world simulation.
 
 ---
 
-# 9. Physics architecture
+# 6. Physics / spatial / navigation
+
+Current:
 
 ```text
-Static level geometry
-       ↓
-CollisionWorld / Octree
-       ├── Capsule resolution
-       ├── raycast
-       └── segmentCast
+Static geometry → CollisionWorld / Octree
+                         ↑
+                   PlayerCapsule
 
-PlayerCapsule
-       ↓
-CollisionWorld
-
-Dynamic nearby entities
-       ↓
-SpatialHash
+Dynamic entities → SpatialHash
 ```
 
-`PlayerCapsule` использует адаптированный MIT collision-response pattern из `ivanoskov/shooter`, но не владеет camera и рассчитан на Facefall fixed loop.
+World queries now include raycast and segment cast; they are used by camera collision, hitscan occlusion and ballistic projectiles.
 
-Правила:
-
-- Octree = static collision;
-- SpatialHash = nearby dynamic entities/crowd;
-- navigation ≠ collision;
-- general rigid-body engine пока не нужен.
-
----
-
-# 10. Combat architecture
-
-```text
-Input
- ↓
-WeaponSystem
- ↓
-ShotEvent
- ├── pistol → hitscan
- ├── shotgun → multi-hitscan
- └── bow → ProjectileSystem
-                  ↓
-DamageSystem / Health
- ├── HitEvent
- └── KillEvent
-```
-
-Hitscan теперь проверяет static-world occlusion через `CollisionWorld.raycast`, чтобы bullets не проходили через wall до enemy hit.
-
-Следующий combat foundation step — связать ballistic projectiles с world/enemy collision и завершить bow draw/release.
-
----
-
-# 11. Presentation / FX architecture
-
-```text
-ShotEvent / HitEvent
-        ↓
-EffectSystem
-├── recipes
-├── ParticlePool
-├── DecalPool
-├── LightPool
-└── WindField
-```
-
-На текущем checkpoint `EffectSystem` уже подключён к реальным Shot/Hit events.
-
-Работает orchestration и transient light/wind layer. Concrete particle/decal adapters ещё предстоит подключить.
-
-Все runtime effects должны иметь budget/TTL/pool.
-
----
-
-# 12. Enemy / navigation target
-
-Минимум:
-
-- Walker;
-- Runner;
-- Brute.
-
-Enemy instances уже могут регистрироваться в `SpatialHash`; это foundation для LocalAvoidance и neighbour queries.
-
-Целевая navigation chain:
+Target navigation remains separate:
 
 ```text
 EnemyBrain
- ↓
+  ↓
 NavMeshQuery
- ↓
+  ↓
 Path corridor
- ↓
+  ↓
 LocalAvoidance + SpatialHash
- ↓
+  ↓
 Desired velocity
 ```
 
-Navmesh integration ещё не выбрана и не реализована.
+A generic rigid-body engine is still intentionally absent until a real need appears.
 
 ---
 
-# 13. Level / asset architecture
-
-Теперь существуют:
+# 7. Combat architecture
 
 ```text
-AssetManager
-  ↓ cached GLB load
-LevelLoader
-  ├── GLB
-  ├── typed LevelManifest
-  └── optional CollisionWorld rebuild
+Input.fire
+  ↓
+WeaponSystem
+  ↓
+ShotEvent
+  ├── pistol → hitscan ─────────────┐
+  ├── shotgun → multi-hitscan ──────┤
+  └── bow → ProjectileSystem        │
+              ↓ ballistic motion    │
+              ↓ segment collision   │
+              ↓                     │
+          ProjectileVisuals         │
+                                    ↓
+                              DamageSystem
+                                ↓
+                           Hit / Kill events
 ```
 
-Первый manifest skeleton:
+Bow is now structurally different from firearm hitscan: it has velocity, gravity, lifetime, continuous segment collision and visible pooled arrow objects.
+
+---
+
+# 8. Presentation / FX
 
 ```text
-public/assets/levels/abandoned-outskirts/level.manifest.json
+Hit/Shot event
+  ↓
+EffectSystem + recipe
+  ├── RuntimeFx / ParticlePool
+  ├── RuntimeFx / DecalPool
+  ├── LightPool
+  ├── WindField
+  └── CameraImpulse
 ```
 
-Целевая authored location:
+Current visible recipe primitives include smoke, casing, blood, debris, sparks, muzzle lights, decals and camera shake.
+
+All transient visual systems are bounded by capacity/TTL. Audio becomes another adapter rather than entering simulation code.
+
+---
+
+# 9. World / level architecture
+
+Target format:
 
 ```text
 public/assets/levels/abandoned-outskirts/
 ├── level.glb
 ├── level.manifest.json
-├── navmesh.bin
+├── navmesh data
 └── preview.webp
 ```
 
-Разделение:
+Responsibilities:
 
-- `level.glb` → visuals/collision geometry;
-- `level.manifest.json` → player/enemy spawns, loot, lights, wind/audio zones, choke points, interactables, event anchors;
-- `navmesh` → AI traversal.
+- GLB → authored visuals and collision geometry;
+- manifest → player/enemy spawns, lights, loot, wind/audio zones, choke points, interactables/events;
+- navmesh → infected traversal.
 
----
-
-# 14. Asset licensing
-
-Code reuse notices:
-
-`THIRD_PARTY_NOTICES.md`
-
-Media assets:
-
-`public/assets/ATTRIBUTION.md`
-
-Каждый внешний production asset обязан иметь source, author, license, attribution requirement и modification note.
+Current runtime already loads the manifest. It drives prototype player spawn, enemy spawn positions and lights. Until `level.glb` exists, procedural geometry remains the collision/visual fallback.
 
 ---
 
-# 15. Mobile performance architecture
+# 10. Release architecture
 
-Quality profiles:
+Repository build:
 
-- `mobile-low`;
-- `mobile-high`;
-- `desktop-high`.
+```text
+npm run build:deploy
+  ├── Vite build engine-lab → dist-next
+  └── copy stable legacy index/css/js → dist-next
+```
 
-Primary target: **30+ FPS Android**. Desktop target: **60 FPS**.
+CI:
 
-Основные budgets: DPR, shadows, lights, grass, rain, particles, decals, visible enemies/update frequency.
+```text
+install
+→ strict typecheck
+→ build combined bundle
+→ upload facefall-dist-next artifact
+```
+
+This intentionally supports two tracks:
+
+- `/` stays stable legacy until parity + Android smoke;
+- engine-next continues to develop and build independently.
+
+`vercel.json` in source is prepared for `build:deploy` with `dist-next` as target output. The manual Vercel connector used in this chat cannot upload the CI zip as one deployment input, so the latest production refresh keeps the stable root rather than prematurely activating engine-next.
 
 ---
 
-# 16. Целевая структура
+# 11. Legacy / temporary pieces
 
-Target остаётся модульной:
+Temporary:
+
+- `game-v050.js`;
+- legacy `index.html` / `styles-safe.css` root;
+- legacy runtime Three.js/GLTFLoader same-origin proxies;
+- Soldier GLB pipeline proof;
+- procedural lab player/enemies/world;
+- procedural fallback world in engine-next.
+
+They are removed only after functional parity, desktop smoke and Android smoke.
+
+---
+
+# 12. Target structure
 
 ```text
 src/
-├── app/
-├── core/
-├── config/
-├── input/
-├── physics/
-├── navigation/
+├── app/                 GameApp / GameState / Bootstrap
+├── core/                GameLoop / EventBus / lifecycle helpers
+├── config/              game/performance/controls
+├── input/               desktop/touch normalized actions
+├── physics/             static collision + dynamic spatial helpers
+├── navigation/          navmesh/query/avoidance/worker
 ├── simulation/
 │   ├── entities/
 │   ├── player/
@@ -425,10 +370,10 @@ src/
 │   ├── enemies/
 │   ├── waves/
 │   └── pickups/
-├── characters/
-├── camera/
-├── world/
-├── rendering/
+├── characters/          GLB characters, animation, FaceSystem
+├── camera/              director/TOP/3RD/collision
+├── world/               assets/levels/materials/vegetation
+├── rendering/           renderer/lighting/atmosphere/quality/visibility
 ├── presentation/
 │   ├── combat/
 │   ├── effects/
@@ -438,55 +383,17 @@ src/
 └── debug/
 ```
 
-Не создаём новые directories ради структуры самой по себе — они появляются по мере реального разделения responsibilities.
+The remaining major decomposition task is to move temporary world/combat/enemy wiring out of `GameApp` into those target systems as 0.5B is implemented.
 
 ---
 
-# 17. Legacy → engine-next migration
+# 13. Change rules
 
-```text
-legacy production
-index.html + game-v050.js + styles-safe.css
-            │
-            │ engine-next развивается параллельно
-            ↓
-Vite/TypeScript functional parity
-            │
-            ├── desktop smoke
-            ├── Android smoke
-            └── CI green
-            ↓
-Vite production migration
-            │
-            ├── remove runtime Three proxy
-            ├── remove legacy entrypoint
-            └── Git history остаётся rollback source
-```
-
----
-
-# 18. Следующие структурные изменения
-
-Ближайший порядок:
-
-1. ballistic ProjectileSystem → real world/enemy collision;
-2. concrete particle/decal adapters;
-3. `LevelLoader` подключить в runtime вместо lab `BoxGeometry` world;
-4. начать extracting simulation/player/world responsibilities из `GameApp`;
-5. functional parity systems;
-6. navmesh spike после появления authored collision level.
-
----
-
-# 19. Правила изменения структуры
-
-1. Не создавать subsystem без понятной responsibility.
-2. `src/main.ts` не расширять gameplay logic.
-3. `GameApp` — integration/lifecycle container, не новый monolith.
-4. Simulation не запускает presentation напрямую, кроме event boundary.
-5. Weapon/enemy balance data-driven.
-6. Collision и navigation раздельны.
-7. Прямой reused code получает license notice.
-8. Assets без понятной лицензии не входят в production repository.
-9. Temporary compatibility files удаляются после миграции callers.
-10. После крупного checkpoint обновляются `structure.md`, `dev.md`, `history.md`.
+1. Do not grow `main.ts` or `GameApp` into monoliths.
+2. Simulation never directly owns DOM/audio/visual-effect creation.
+3. Static collision, crowd lookup and navigation remain separate structures.
+4. Weapons/enemies/FX remain data-driven.
+5. External code/assets require license tracking.
+6. Generated `dist-next` is build output, not source-of-truth.
+7. Production engine switch happens only after parity and real Android validation.
+8. Update `structure.md`, `dev.md`, `history.md` at large checkpoints.
