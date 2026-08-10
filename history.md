@@ -10,18 +10,7 @@ Source of truth: `main`
 
 `history.md` — проектный журнал переписки и решений Facefall Survivor.
 
-Он хранит:
-
-- исходную идею;
-- ключевые запросы пользователя;
-- сделанные версии;
-- ошибки и неудачные подходы;
-- причины архитектурных изменений;
-- результаты исследований;
-- контрольные commits/PR;
-- текущий статус и следующий шаг.
-
-Это не dump tool-calls и не скрытые рассуждения, а восстановимая история проекта.
+Он хранит исходную идею, ключевые запросы, версии, ошибки, причины architecture changes, результаты аудитов, commits/PR и следующий шаг. Это не dump tool-calls и не скрытые рассуждения, а восстановимая история проекта.
 
 ---
 
@@ -32,65 +21,27 @@ Source of truth: `main`
 Ключевые требования:
 
 - top-down gameplay в духе Diablo;
-- позже — полноценный third-person вариант;
-- огнестрельное оружие + лук;
-- пользователь загружает фотографию;
-- фото становится лицом героя;
+- полноценный third-person вариант;
+- pistol / shotgun / bow;
+- пользователь загружает фотографию, которая становится лицом героя;
 - игра должна работать на телефоне;
-- внешний вид должен постепенно стать качественным и атмосферным, а не остаться canvas/procedural demo.
+- внешний вид должен стать качественным и атмосферным, а не остаться procedural demo.
 
-Закрепились три базовых weapons:
+Базовые infected archetypes: Walker / Runner / Brute.
 
-- pistol;
-- shotgun;
-- bow.
-
-И три infected archetypes:
-
-- Walker;
-- Runner;
-- Brute.
+Создан repository `ptaskaev91-glitch/facefall-survivor`, `main` выбран source-of-truth.
 
 ---
 
-# 3. Первые browser prototypes
+# 3. GitHub Pages → Vercel
 
-Проект начинался с минимальной HTML/CSS/JavaScript версии:
-
-- загрузка лица;
-- game loop;
-- shooting;
-- waves;
-- mobile controls;
-- публичный GitHub repository.
-
-Создан repository:
-
-`ptaskaev91-glitch/facefall-survivor`
-
-`main` выбран source-of-truth.
-
----
-
-# 4. GitHub Pages → Vercel
-
-На раннем этапе пробовали GitHub Pages.
-
-Проблемы:
-
-- Pages возвращал 404;
-- workflow добавлял лишнюю инфраструктуру;
-- Vercel оказался надёжнее.
-
-Пользователь выбрал:
-
-> «Окей, если можно без pages и только с Vercel — давай делать так.»
+На раннем этапе пробовали GitHub Pages, но Pages возвращал 404 и добавлял лишний workflow. Пользователь выбрал Vercel-only hosting.
 
 С этого момента:
 
 - GitHub = source repository;
-- Vercel = единственный production hosting target;
-- GitHub Pages удалён из architecture.
+- Vercel = production/preview;
+- GitHub Pages не используется.
 
 Production URL:
 
@@ -98,11 +49,9 @@ Production URL:
 
 ---
 
-# 5. Build 0.3 — Cinematic prototype
+# 4. Build 0.3 — Cinematic prototype
 
-После запроса пользователя продолжать и добавлять эффекты был сделан большой visual/combat pass.
-
-Добавлялись:
+После запроса пользователя продолжать и добавлять эффекты был сделан большой visual/combat pass:
 
 - cinematic menu;
 - face persistence;
@@ -120,120 +69,80 @@ Production URL:
 - mobile auto-aim;
 - procedural audio.
 
-К этому моменту стало заметно, что monolithic runtime быстро усложняется.
+Стало заметно, что monolithic runtime быстро усложняется.
 
 ---
 
-# 6. Runtime bugs раннего прототипа
+# 5. Runtime bugs раннего прототипа
 
-Были исправлены важные проблемы:
+Были исправлены initialization ошибки rain/fog и некорректное lighting compositing. Появился отдельный light mask и локальные runtime checks.
 
-## Initialization
-
-Rain/fog arrays могли использоваться до корректной initialization.
-
-## Lighting compositing
-
-Темнота/маска света первоначально могла стирать уже отрисованный мир.
-
-Был сделан отдельный light mask и локальные runtime проверки.
-
-Главный вывод: красивый эффект нельзя добавлять ценой хрупкой initialization architecture.
+Главный вывод: visual effect нельзя добавлять ценой хрупкой initialization architecture.
 
 ---
 
-# 7. Переход в Three.js / 3D
+# 6. Переход в Three.js / 3D
 
-Пользователь попросил:
+После запроса:
 
-> «Продолжай, делай прям качественно. И сделай вариант вида от 3го лица. Добавь траву и другие текстуры».
+> «Продолжай, делай прям качественно. И сделай вариант вида от 3го лица. Добавь траву и другие текстуры»
 
-Направление проекта изменилось:
+проект перешёл к Three.js/WebGL:
 
-- Three.js/WebGL;
 - 3D terrain;
-- top-down camera;
-- third-person camera;
-- переключение camera;
+- TOP + 3RD cameras;
+- camera switching;
 - grass;
 - dirt/asphalt;
 - trees/props;
 - rain/fog/lights;
-- mobile controls.
+- touch controls.
 
 ---
 
-# 8. Mobile startup failures
+# 7. Mobile startup failures
 
-После merge пользователь сообщил:
+Пользователь сообщил сначала «Ни одна кнопка не нажимается», затем появилась бесконечная загрузка 3D.
 
-> «Ни одна кнопка не нажимается».
-
-После первого fix появилась вторая проблема — бесконечное состояние загрузки 3D.
-
-Были добавлены:
+Были введены:
 
 - menu bootstrap отдельно от 3D initialization;
-- timeout/fallback механизмы;
+- timeout/fallback;
 - `styles-safe.css`;
 - Vercel same-origin proxy для Three.js/GLTFLoader/hero model;
-- несколько production stabilization passes.
+- несколько stabilization passes.
 
 Главный урок:
 
 > Runtime CDN + monolithic JS являются риском для mobile startup.
 
-Это позже стало ключевой причиной перехода на npm/Vite bundle.
+Это стало одной из главных причин перехода на npm/Vite bundle.
 
 ---
 
-# 9. Визуальный аудит third-person prototype
+# 8. Визуальный аудит third-person prototype
 
-Пользователь прислал скриншот и спросил:
+По скриншоту пользователя были зафиксированы проблемы:
 
-> «Что тебя смущает?»
-
-Были зафиксированы проблемы:
-
-- mannequin/primitive hero;
+- primitive/mannequin hero;
 - face выглядело как накладка;
-- слишком тёмная сцена;
-- materials/grass почти не читались;
+- сцена слишком тёмная;
+- materials/grass слабо читались;
 - camera слишком близко/низко;
 - оружие плохо читалось;
-- заражённые выглядели procedural;
-- мир был пустым;
-- HUD выглядел как web UI.
+- заражённые procedural;
+- мир пустой;
+- HUD похож на web UI.
 
-Принято решение:
-
-> Не улучшать бесконечно BoxGeometry/SphereGeometry, а перейти к нормальным GLB characters/weapons/environment.
+Принято решение не полировать BoxGeometry бесконечно, а переходить к GLB characters/weapons/environment.
 
 ---
 
-# 10. Первый dev.md
+# 9. Первый dev.md и Build 0.5 ALPHA
 
-По запросу пользователя создан roadmap.
+Создан roadmap: Character/Infected quality, authored location, materials, lighting, cameras, combat feel, Face System, HUD, performance и production discipline.
 
-Основные направления:
-
-- Character Quality;
-- Infected Quality;
-- authored location;
-- materials/terrain;
-- lighting;
-- TOP/3RD cameras;
-- combat feel;
-- Face System 2.0;
-- HUD;
-- performance;
-- production discipline.
-
----
-
-# 11. Build 0.5 ALPHA — Character prototype
-
-После команды «Делай» был прототипирован GLB character pipeline:
+После команды «Делай» прототипирован GLB character pipeline:
 
 - humanoid GLB;
 - AnimationMixer;
@@ -241,126 +150,83 @@ Rain/fog arrays могли использоваться до корректно�
 - face mask/head attachment;
 - weapon visuals;
 - upgraded third-person camera;
-- character lighting;
 - fallback mannequin.
 
-Для proof использовался Three.js Soldier example. Он не является final Facefall asset.
+Three.js Soldier example использовался только как pipeline proof, не как final asset.
 
-Legacy production checkpoint закрепился как `0.5 ALPHA`.
-
----
-
-# 12. Решение провести архитектурные аудиты
-
-Стало понятно, что дальше развивать один большой runtime опасно.
-
-Пользователь предложил последовательно изучить три open-source проекта и после этого продолжить игру.
-
-Цель каждого аудита:
-
-- что сделано правильно;
-- что подходит Facefall;
-- что нельзя переносить;
-- как должна измениться architecture.
+Legacy production checkpoint: `0.5 ALPHA`.
 
 ---
 
-# 13. Аудит №1 — `ivanoskov/shooter`
+# 10. Решение провести три архитектурных аудита
 
-Главный вывод:
+Чтобы не строить второй monolith, пользователь предложил изучить open-source проекты и после этого продолжить игру.
 
-> Хороший browser/Three.js foundation, но не полноценная готовая shooter game.
+## Аудит №1 — `ivanoskov/shooter`
 
 Полезное:
 
-- TypeScript;
-- Vite;
-- npm Three.js;
-- GLB level loading;
+- TypeScript/Vite/npm Three.js;
+- GLB loading;
 - static Octree;
-- Capsule player;
-- quality presets;
-- debug tooling;
-- separate Player/Camera/Input/Game.
+- Capsule;
+- quality/debug architecture.
 
-Не переносим 1:1:
+Не переносить 1:1:
 
 - double physics update;
 - desktop-only Pointer Lock;
-- сомнительный mouse sensitivity path;
-- dynamic Octree как crowd solution;
+- mouse sensitivity implementation;
+- dynamic Octree as crowd solution;
 - FPS camera.
 
-После аудита появился обязательный этап **0.5A Engine Foundation**.
+Именно после этого появился этап **0.5A Engine Foundation**.
 
----
-
-# 14. Аудит №2 — `Unvanquished/Unvanquished`
-
-Главный вывод:
-
-> Shooter даёт browser foundation, Unvanquished показывает правильную gameplay architecture.
+## Аудит №2 — `Unvanquished/Unvanquished`
 
 Полезное:
 
 - simulation/presentation separation;
-- data-driven weapons;
-- data-driven entity attributes;
-- Damage/Hit/Kill pipeline;
-- CombatFeedback отдельно;
-- projectile abstraction;
-- component-oriented logic;
+- data-driven weapons/entities;
+- Damage/Hit/Kill;
+- CombatFeedback;
+- projectiles;
+- components;
 - animation state/blending;
 - Recast/Detour navmesh;
 - behavior/state decision architecture.
 
-Не переносим:
+Не переносить:
 
 - Dæmon engine;
 - C++/CMake;
-- networking/prediction;
-- heavy CBSE generator;
+- multiplayer prediction;
+- heavy CBSE;
 - GPL game code напрямую.
 
-Для Facefall принято:
+Для Facefall: collision и navigation — разные systems; infected pathfinding → navmesh; lightweight State Tree.
 
-- static collision и navigation — разные systems;
-- navmesh для infected pathfinding;
-- lightweight State Tree вместо тяжёлого general Behavior Tree framework.
-
----
-
-# 15. Аудит №3 — `redeclipse/base`
-
-Главный вывод:
-
-> Red Eclipse особенно полезен как reference для weapon feel, FX и environment systems.
+## Аудит №3 — `redeclipse/base`
 
 Полезное:
 
 - explicit weapon states;
-- recoil yaw/pitch/recovery;
-- spread/accuracy;
-- head/torso/limb hit zones;
-- hitscan vs physical projectile;
-- FX recipe как composition particles/light/sound/decal/wind/camera feedback;
-- bounded decals/stains;
-- grass distance budgets;
+- recoil/spread;
+- hit zones;
+- hitscan vs projectile;
+- FX recipes = particles/light/sound/decal/wind/camera;
+- bounded decals;
+- grass budgets;
 - global/local wind;
-- gameplay markers отдельно от level geometry.
+- gameplay markers отдельно от geometry.
 
-Waypoint AI не выбран для Facefall — navmesh architecture лучше подходит authored environment.
-
-Лицензионное правило:
-
-- architecture ideas изучаем;
-- external media/assets отдельно проверяются по лицензии.
+Waypoint AI не выбран — navmesh лучше для authored environment.
 
 ---
 
-# 16. Итог трёх аудитов
+# 11. Итог трёх аудитов
 
-Формула зафиксирована:
+Формула:
 
 > **Facefall = browser foundation из идей shooter + gameplay architecture из идей Unvanquished + combat/FX/environment philosophy Red Eclipse + собственная mobile-first реализация.**
 
@@ -380,186 +246,223 @@ Waypoint AI не выбран для Facefall — navmesh architecture лучш�
 
 ---
 
-# 17. Documentation Freeze
+# 12. Documentation Freeze
 
-Пользователь попросил временно не продолжать gameplay coding и создать три source-of-truth файла:
+Пользователь попросил временно не продолжать coding и создать:
 
 - `structure.md`;
 - `history.md`;
-- полностью актуализированный `dev.md`.
+- полностью актуальный `dev.md`.
 
-В них были зафиксированы:
+В них были зафиксированы current/target structure, технология, инструменты, все три аудита, roadmap до 1.0 и правила разработки.
 
-- current/target structure;
-- технология;
-- инструменты;
-- три аудита;
-- roadmap до 1.0;
-- правила разработки.
-
-После завершения пользователь сказал:
-
-> «Отлично, делай».
-
-Documentation Freeze завершён.
+После завершения пользователь сказал: «Отлично, делай». Freeze завершён.
 
 ---
 
-# 18. 2026-08-10 — первый engine-next development checkpoint после freeze
+# 13. PR #1 — GameApp lifecycle checkpoint
 
-Работа продолжена строго по `dev.md`.
-
-## Branch / PR
-
-Создана branch:
-
-`engine-next/0.5a-foundation`
-
-Открыт GitHub PR **#1**:
-
-`Engine Next 0.5A: establish GameApp lifecycle`
-
-PR использован как безопасный CI gate перед merge в `main`.
-
-## Core lifecycle
+Создана branch `engine-next/0.5a-foundation`, открыт PR #1 `Engine Next 0.5A: establish GameApp lifecycle`.
 
 Добавлены:
 
-- `src/app/GameState.ts`;
-- `src/app/GameApp.ts`;
-- `src/app/Bootstrap.ts`.
+- `GameState`;
+- `GameApp`;
+- `Bootstrap`;
+- thin `src/main.ts`;
+- start/pause/resume/dispose;
+- visibility handling;
+- clean TouchInput detach;
+- `TopDownCamera` / `ThirdPersonCamera` / `CameraDirector`;
+- `LightPool`;
+- `EffectSystem`.
 
-`src/main.ts` сокращён до thin bootstrap.
+GitHub Actions несколько раз успешно прошёл install + strict TypeScript + Vite build.
 
-Добавлены:
-
-- controlled state transitions;
-- start/pause/resume/dispose lifecycle;
-- visibility/background-tab handling;
-- centralized renderer/input/event cleanup;
-- error path в bootstrap.
-
-## Touch cleanup
-
-`TouchInput` переделан так, чтобы `detach()` снимал не только joystick listeners, но и action listeners FIRE/RELOAD/WEAPON/CAM, после чего reset-ил InputManager.
-
-Это важно для restart/lifecycle без накопления обработчиков.
-
-## Cameras
-
-Старый `DualCameraRig` разделён архитектурно на:
-
-- `TopDownCamera`;
-- `ThirdPersonCamera`;
-- `CameraDirector`.
-
-`DualCameraRig.ts` временно оставлен как compatibility shim, чтобы не делать опасный большой caller rewrite одним commit.
-
-## Effects
-
-Добавлены:
-
-- `LightPool` с bounded transient point lights;
-- `EffectSystem` orchestrator.
-
-`EffectSystem` уже умеет собрать один recipe из:
-
-- particles adapter;
-- light adapter;
-- decal adapter;
-- WindField impulse;
-- camera shake adapter;
-- hit-stop adapter.
-
-Следующий шаг — подключить orchestrator к реальным Shot/Hit events.
-
-## CI
-
-GitHub Actions несколько раз прогнал изменения PR.
-
-Успешно прошли:
-
-- install dependencies;
-- strict TypeScript typecheck;
-- Vite production build.
-
-Это первая фактически подтверждённая зелёная engine-next CI checkpoint после архитектурного freeze.
-
-## Merge
-
-PR #1 был переведён из draft и squash-merged в `main`.
-
-Merge commit/checkpoint:
+PR #1 squash-merged в main:
 
 `0a59903209790ee2e12a21e5e4f5da5d27bd6896`
 
-Production legacy runtime **не переключался и не менялся**.
+Production legacy runtime не менялся.
 
 ---
 
-# 19. Текущее состояние
+# 14. Пользователь меняет политику переиспользования
 
-Production:
+Пользователь уточнил, что разработку можно ускорять прямым reuse:
 
-- legacy 0.5 ALPHA;
-- Vercel URL остаётся прежним.
+> «Там где можно скопировать — копируй. Где нельзя — пиши с 0.»
 
-`main` одновременно содержит новый engine-next foundation.
+После этого принято правило:
 
-Уже есть:
+- permissive-compatible изолированные блоки можно адаптировать напрямую;
+- обязательно фиксировать source/license;
+- GPL/несовместимый код не копировать;
+- C++/native engine-specific системы адаптировать архитектурно, а не copy-paste;
+- если integration cost выше собственного clean implementation — писать с нуля.
 
-- Vite/TypeScript/npm Three.js;
-- fixed GameLoop;
-- typed EventBus;
+Для этого создан `THIRD_PARTY_NOTICES.md`.
+
+---
+
+# 15. PR #2 — physics / aiming / level foundation
+
+Branch:
+
+`engine-next/0.5a-core-physics`
+
+PR:
+
+`#2 Engine Next 0.5A: core physics and camera collision`
+
+## Что переиспользовано напрямую с адаптацией
+
+Из MIT `ivanoskov/shooter`, revision `70a7b9f7fc43d99db1e2833e0042b00da00d9cf0`:
+
+1. Capsule/Octree collision-response pattern из `Player.ts` → новый `PlayerCapsule.ts`.
+2. GLTFLoader/traverse preparation pattern из `Game.ts` → `AssetManager.ts` / `LevelLoader.ts`.
+
+MIT notice сохранён в `THIRD_PARTY_NOTICES.md`.
+
+## Что написано с нуля для Facefall
+
+- `SpatialHash`;
+- `CameraCollision`;
+- static world ray/segment queries orchestration;
+- desktop pointer aiming;
+- touch free-screen look;
+- TOP cursor/touch ground aiming;
+- 3RD look-delta facing;
+- `LevelManifest` schema/validation;
+- Facefall integration of effect/world/combat systems.
+
+## Physics
+
+Добавлены/подключены:
+
+- `PlayerCapsule` вместо raw Capsule wiring;
+- `CollisionWorld.raycast()`;
+- `CollisionWorld.segmentCast()`;
+- `SpatialHash`;
+- enemy registration/removal в SpatialHash;
+- static-world occlusion для hitscan.
+
+Теперь bullet damage не должен проходить через static wall, если world hit ближе enemy hit.
+
+## Cameras
+
+Добавлены:
+
+- `CameraCollision`;
+- third-person auto push-in при препятствии между look anchor и desired camera position;
+- `GameApp` переведён на прямой `CameraDirector`;
+- obsolete `DualCameraRig` shim удалён.
+
+## Input / aim
+
+`InputManager` теперь хранит:
+
+- movement;
+- aim delta;
+- pointer/touch NDC;
+- held/pressed actions.
+
+Desktop:
+
+- mouse position → TOP aim;
+- mouse movement → 3RD look.
+
+Touch:
+
+- left joystick → move;
+- свободная область canvas → look/aim;
+- action buttons отдельно.
+
+## FX
+
+`EffectSystem` подключён к реальным Shot/Hit events.
+
+Подключён transient `LightPool` adapter для muzzle recipes и WindField impulses. Concrete particle/decal adapters остаются следующим этапом.
+
+## World/assets
+
+Созданы:
+
+- `AssetManager`;
+- `LevelLoader`;
+- `LevelManifest`;
+- `public/assets/ATTRIBUTION.md`;
+- первый `Abandoned Outskirts` manifest skeleton.
+
+Manifest уже умеет описывать player/enemy spawns, lights, wind zones и choke point foundation.
+
+## Lockfile limitation
+
+Попытка выполнить local clean install через container показала отсутствие наружного DNS к GitHub/npm. Поэтому `package-lock.json` не создавался вручную и не выдумывался. CI при этом имеет network access и продолжает подтверждать install/typecheck/build.
+
+## CI
+
+После всех изменений, включая удаление compatibility shim, финальный GitHub Actions run полностью green:
+
+- dependency install;
+- strict TypeScript typecheck;
+- Vite production build.
+
+## Merge
+
+PR #2 squash-merged в `main`.
+
+Checkpoint:
+
+`29008e7d53638f37e4c541dce23128952dd4732f`
+
+Production Vercel legacy 0.5 ALPHA намеренно не переключался.
+
+---
+
+# 16. Текущее состояние после PR #2
+
+В `main` уже есть:
+
+- Vite/TypeScript/npm Three.js foundation;
 - GameApp/GameState/Bootstrap;
-- keyboard/touch input foundation;
-- Octree/Capsule foundation;
+- fixed GameLoop/EventBus;
+- desktop + touch InputManager;
+- pointer/touch aim foundation;
+- Octree/PlayerCapsule;
+- world ray/segment queries;
+- SpatialHash;
+- TopDown/ThirdPerson/CameraDirector/CameraCollision;
 - data-driven weapons;
-- Health/Damage/Weapon systems;
+- Weapon/Health/Damage systems;
+- hitscan world occlusion;
 - ProjectileSystem foundation;
 - infected archetypes;
-- quality profiles;
-- split camera controllers;
-- grass foundation;
-- recipes/pools/WindField/EffectSystem;
+- EffectSystem + LightPool/WindField/pool foundations;
+- AssetManager/LevelLoader/LevelManifest;
+- Abandoned Outskirts manifest skeleton;
+- code/media attribution registries;
 - green CI.
 
----
-
-# 20. Следующий порядок
-
-После checkpoint `0a599032`:
-
-1. закрепить package lock / reproducible install;
-2. убрать CameraDirector compatibility shim;
-3. выделить PlayerCapsule;
-4. добавить SpatialHash;
-5. camera/world collision query;
-6. довести pointer-look/mobile aim input;
-7. подключить EffectSystem к Shot/Hit;
-8. AssetManager / LevelLoader / LevelManifest;
-9. functional parity с legacy;
-10. desktop smoke-test;
-11. Android smoke-test;
-12. только потом production migration;
-13. после migration — visual vertical slice 0.6.
+Production по-прежнему остаётся безопасным legacy checkpoint.
 
 ---
 
-# 21. Правило дальнейшего ведения history.md
+# 17. Следующий порядок после `29008e7d`
 
-Каждый крупный этап добавляется новой секцией:
+1. Найти безопасный способ закрепить lockfile и перейти CI на `npm ci`.
+2. Соединить ballistic ProjectileSystem с world/enemy collision + DamageSystem.
+3. Concrete Particle/Decal adapters + camera shake.
+4. Подключить LevelLoader к runtime вместо hardcoded lab world.
+5. Разносить player/world/combat wiring из GameApp в отдельные systems.
+6. Начать 0.5B functional parity: menu/face/lifecycle/waves/pickups.
+7. Desktop smoke-test.
+8. Android smoke-test.
+9. Только после parity — Vite production migration.
+10. Затем visual vertical slice 0.6.
 
-```text
-## YYYY-MM-DD — checkpoint
+---
 
-### Запрос пользователя
-### Решение
-### Что сделано
-### Что сломалось / ограничения
-### Проверка
-### Commit / PR
-### Следующий шаг
-```
+# 18. Правило дальнейшего ведения history.md
 
-Прошлые решения не переписываются задним числом. Если architecture меняется — добавляется новая запись с объяснением причины.
+Каждый крупный этап добавляется новой секцией с запросом пользователя, решением, фактическими изменениями, ограничениями, проверкой, commit/PR и следующим шагом. Прошлые решения не переписываются задним числом; если architecture меняется, добавляется новое событие с причиной.
