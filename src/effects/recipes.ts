@@ -76,5 +76,12 @@ export const EFFECTS: Record<string, EffectRecipe> = {
     ],
     decal: { kind: 'blood', size: 0.28, lifetime: 14 },
     hitStopMs: 12
+  },
+  'surface-hit': {
+    particles: [
+      { kind: 'spark', count: 3, lifetime: 0.22, speed: 2.0, size: 0.025 },
+      { kind: 'debris', count: 3, lifetime: 0.38, speed: 1.3, size: 0.03 }
+    ],
+    decal: { kind: 'bullet', size: 0.16, lifetime: 18 }
   }
 };
