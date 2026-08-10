@@ -1,4 +1,6 @@
 {
+  "buildCommand": "npm run build:deploy",
+  "outputDirectory": "dist-next",
   "rewrites": [
     {
       "source": "/vendor/three.js",
