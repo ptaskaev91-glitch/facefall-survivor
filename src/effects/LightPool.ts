@@ -4,6 +4,7 @@ interface LightInstance {
   light: PointLight;
   age: number;
   lifetime: number;
+  baseIntensity: number;
   active: boolean;
 }
 
@@ -29,7 +30,7 @@ export class LightPool {
       const light = new PointLight(0xffffff, 0, 1, 2);
       light.visible = false;
       this.scene.add(light);
-      item = { light, age: 0, lifetime: 0, active: false };
+      item = { light, age: 0, lifetime: 0, baseIntensity: 0, active: false };
       this.items.push(item);
     }
 
@@ -40,6 +41,7 @@ export class LightPool {
 
     item.age = 0;
     item.lifetime = Math.max(0.01, spec.lifetime);
+    item.baseIntensity = spec.intensity;
     item.active = true;
     item.light.color.setHex(spec.color);
     item.light.intensity = spec.intensity;
@@ -53,7 +55,7 @@ export class LightPool {
       if (!item.active) continue;
       item.age += dt;
       const remaining = Math.max(0, 1 - item.age / item.lifetime);
-      item.light.intensity *= remaining > 0 ? 0.82 + remaining * 0.18 : 0;
+      item.light.intensity = item.baseIntensity * remaining;
       if (item.age >= item.lifetime) this.release(item);
     }
   }
