@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Capsule } from 'three/addons/math/Capsule.js';
 import { GameLoop } from './core/GameLoop';
+import { EventBus } from './core/EventBus';
 import { DualCameraRig, type CameraMode } from './camera/DualCameraRig';
 import { CollisionWorld } from './physics/CollisionWorld';
 import { detectQuality } from './graphics/quality';
@@ -8,6 +9,13 @@ import { GrassField } from './world/GrassField';
 import { WEAPONS } from './combat/weapons';
 import { ENEMY_ARCHETYPES } from './enemies/archetypes';
 import { EFFECTS } from './effects/recipes';
+import { InputManager } from './input/InputManager';
+import { KeyboardMouseInput } from './input/KeyboardMouseInput';
+import { TouchInput } from './input/TouchInput';
+import { WeaponSystem } from './combat/WeaponSystem';
+import { Health } from './combat/Health';
+import { DamageSystem } from './combat/DamageSystem';
+import type { FacefallEvents, HitZone } from './combat/types';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 const status = document.querySelector<HTMLDivElement>('#status');
@@ -19,10 +27,7 @@ if (!app || !status || !topButton || !thirdButton) {
 }
 
 const quality = detectQuality();
-const renderer = new THREE.WebGLRenderer({
-  antialias: quality.antialias,
-  powerPreference: 'high-performance'
-});
+const renderer = new THREE.WebGLRenderer({ antialias: quality.antialias, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.maxPixelRatio));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -101,38 +106,117 @@ function makeCapsuleMarker(radius: number, bodyLength: number, color: number): T
 }
 
 const player = makeCapsuleMarker(0.36, 0.85, 0x8d9c8d);
-const weapon = new THREE.Mesh(
+const weaponMesh = new THREE.Mesh(
   new THREE.BoxGeometry(0.12, 0.1, 0.85),
   new THREE.MeshStandardMaterial({ color: 0x1f2421, roughness: 0.32, metalness: 0.65 })
 );
-weapon.position.set(0.32, 1.18, -0.52);
-player.add(weapon);
+weaponMesh.position.set(0.32, 1.18, -0.52);
+player.add(weaponMesh);
 scene.add(player);
 
-const playerCapsule = new Capsule(
-  new THREE.Vector3(0, 0.35, 0),
-  new THREE.Vector3(0, 1.35, 0),
-  0.35
-);
+const playerCapsule = new Capsule(new THREE.Vector3(0, 0.35, 0), new THREE.Vector3(0, 1.35, 0), 0.35);
 
 const grass = new GrassField(quality);
 scene.add(grass.group);
 
+const events = new EventBus<FacefallEvents>();
+const weaponSystem = new WeaponSystem(events);
+const damageSystem = new DamageSystem(events);
+const raycaster = new THREE.Raycaster();
 const enemyMeshes: THREE.Object3D[] = [];
+const enemyRoots = new Map<string, THREE.Object3D>();
+
 for (const [i, enemy] of Object.values(ENEMY_ARCHETYPES).entries()) {
+  const id = `enemy-${enemy.id}-${i}`;
   const radius = enemy.id === 'brute' ? 0.55 : 0.34;
   const length = enemy.id === 'brute' ? 1.15 : 0.82;
   const mesh = makeCapsuleMarker(radius, length, enemy.id === 'brute' ? 0x765246 : enemy.id === 'runner' ? 0x725b4a : 0x66564d);
   mesh.position.set(-4 + i * 4.2, 0, -8 - i * 2.5);
   const scale = enemy.id === 'runner' ? 0.88 : enemy.id === 'brute' ? 1.18 : 1;
   mesh.scale.setScalar(scale);
+  mesh.traverse((object) => { object.userData.damageTargetId = id; });
   scene.add(mesh);
   enemyMeshes.push(mesh);
+  enemyRoots.set(id, mesh);
+  damageSystem.register({ id, health: new Health(enemy.health) });
 }
 
-const keys = new Set<string>();
-window.addEventListener('keydown', (event) => keys.add(event.code));
-window.addEventListener('keyup', (event) => keys.delete(event.code));
+function getHitZone(object: THREE.Object3D, point: THREE.Vector3): HitZone {
+  const rootId = object.userData.damageTargetId as string | undefined;
+  const root = rootId ? enemyRoots.get(rootId) : undefined;
+  if (!root) return 'torso';
+  const localY = point.y - root.position.y;
+  if (localY > 1.35 * root.scale.y) return 'head';
+  if (localY < 0.55 * root.scale.y) return 'limb';
+  return 'torso';
+}
+
+function spreadDirection(base: THREE.Vector3, spread: number): THREE.Vector3 {
+  const result = base.clone();
+  result.x += (Math.random() - 0.5) * spread;
+  result.y += (Math.random() - 0.5) * spread * 0.45;
+  result.z += (Math.random() - 0.5) * spread;
+  return result.normalize();
+}
+
+events.on('shot', (shot) => {
+  const definition = WEAPONS[shot.weaponId];
+  if (definition.fireModel !== 'hitscan') return;
+
+  for (let pellet = 0; pellet < definition.pellets; pellet++) {
+    const direction = spreadDirection(shot.direction, definition.spread);
+    raycaster.set(shot.origin, direction);
+    raycaster.far = 70;
+    const intersections = raycaster.intersectObjects(enemyMeshes, true);
+    const intersection = intersections.find((entry) => entry.object.visible && entry.object.userData.damageTargetId);
+    if (!intersection) continue;
+
+    const targetId = intersection.object.userData.damageTargetId as string;
+    const hitZone = getHitZone(intersection.object, intersection.point);
+    const multiplier = hitZone === 'head' ? definition.headMultiplier : hitZone === 'limb' ? definition.limbMultiplier : 1;
+    damageSystem.apply({
+      amount: definition.damage * multiplier,
+      kind: shot.weaponId === 'shotgun' ? 'pellet' : 'bullet',
+      sourceId: shot.sourceId,
+      targetId,
+      hitPoint: intersection.point.clone(),
+      direction: direction.clone(),
+      impulse: definition.impulse,
+      hitZone,
+      critical: hitZone === 'head'
+    });
+  }
+});
+
+events.on('hit', (hit) => {
+  status.dataset.lastEvent = `${hit.hitZone.toUpperCase()} ${Math.round(hit.amount)} DMG`;
+  refreshStatus();
+});
+
+events.on('kill', (hit) => {
+  const root = enemyRoots.get(hit.targetId);
+  if (root) root.visible = false;
+  status.dataset.lastEvent = `KILL ${hit.targetId}`;
+  refreshStatus();
+});
+
+const input = new InputManager();
+const keyboard = new KeyboardMouseInput(input);
+keyboard.attach();
+
+const joy = document.querySelector<HTMLElement>('#joy');
+const stick = document.querySelector<HTMLElement>('#stick');
+const touchFire = document.querySelector<HTMLElement>('#touchFire');
+if (joy && stick && touchFire) {
+  new TouchInput(input, {
+    joystick: joy,
+    stick,
+    fire: touchFire,
+    reload: document.querySelector<HTMLElement>('#touchReload') ?? undefined,
+    switchWeapon: document.querySelector<HTMLElement>('#touchWeapon') ?? undefined,
+    toggleCamera: document.querySelector<HTMLElement>('#touchCamera') ?? undefined
+  }).attach();
+}
 
 let cameraMode: CameraMode = 'top';
 function setCameraMode(mode: CameraMode): void {
@@ -150,21 +234,20 @@ const move = new THREE.Vector3();
 const desired = new THREE.Vector3();
 const velocity = new THREE.Vector3();
 const temp = new THREE.Vector3();
+const muzzle = new THREE.Vector3();
+let statusRefresh = 0;
 
 const loop = new GameLoop({
   fixedUpdate(dt) {
-    desired.set(0, 0, 0);
-    if (keys.has('KeyW') || keys.has('ArrowUp')) desired.z -= 1;
-    if (keys.has('KeyS') || keys.has('ArrowDown')) desired.z += 1;
-    if (keys.has('KeyA') || keys.has('ArrowLeft')) desired.x -= 1;
-    if (keys.has('KeyD') || keys.has('ArrowRight')) desired.x += 1;
+    const controls = input.snapshot();
+    desired.set(controls.moveX, 0, controls.moveY);
 
     if (desired.lengthSq() > 0) {
       desired.normalize();
       facing.lerp(temp.copy(desired), 1 - Math.exp(-dt * 12)).normalize();
     }
 
-    const targetSpeed = desired.lengthSq() > 0 ? 5.0 : 0;
+    const targetSpeed = desired.lengthSq() > 0 ? (controls.sprint ? 7.1 : 5.0) : 0;
     move.copy(desired).multiplyScalar(targetSpeed);
     velocity.lerp(move, 1 - Math.exp(-dt * 10));
 
@@ -178,28 +261,41 @@ const loop = new GameLoop({
 
     player.position.set(playerCapsule.start.x, playerCapsule.start.y - 0.35, playerCapsule.start.z);
     player.rotation.y = Math.atan2(-facing.x, -facing.z);
+
+    weaponSystem.update(dt);
+    if (input.consumePressed('toggleCamera')) setCameraMode(cameraMode === 'top' ? 'third' : 'top');
+    if (input.consumePressed('switchWeapon')) weaponSystem.cycle();
+    if (input.consumePressed('reload')) weaponSystem.reload();
+    if (controls.fire) {
+      muzzle.copy(player.position).add(new THREE.Vector3(0, 1.15, 0)).addScaledVector(facing, 0.5);
+      weaponSystem.fire('player', muzzle, facing);
+    }
+
+    statusRefresh -= dt;
+    if (statusRefresh <= 0) {
+      statusRefresh = 0.2;
+      refreshStatus();
+    }
   },
   render(_alpha, frameDt) {
     cameraRig.update(player.position, facing, frameDt);
     grass.update(camera.position);
     renderer.render(scene, camera);
   }
-}, {
-  fixedStep: 1 / 60,
-  maxFrameDelta: 0.1,
-  maxSubSteps: 5
-});
+}, { fixedStep: 1 / 60, maxFrameDelta: 0.1, maxSubSteps: 5 });
 
 function refreshStatus(): void {
+  const runtime = weaponSystem.runtime();
+  const lastEvent = status.dataset.lastEvent ? ` · ${status.dataset.lastEvent}` : '';
   status.textContent = [
     'ENGINE NEXT готов',
     `quality=${quality.id}`,
     `camera=${cameraMode}`,
-    `weapons=${Object.keys(WEAPONS).length}`,
-    `enemy archetypes=${enemyMeshes.length}`,
+    `${WEAPONS[weaponSystem.selected].label} ${runtime.magazine}/${runtime.reserve}`,
+    `enemies=${enemyMeshes.filter((enemy) => enemy.visible).length}`,
     `fx recipes=${Object.keys(EFFECTS).length}`,
-    'Three.js bundled via npm'
-  ].join(' · ');
+    'Three.js=bundled'
+  ].join(' · ') + lastEvent;
 }
 
 refreshStatus();
