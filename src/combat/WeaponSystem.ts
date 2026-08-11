@@ -1,4 +1,5 @@
 import { Vector3 } from 'three';
+import { aimController } from '../aim/AimController';
 import { EventBus } from '../core/EventBus';
 import { WEAPONS, type WeaponDefinition } from './weapons';
 import type { FacefallEvents, WeaponId } from './types';
@@ -16,6 +17,7 @@ export interface WeaponRuntime {
 export class WeaponSystem {
   readonly runtimes = new Map<WeaponId, WeaponRuntime>();
   selected: WeaponId = 'pistol';
+  private readonly resolvedDirection = new Vector3();
 
   constructor(private readonly events: EventBus<FacefallEvents>) {
     this.reset();
@@ -70,7 +72,7 @@ export class WeaponSystem {
     return this.selected;
   }
 
-  fire(sourceId: string, origin: Vector3, direction: Vector3): boolean {
+  fire(sourceId: string, origin: Vector3, fallbackDirection: Vector3): boolean {
     const definition = this.definition();
     const runtime = this.runtime();
     if (runtime.state !== 'idle' || runtime.magazine <= 0) return false;
@@ -78,6 +80,13 @@ export class WeaponSystem {
     runtime.magazine--;
     runtime.state = 'cooldown';
     runtime.stateTime = definition.fireInterval;
+
+    const direction = sourceId === 'player'
+      ? aimController.getWorldDirection(this.resolvedDirection)
+      : this.resolvedDirection.copy(fallbackDirection);
+
+    if (direction.lengthSq() <= 1e-6) direction.copy(fallbackDirection);
+
     this.events.emit('shot', {
       weaponId: definition.id,
       sourceId,
