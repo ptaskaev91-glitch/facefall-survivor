@@ -1,6 +1,4 @@
 import { aimController } from '../aim/AimController';
-import type { FacefallEvents } from '../combat/types';
-import type { EventBus } from '../core/EventBus';
 import { AudioSystem } from '../presentation/audio/AudioSystem';
 import { GameApp, type GameAppDom } from './GameApp';
 import { ProductShell, resolveProductShellDom } from './ProductShell';
@@ -47,10 +45,7 @@ export async function bootstrapEngineNext(): Promise<GameApp | null> {
     dom.status.textContent = 'ENGINE NEXT · готовим меню…';
     app = new GameApp(dom);
 
-    // Temporary integration boundary until GameApp exposes a dedicated presentation
-    // port. The EventBus stays private to simulation code; bootstrap owns adapters.
-    const events = (app as unknown as { events: EventBus<FacefallEvents> }).events;
-    const audio = new AudioSystem(events);
+    const audio = new AudioSystem(app.events);
     const shell = new ProductShell(app, resolveProductShellDom(), audio);
     shell.attach();
 
