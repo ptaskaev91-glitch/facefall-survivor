@@ -99,6 +99,12 @@ export class EnemySystem {
     }
   }
 
+  forEachActive(callback: (actor: EnemyActor) => void): void {
+    for (const actor of this.actors.values()) {
+      if (actor.alive && actor.root.visible) callback(actor);
+    }
+  }
+
   kill(id: string): boolean {
     const actor = this.actors.get(id);
     if (!actor || !actor.alive) return false;
