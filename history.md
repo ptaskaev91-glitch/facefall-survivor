@@ -1,6 +1,6 @@
 # Facefall Survivor — History
 
-Последняя актуализация: **2026-08-10**  
+Последняя актуализация: **2026-08-11**  
 Repository: `ptaskaev91-glitch/facefall-survivor`  
 Source of truth: `main`
 
@@ -234,174 +234,57 @@ Original Facefall implementations:
 - LevelManifest;
 - combat/FX integration.
 
-Также добавлены:
-
-- static world ray/segment queries;
-- third-person camera push-in;
-- hitscan world occlusion;
-- EffectSystem connected to Shot/Hit events;
-- Abandoned Outskirts manifest skeleton;
-- media `ATTRIBUTION.md`.
+Также добавлены static world ray/segment queries, third-person camera push-in, hitscan world occlusion, EffectSystem integration, Abandoned Outskirts manifest skeleton и media attribution registry.
 
 CI green. PR #2 squash-merged → checkpoint `29008e7d`.
 
 ---
 
-# 13. 2026-08-10 — большой 0.5A блок по запросу пользователя
+# 13. PR #3 — большой 0.5A projectile / FX / level block
 
-Пользователь попросил:
+По просьбе пользователя сделать большой связанный блок добавлены:
 
-> сделать сразу большой блок, в конце слить в `main` и обновить Vercel.
+- ballistic bow runtime;
+- projectile gravity/lifetime/segment collision;
+- pooled visible arrows;
+- concrete RuntimeFx particles/decals/camera impulse;
+- surface-hit recipe;
+- manifest-first runtime loading;
+- player spawn / enemy spawn / lights из manifest.
 
-Создан branch `engine-next/0.5a-big-block` и PR **#3**.
-
-## Ballistic bow
-
-ProjectileSystem подключён к реальному combat runtime:
-
-- bow ShotEvent создаёт ballistic projectile;
-- velocity + gravity + lifetime;
-- segment collision каждый fixed tick;
-- collision проверяет enemy и static world;
-- enemy hit идёт в общий DamageSystem;
-- world hit завершает projectile и вызывает surface FX;
-- создан pooled `ProjectileVisuals`, поэтому стрелы реально имеют отдельную visual representation.
-
-## Concrete FX
-
-Создан `RuntimeFx`:
-
-- ParticlePool получил concrete runtime particles;
-- DecalPool получил concrete bounded decals;
-- появились smoke/casing/blood/debris/spark runtime variants;
-- CameraImpulse даёт camera shake;
-- LightPool остаётся bounded;
-- добавлен `surface-hit` recipe.
-
-Таким образом architecture Red-Eclipse-style recipes стала не только interfaces, а рабочим presentation pipeline.
-
-## Level manifest in runtime
-
-LevelLoader получил manifest-first API.
-
-`GameApp` теперь загружает `Abandoned Outskirts/level.manifest.json` при старте engine-next.
-
-Manifest уже управляет prototype runtime data:
-
-- player spawn;
-- enemy spawn placement;
-- level lights.
-
-Пока `level.glb` отсутствует, procedural lab geometry остаётся fallback.
-
-## Validation / merge
-
-PR #3 CI полностью green:
-
-- dependencies install;
-- strict TypeScript;
-- Vite production build.
-
-PR #3 squash-merged в `main`.
-
-Checkpoint:
-
-`bec7b5f8c0110876df2d54b60c7fbb839ee453ca`
+CI green. PR #3 squash-merged → `bec7b5f8c0110876df2d54b60c7fbb839ee453ca`.
 
 ---
 
-# 14. Release tooling / combined artifact
+# 14. PR #4 — release tooling
 
-После PR #3 подготовлен безопасный transition deployment pipeline.
-
-В `main` добавлены:
+Добавлены:
 
 - `scripts/copy-legacy.mjs`;
 - `npm run build:deploy`;
-- `vercel.json` с `buildCommand` и `outputDirectory=dist-next`;
-- CI переключён на combined deploy build.
+- combined `dist-next`;
+- CI artifact `facefall-dist-next`;
+- Vercel output config для переходного периода.
 
-Смысл:
+PR #4 squash-merged → `6d051dae8febbfd61bf2b3cb826bb595edbcbc31`.
 
-```text
-Vite engine-next build
-       +
-stable legacy root files
-       ↓
-dist-next
-```
-
-Так можно собирать новую architecture, не заставляя `/` преждевременно переключаться на engine-next.
-
-Для получения точного CI build создан PR **#4** `Release tooling: publish combined Vercel artifact`.
-
-CI успешно выполнил:
-
-- install;
-- strict typecheck;
-- combined Vercel build;
-- upload `facefall-dist-next` artifact.
-
-Artifact id: `9074430084`.
-
-PR #4 squash-merged в `main`.
-
-Release-tooling checkpoint:
-
-`6d051dae8febbfd61bf2b3cb826bb595edbcbc31`
+Production root намеренно остался legacy до functional parity + Android smoke-test.
 
 ---
 
-# 15. Vercel refresh after the big block
+# 15. Vercel refresh после 0.5A
 
-Connector limitation discovered: current Vercel deploy action accepts explicit `{name,target,files}`, but cannot consume the downloaded CI zip as a single deployment input.
+Production refresh был сделан безопасно без преждевременного переключения `/` на engine-next.
 
-Чтобы не рисковать рабочим public root незавершённым engine-next, production был обновлён безопасно:
+Зафиксированный deployment request:
 
-- новый production deployment получил текущий stable 0.5 ALPHA index;
-- stable legacy CSS/JS проксируются с immutable предыдущего working deployment;
-- Three/GLTF/hero same-origin rewrites сохранены;
-- primary aliases были назначены новому deployment.
+`dpl_2SmWVpkqFmuZL2BBrpQ7v2UbRcEb`
 
-Vercel response:
-
-- deployment id: `dpl_2SmWVpkqFmuZL2BBrpQ7v2UbRcEb`;
-- unique URL: `https://facefall-survivor-862tw5dsx-pavels-projects-0b29bb12.vercel.app`;
-- primary alias: `https://facefall-survivor-pavels-projects-0b29bb12.vercel.app`;
-- initial status returned by create action: `INITIALIZING`.
-
-Immediately after creation, Vercel connector's `get_deployment`/build-log calls again returned `404 not_found` for the new deployment ID. This same connector inconsistency occurred previously. Therefore history does **not** claim READY without browser/user verification.
-
-Important: this refresh intentionally did **not** activate engine-next as `/`. That remains blocked by functional parity + Android smoke-test.
+Vercel connector иногда возвращал `404 not_found` при последующем polling свежих deployment IDs, поэтому READY никогда не считался подтверждённым без фактической проверки.
 
 ---
 
-# 16. Current state after this pass
-
-`main` now contains:
-
-- strict TypeScript/Vite/npm Three.js engine-next;
-- one fixed GameLoop;
-- GameApp/GameState/Bootstrap;
-- desktop/touch input foundation;
-- TOP/3RD camera architecture + camera collision;
-- Octree / PlayerCapsule / SpatialHash;
-- Weapon/Health/Damage pipeline;
-- real hitscan + ballistic projectile foundations;
-- visible pooled arrow projectiles;
-- concrete pooled runtime FX + camera shake;
-- AssetManager / LevelLoader / LevelManifest;
-- runtime manifest integration;
-- combined release build and CI artifact pipeline;
-- code/media licensing notices.
-
-Production root remains the stable legacy 0.5 ALPHA until parity is complete.
-
----
-
-# 17. 2026-08-10 — PR #5 / первый полноценный 0.5B gameplay loop
-
-После команды пользователя «Продолжай» начат этап **0.5B Functional Parity**.
+# 16. PR #5 — первый полноценный 0.5B gameplay loop
 
 Branch: `engine-next/0.5b-gameplay-loop`.  
 PR: **#5**.  
@@ -409,69 +292,151 @@ Squash merge checkpoint: `dcdee8b058726743ba2e518602e2b8cce458f0d1`.
 
 Добавлено:
 
-- новый `EnemySystem`;
-- реальные runtime Walker / Runner / Brute spawn instances;
-- движение заражённых к герою;
-- melee attack range/cooldown/damage из data-driven archetypes;
-- moving enemy SpatialHash update;
-- player зарегистрирован в общем `DamageSystem`;
-- Player Health = 100;
-- новый `WaveDirector`;
-- wave composition растёт по сложности;
-- spawn идёт из `enemy-spawn` markers `LevelManifest`;
-- max active infected зависит от quality profile;
-- kills и score;
-- `gameover` state;
-- restart без reload страницы;
-- reset weapons/projectiles/health/enemies между забегами;
-- engine-lab HUD: HP / WAVE / KILLS / SCORE;
-- engine-lab game-over overlay и кнопка restart;
-- engine-lab label поднят до `ENGINE NEXT 0.5B`.
+- EnemySystem;
+- Walker / Runner / Brute runtime;
+- chase + melee attacks;
+- moving SpatialHash update;
+- player Health/Damage;
+- WaveDirector;
+- manifest spawn zones;
+- quality-dependent enemy cap;
+- kills / score;
+- gameover/restart;
+- HP/WAVE/KILLS/SCORE HUD.
 
-CI для PR #5 полностью green:
+CI полностью green.
 
-- dependencies install — success;
+Ограничение: navigation пока direct chase без navmesh.
+
+---
+
+# 17. Реальный Android feedback — movement и reticle
+
+Пользователь протестировал engine-next на Android и сообщил две конкретные проблемы:
+
+1. joystick movement был непонятен относительно экрана;
+2. не хватало небольшого прицела.
+
+В 0.5B.1 введён camera-relative `MovementFrame`: joystick/WASD теперь преобразуются относительно активной камеры. Добавлен компактный reticle и визуальная стрелка `MOVE` на joystick.
+
+PR #6 squash-merged → checkpoint `276ef78c3e894890c9c75796f9420c8158a91536`.
+
+Этот Android тест важен: engine-next доказал, что загружается и реально управляется на целевом мобильном устройстве, но выявил недостаток самой aim architecture.
+
+---
+
+# 18. PR #7 — focused dual-mode AimSystem
+
+Пользователь показал скриншоты и уточнил:
+
+> «Прицел не двигается при свайпе по экрану. Давай отдельно, фокусно займёмся наведением прицела, в обоих режимах. Это важно».
+
+Было принято решение временно остановить остальные направления и исправить сам контракт наведения.
+
+Добавлен `AimController`.
+
+Ключевой принцип:
+
+> **видимый reticle и фактическое направление ShotEvent должны использовать одно и то же aim state.**
+
+TOP:
+
+- свободно перемещаемый screen-space reticle;
+- touch swipe работает как relative trackpad;
+- reticle → camera ray → ground/world aim;
+- герой ориентируется в эту точку.
+
+3RD:
+
+- floating reticle в ограниченной зоне;
+- вертикальное положение влияет на shot direction;
+- при выходе из central deadzone горизонтальная позиция создаёт soft turn demand для героя/камеры.
+
+WeaponSystem для player shot теперь получает direction из AimController, а не из декоративного HUD/отдельного facing-only пути.
+
+PR #7 CI green. Squash merge checkpoint:
+
+`967993a3c7d57c448e152526d81c9d7f3249789a`
+
+Vercel aim test preview был создан отдельно. Последнее ощущение aim на устройстве всё ещё требует пользовательской проверки.
+
+---
+
+# 19. PR #8 — menu + local face parity
+
+После команды пользователя «Продолжай dev» development вернулся к 0.5B parity.
+
+Выбран крупнейший незакрытый разрыв между engine-next и legacy: product start flow и face upload.
+
+Добавлены:
+
+- `menu` и `face_setup` состояния в GameState;
+- `ProductShell`;
+- engine-next перестал auto-start gameplay;
+- pre-game TOP / 3RD selection;
+- локальный face picker;
+- preview выбранного фото;
+- replace/remove;
+- `FaceStore` через `localStorage`;
+- clear loading/error feedback;
+- `GameApp.start({ cameraMode, faceDataUrl })`;
+- runtime input attaches только после старта gameplay;
+- `FaceSystem` применяет фото к текущему prototype hero;
+- neutral fallback face.
+
+`FaceSystem` сейчас deliberately temporary: это parity face plane на procedural hero. Final Face System 2.0 должен интегрировать лицо в production head/UV.
+
+Первый CI PR #8 поймал strict TypeScript material mismatch (`MeshBasicMaterial` vs inferred `MeshStandardMaterial`). Ошибка была исправлена, после чего повторный CI полностью прошёл:
+
+- install — success;
 - strict TypeScript — success;
-- combined Vercel bundle — success;
+- combined Vercel build — success;
 - artifact upload — success.
 
-Это первая engine-next версия, где есть не только технический combat proof, а замкнутый gameplay loop:
+PR #8 squash-merged в `main`.
 
-```text
-wave spawn
-→ infected chase
-→ infected melee damage
-→ player shoots
-→ damage/kill
-→ score/kills
-→ next wave
-→ player death
-→ game over
-→ restart
-```
+Checkpoint:
 
-Ограничение: enemy navigation пока прямолинейная и ещё не использует navmesh/obstacle avoidance, поэтому это functional parity foundation, а не финальный AI.
+`56f90d50ac488f4227b28305d4b1da419927375a`
 
 ---
 
-# 18. Next order
+# 20. Текущая точка
 
-1. Обновить Vercel test build для engine-next 0.5B и проверить его в браузере/Android.
-2. Перенести face upload/local persistence в engine-next.
-3. Добавить полноценный menu/start flow вместо lab-only auto-start.
-4. Довести third-person aim/crosshair/mobile aim assist.
-5. Добавить rain/ambient atmosphere parity.
-6. Начать navmesh spike + EnemyState/avoidance.
-7. Декомпозировать GameApp дальше после стабилизации 0.5B.
-8. Desktop browser smoke-test.
-9. Real Android smoke-test.
-10. Только после parity + smoke-test переключить production `/` на Vite engine-next.
+Engine-next теперь имеет:
+
+- modular TypeScript/Vite runtime;
+- camera-relative movement;
+- TOP/3RD AimController;
+- unified visible-reticle/shot direction;
+- combat/enemy/wave/gameover loop;
+- menu/start flow;
+- local face persistence;
+- pre-game camera selection;
+- prototype face integration;
+- pooled FX/projectiles;
+- manifest-driven runtime markers.
+
+Production `/` всё ещё legacy 0.5 ALPHA до завершения parity и свежего Android smoke-test.
 
 ---
 
-# 19. Future history format
+# 21. Следующий порядок
 
-For each large pass:
+1. Опубликовать отдельный Vercel preview текущего 0.5B.3.
+2. Проверить на Android: menu → face select → preview → camera choice → start → persisted reload → replace/remove.
+3. Повторно оценить aim 0.5B.2/0.5B.3 в TOP и 3RD.
+4. Добавить health/ammo pickups.
+5. Добавить rain + base ambient atmosphere.
+6. Закрепить package lock / перейти CI на `npm ci`.
+7. Добавить browser smoke automation.
+8. Начать navmesh spike.
+9. Провести latest desktop + Android smoke-test.
+10. Только затем рассматривать переключение production `/` на engine-next.
+
+---
+
+# 22. Future history format
 
 ```text
 ## YYYY-MM-DD — checkpoint
