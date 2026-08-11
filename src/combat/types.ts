@@ -27,6 +27,10 @@ export interface ShotEvent {
   direction: Vector3;
 }
 
+export interface WeaponReloadEvent {
+  weaponId: WeaponId;
+}
+
 export interface EnemyAttackEvent {
   sourceId: string;
   position: Vector3;
@@ -46,6 +50,7 @@ export type WeaponId = 'pistol' | 'shotgun' | 'bow';
 
 export interface FacefallEvents {
   shot: ShotEvent;
+  weaponReload: WeaponReloadEvent;
   hit: HitEvent;
   kill: HitEvent;
   enemyAttack: EnemyAttackEvent;
