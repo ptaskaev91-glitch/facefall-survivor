@@ -18,6 +18,7 @@ export class AudioSystem {
 
   constructor(events: EventBus<FacefallEvents>) {
     this.cleanups.push(events.on('shot', (event) => this.onShot(event)));
+    this.cleanups.push(events.on('weaponReload', (event) => this.onReload(event.weaponId)));
     this.cleanups.push(events.on('hit', (event) => {
       if (event.targetId === 'player') this.pulse(88, 0.12, 0.06, 'sawtooth');
       else this.noiseBurst(event.critical ? 0.11 : 0.06, event.critical ? 0.10 : 0.055, 1300);
@@ -125,6 +126,18 @@ export class AudioSystem {
     }
     this.pulse(420, 0.07, 0.035, 'triangle');
     this.noiseBurst(0.035, 0.035, 2600);
+  }
+
+  private onReload(weaponId: 'pistol' | 'shotgun' | 'bow'): void {
+    if (!this.context || this.context.state !== 'running') return;
+    if (weaponId === 'bow') {
+      this.noiseBurst(0.04, 0.018, 2200);
+      this.pulse(340, 0.045, 0.018, 'triangle');
+      return;
+    }
+    const base = weaponId === 'shotgun' ? 165 : 230;
+    this.pulse(base, 0.045, 0.025, 'square');
+    this.noiseBurst(weaponId === 'shotgun' ? 0.075 : 0.05, 0.022, 1100);
   }
 
   private thunder(intensity: number): void {
