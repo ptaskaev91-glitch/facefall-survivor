@@ -17,7 +17,6 @@ export function resolveGameAppDom(): GameAppDom {
     status: required<HTMLDivElement>('#status'),
     topButton: required<HTMLButtonElement>('#camTop'),
     thirdButton: required<HTMLButtonElement>('#camThird'),
-    reticle: optional<HTMLElement>('#aimReticle'),
     hp: optional<HTMLElement>('#runHp'),
     wave: optional<HTMLElement>('#runWave'),
     kills: optional<HTMLElement>('#runKills'),
@@ -39,8 +38,8 @@ export async function bootstrapEngineNext(): Promise<GameApp | null> {
   let app: GameApp | null = null;
 
   try {
+    aimController.setReticle(optional<HTMLElement>('#aimReticle'));
     dom = resolveGameAppDom();
-    aimController.setReticle(dom.reticle);
     dom.status.textContent = 'ENGINE NEXT · bootstrap…';
     app = new GameApp(dom);
     await app.start();
