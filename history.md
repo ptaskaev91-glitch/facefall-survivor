@@ -321,44 +321,37 @@ CI полностью green.
 
 PR #6 squash-merged → checkpoint `276ef78c3e894890c9c75796f9420c8158a91536`.
 
-Этот Android тест важен: engine-next доказал, что загружается и реально управляется на целевом мобильном устройстве, но выявил недостаток самой aim architecture.
+Этот Android test подтвердил browser/mobile runtime, но выявил недостаток самой aim architecture.
 
 ---
 
 # 18. PR #7 — focused dual-mode AimSystem
 
-Пользователь показал скриншоты и уточнил:
-
-> «Прицел не двигается при свайпе по экрану. Давай отдельно, фокусно займёмся наведением прицела, в обоих режимах. Это важно».
-
-Было принято решение временно остановить остальные направления и исправить сам контракт наведения.
+Пользователь показал скриншоты и уточнил, что прицел не двигается при свайпе и наведение в обоих режимах нужно исправить отдельно.
 
 Добавлен `AimController`.
 
 Ключевой принцип:
 
-> **видимый reticle и фактическое направление ShotEvent должны использовать одно и то же aim state.**
+> **видимый reticle и фактическое направление ShotEvent используют одно и то же aim state.**
 
 TOP:
 
 - свободно перемещаемый screen-space reticle;
 - touch swipe работает как relative trackpad;
-- reticle → camera ray → ground/world aim;
-- герой ориентируется в эту точку.
+- reticle → camera ray → world aim.
 
 3RD:
 
 - floating reticle в ограниченной зоне;
 - вертикальное положение влияет на shot direction;
-- при выходе из central deadzone горизонтальная позиция создаёт soft turn demand для героя/камеры.
+- выход из central deadzone создаёт soft turn demand для героя/камеры.
 
-WeaponSystem для player shot теперь получает direction из AimController, а не из декоративного HUD/отдельного facing-only пути.
+WeaponSystem для player shot получает direction из AimController.
 
 PR #7 CI green. Squash merge checkpoint:
 
 `967993a3c7d57c448e152526d81c9d7f3249789a`
-
-Vercel aim test preview был создан отдельно. Последнее ощущение aim на устройстве всё ещё требует пользовательской проверки.
 
 ---
 
@@ -366,77 +359,146 @@ Vercel aim test preview был создан отдельно. Последнее
 
 После команды пользователя «Продолжай dev» development вернулся к 0.5B parity.
 
-Выбран крупнейший незакрытый разрыв между engine-next и legacy: product start flow и face upload.
-
 Добавлены:
 
-- `menu` и `face_setup` состояния в GameState;
+- `menu` и `face_setup` states;
 - `ProductShell`;
 - engine-next перестал auto-start gameplay;
 - pre-game TOP / 3RD selection;
-- локальный face picker;
-- preview выбранного фото;
+- local face picker/preview;
 - replace/remove;
 - `FaceStore` через `localStorage`;
-- clear loading/error feedback;
+- loading/error feedback;
 - `GameApp.start({ cameraMode, faceDataUrl })`;
-- runtime input attaches только после старта gameplay;
-- `FaceSystem` применяет фото к текущему prototype hero;
+- runtime input attaches после start;
+- `FaceSystem` применяет фото к prototype hero;
 - neutral fallback face.
 
-`FaceSystem` сейчас deliberately temporary: это parity face plane на procedural hero. Final Face System 2.0 должен интегрировать лицо в production head/UV.
+`FaceSystem` временный: это parity face plane. Final Face System 2.0 должен интегрировать лицо в production head/UV.
 
-Первый CI PR #8 поймал strict TypeScript material mismatch (`MeshBasicMaterial` vs inferred `MeshStandardMaterial`). Ошибка была исправлена, после чего повторный CI полностью прошёл:
+Первый CI поймал strict TypeScript material mismatch. После исправления CI полностью green.
 
-- install — success;
-- strict TypeScript — success;
-- combined Vercel build — success;
-- artifact upload — success.
-
-PR #8 squash-merged в `main`.
-
-Checkpoint:
+PR #8 squash-merged:
 
 `56f90d50ac488f4227b28305d4b1da419927375a`
 
 ---
 
-# 20. Текущая точка
+# 20. Vercel preview contract issue
+
+После PR #8 CI-built `engine-next-preview` был проверен и содержал compiled `0.5B.3 MENU+FACE` bundle.
+
+Попытка создать новый Vercel preview выявила отдельную проблему connector contract: видимая схема `deploy_to_vercel` не принимала параметры, а backend требовал `target`, `name`, `files`.
+
+Это не build failure. Новый 0.5B.3 preview URL не был объявлен как созданный. Production не менялся.
+
+---
+
+# 21. PR #9 — manifest pickups + bounded rain
+
+Development продолжен по `dev.md` несмотря на Vercel connector issue.
+
+Branch: `engine-next/0.5b4-pickups-rain`.  
+PR: **#9**.  
+Squash merge checkpoint:
+
+`0876eff1839e9c93a669dc328cf225e200ebf498`
+
+Добавлено:
+
+## Pickups
+
+- новый `PickupSystem`;
+- health/ammo как `LevelManifest kind=loot` markers;
+- Abandoned Outskirts получил один health и два ammo markers;
+- health использует общий `Health.heal()`;
+- ammo пополняет reserve выбранного оружия через `WeaponSystem.addReserve()`;
+- proximity collection;
+- simple bounded visuals;
+- hide + prototype 18-second respawn;
+- reset между run-ами.
+
+## Rain
+
+Добавлен `RainField`:
+
+- одна `Points` geometry вместо Mesh на каждую каплю;
+- reusable typed arrays positions/speeds;
+- quality-dependent density: примерно 420 / 760 / 1200 drops;
+- rain volume recycle вокруг player anchor;
+- mobile-first budget;
+- корректный dispose.
+
+## Aim consistency
+
+Закрыта ещё одна integration gap из focused aim-pass: в TOP фактический ShotEvent уже шёл в visible reticle, но procedural герой мог визуально не следовать touch-reticle. Теперь TOP facing также берётся из `AimController` world direction.
+
+Итоговый invariant:
+
+```text
+visible reticle
+→ AimController
+→ world aim
+├→ hero facing
+└→ WeaponSystem ShotEvent
+```
+
+## CI
+
+PR #9 полностью green:
+
+- dependencies install — success;
+- strict TypeScript — success;
+- combined Vercel build — success;
+- deploy artifact upload — success.
+
+После merge engine-lab build label обновлён на:
+
+`FACEFALL // ENGINE NEXT 0.5B.4 PICKUPS+RAIN`
+
+---
+
+# 22. Текущая точка
 
 Engine-next теперь имеет:
 
 - modular TypeScript/Vite runtime;
+- product menu/start flow;
+- local face picker/persistence;
+- TOP/3RD camera selection;
 - camera-relative movement;
-- TOP/3RD AimController;
-- unified visible-reticle/shot direction;
-- combat/enemy/wave/gameover loop;
-- menu/start flow;
-- local face persistence;
-- pre-game camera selection;
-- prototype face integration;
+- shared reticle/facing/shot AimController contract;
+- pistol/shotgun/bow pipeline;
+- ballistic arrows;
+- EnemySystem + Walker/Runner/Brute;
+- WaveDirector;
+- player damage/gameover/restart;
+- score/kills;
+- manifest-driven health/ammo pickups;
+- bounded quality-scaled rain;
 - pooled FX/projectiles;
 - manifest-driven runtime markers.
 
-Production `/` всё ещё legacy 0.5 ALPHA до завершения parity и свежего Android smoke-test.
+Production `/` остаётся legacy 0.5 ALPHA до завершения parity и свежего Android smoke-test.
 
 ---
 
-# 21. Следующий порядок
+# 23. Следующий порядок
 
-1. Опубликовать отдельный Vercel preview текущего 0.5B.3.
-2. Проверить на Android: menu → face select → preview → camera choice → start → persisted reload → replace/remove.
-3. Повторно оценить aim 0.5B.2/0.5B.3 в TOP и 3RD.
-4. Добавить health/ammo pickups.
-5. Добавить rain + base ambient atmosphere.
-6. Закрепить package lock / перейти CI на `npm ci`.
-7. Добавить browser smoke automation.
-8. Начать navmesh spike.
-9. Провести latest desktop + Android smoke-test.
-10. Только затем рассматривать переключение production `/` на engine-next.
+1. Закрепить reproducible `package-lock.json` и перевести CI на `npm ci`.
+2. Добавить automated browser smoke: boot → menu → start → gameplay + fatal console checks.
+3. Создать базовый AudioSystem и rain/wind ambient layer; затем lightning/thunder.
+4. Добавить aim sensitivity/deadzone config и лёгкий mobile aim assist после device tuning.
+5. Продолжить decomposition GameApp.
+6. Начать navmesh spike и obstacle-aware enemy movement.
+7. Решить Vercel preview deployment path через рабочий connector/Git integration/artifact route.
+8. Провести latest desktop + Android smoke-test 0.5B.4.
+9. Сравнить functional parity с legacy.
+10. Только затем переключать production `/` на engine-next.
 
 ---
 
-# 22. Future history format
+# 24. Future history format
 
 ```text
 ## YYYY-MM-DD — checkpoint
