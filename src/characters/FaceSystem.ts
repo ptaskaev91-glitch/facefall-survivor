@@ -6,10 +6,10 @@ import * as THREE from 'three';
 export class FaceSystem {
   private readonly root = new THREE.Group();
   private readonly geometry = new THREE.PlaneGeometry(0.54, 0.66);
-  private readonly fallbackMaterial = new THREE.MeshStandardMaterial({
+  private readonly fallbackMaterial = new THREE.MeshBasicMaterial({
     color: 0xaab7a7,
-    roughness: 0.82,
-    side: THREE.DoubleSide
+    side: THREE.DoubleSide,
+    toneMapped: false
   });
   private readonly mesh = new THREE.Mesh(this.geometry, this.fallbackMaterial);
   private texture: THREE.Texture | null = null;
