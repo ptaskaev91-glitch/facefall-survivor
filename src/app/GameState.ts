@@ -1,5 +1,7 @@
 export type GameState =
   | 'boot'
+  | 'menu'
+  | 'face_setup'
   | 'loading'
   | 'playing'
   | 'paused'
@@ -8,12 +10,14 @@ export type GameState =
   | 'disposed';
 
 const ALLOWED_TRANSITIONS: Record<GameState, readonly GameState[]> = {
-  boot: ['loading', 'error', 'disposed'],
-  loading: ['playing', 'error', 'disposed'],
-  playing: ['paused', 'gameover', 'error', 'disposed'],
-  paused: ['playing', 'gameover', 'error', 'disposed'],
-  gameover: ['loading', 'disposed'],
-  error: ['loading', 'disposed'],
+  boot: ['menu', 'loading', 'error', 'disposed'],
+  menu: ['face_setup', 'loading', 'disposed'],
+  face_setup: ['menu', 'loading', 'disposed'],
+  loading: ['playing', 'menu', 'error', 'disposed'],
+  playing: ['paused', 'gameover', 'menu', 'error', 'disposed'],
+  paused: ['playing', 'gameover', 'menu', 'error', 'disposed'],
+  gameover: ['loading', 'menu', 'disposed'],
+  error: ['menu', 'loading', 'disposed'],
   disposed: []
 };
 
