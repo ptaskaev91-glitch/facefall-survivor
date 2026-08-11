@@ -4,7 +4,7 @@
 Repository: `ptaskaev91-glitch/facefall-survivor`  
 Source of truth: `main`  
 Production root: **legacy 0.5 ALPHA on Vercel**  
-Latest engine-next checkpoint: **PR #8 / `56f90d50ac488f4227b28305d4b1da419927375a`**  
+Latest engine-next checkpoint: **PR #9 / `0876eff1839e9c93a669dc328cf225e200ebf498`**  
 Focused aim checkpoint: **PR #7 / `967993a3c7d57c448e152526d81c9d7f3249789a`**
 
 ---
@@ -17,7 +17,7 @@ Focused aim checkpoint: **PR #7 / `967993a3c7d57c448e152526d81c9d7f3249789a`**
 
 # 2. Итоговая технологическая формула
 
-> **TypeScript + Vite + npm Three.js + GLB/manifest levels + static Octree/Capsule collision + SpatialHash + navmesh AI + data-driven combat + event-driven presentation + pooled FX + local-first face system + mobile-first controls/performance.**
+> **TypeScript + Vite + npm Three.js + GLB/manifest levels + static Octree/Capsule collision + SpatialHash + navmesh AI + data-driven combat + event-driven presentation + pooled/batched FX + local-first face system + mobile-first controls/performance.**
 
 GitHub `main` остаётся source-of-truth. Vercel — единственный hosting target.
 
@@ -97,6 +97,9 @@ facefall-survivor/
 │   ├── waves/
 │   │   └── WaveDirector.ts
 │   │
+│   ├── pickups/
+│   │   └── PickupSystem.ts
+│   │
 │   ├── effects/
 │   │   ├── recipes.ts
 │   │   ├── EffectSystem.ts
@@ -105,6 +108,9 @@ facefall-survivor/
 │   │   ├── DecalPool.ts
 │   │   ├── LightPool.ts
 │   │   └── WindField.ts
+│   │
+│   ├── rendering/
+│   │   └── RainField.ts
 │   │
 │   ├── graphics/
 │   │   └── quality.ts
@@ -145,8 +151,6 @@ dist-next/
 
 # 4. Product lifecycle
 
-Current engine-next lifecycle after PR #8:
-
 ```text
 BOOT
   ↓
@@ -165,7 +169,7 @@ RESTART → PLAYING
 ERROR → MENU
 ```
 
-`ProductShell` owns menu/file-input/local UI state. `GameApp` receives already-normalized start options and never owns raw `<input type=file>` logic.
+`ProductShell` owns browser UI/file-input state. `GameApp` receives normalized start options and does not own raw file-selection logic.
 
 ---
 
@@ -185,15 +189,15 @@ FaceSystem
 prototype hero face mesh/texture
 ```
 
-Current `FaceSystem` is deliberately a parity implementation: it uses a temporary face plane on the procedural hero. Final 0.85/0.6 integration must fit the face to the production head/UV rather than preserve this temporary geometry.
+Current `FaceSystem` is a functional-parity implementation. Final production integration must fit the face to the real character head/UV instead of keeping the temporary plane.
 
-Privacy rule remains local-first: face upload is not required to leave the browser.
+Privacy rule remains local-first: the face image is not required to leave the browser.
 
 ---
 
 # 6. Aim architecture
 
-The visible reticle is now gameplay state, not decorative UI.
+The reticle is gameplay state, not decoration.
 
 ```text
 Mouse / touch swipe
@@ -201,8 +205,9 @@ Mouse / touch swipe
 Input adapters
   ↓
 AimController screen-space NDC
-  ├── updates visible reticle
-  ├── TOP → camera ray → ground/world aim
+  ├── visible reticle
+  ├── TOP → camera ray → world aim
+  │          └── hero facing follows same world direction
   └── 3RD → camera ray + floating-reticle soft edge
                    ↓
              CameraDirector turn demand
@@ -214,11 +219,9 @@ AimController screen-space NDC
                 ShotEvent
 ```
 
-Important invariant:
+Invariant:
 
-> **The direction used by WeaponSystem must come from the same AimController state that positions the visible reticle.**
-
-TOP uses a wide free reticle. 3RD uses a tighter floating reticle; moving toward the horizontal edge requests gradual character/camera yaw.
+> **Visible reticle, procedural hero facing and actual player ShotEvent all derive from the same AimController state.**
 
 ---
 
@@ -232,8 +235,6 @@ TouchInput ─────────┘
 
 `MovementFrame` maps joystick/WASD relative to the active camera, so screen-up means forward in both TOP and 3RD.
 
-Cameras:
-
 ```text
 CameraDirector
 ├── TopDownCamera
@@ -241,7 +242,7 @@ CameraDirector
       └── CameraCollision → CollisionWorld
 ```
 
-Both cameras render/control one player/world simulation.
+Both cameras use one player/world simulation.
 
 ---
 
@@ -257,15 +258,15 @@ Bootstrap
 
 GameLoop fixed tick
   ↓
-Input snapshot
+Input
   ↓
-Player / weapons / enemies / waves
+Player / weapons / enemies / waves / pickups
   ↓
 Physics / projectiles / SpatialHash
   ↓
 Events
   ↓
-FX / HUD / camera / render
+FX / HUD / atmosphere / camera / render
 ```
 
 There must never be a second independent gameplay/physics loop.
@@ -286,7 +287,7 @@ EnemySystem → moving actors → SpatialHash
 
 Raycast/segmentCast are reused for camera collision, hitscan occlusion and ballistic projectile collision.
 
-Current infected movement is still direct chase. Target:
+Current infected movement is direct chase. Target:
 
 ```text
 EnemyBrain
@@ -300,7 +301,7 @@ LocalAvoidance + SpatialHash
 Desired velocity
 ```
 
-Collision and navigation stay separate.
+Collision and navigation remain separate.
 
 ---
 
@@ -331,11 +332,33 @@ WaveDirector
 EnemySystem.spawn(Walker / Runner / Brute)
 ```
 
-WaveDirector owns composition/timing; final navigation will not change that contract.
+WaveDirector owns wave composition/timing; final navmesh will not change that contract.
 
 ---
 
-# 11. Presentation / FX
+# 11. Pickup architecture
+
+Pickups are semantic level objects, not coordinates hardcoded inside `PickupSystem`.
+
+```text
+LevelManifest kind=loot
+  ↓
+PickupSystem.configure()
+  ├── health → Health.heal()
+  └── ammo → WeaponSystem.addReserve()
+       ↓
+proximity collection
+       ↓
+hide / timed respawn / reset with run
+```
+
+Current Abandoned Outskirts manifest contains health and ammo loot markers. The system supports bounded simple visuals and an 18-second respawn prototype.
+
+---
+
+# 12. Presentation / atmosphere
+
+Combat presentation:
 
 ```text
 Shot / Hit event
@@ -348,11 +371,23 @@ EffectSystem + recipe
   └── camera impulse
 ```
 
-Runtime visuals remain bounded by capacity/TTL. Audio will enter as another presentation adapter, not as combat logic.
+Atmosphere currently adds:
+
+```text
+RainField
+  ↓ quality profile
+single Points geometry
+  ↓
+420 / 760 / 1200 approximate drops by profile
+  ↓
+recycled around player anchor
+```
+
+Rain intentionally avoids one Mesh per drop. Audio will become a separate presentation adapter later.
 
 ---
 
-# 12. Level architecture
+# 13. Level architecture
 
 Target:
 
@@ -368,11 +403,11 @@ public/assets/levels/abandoned-outskirts/
 - manifest → player/enemy spawns, lights, loot, wind/audio zones, choke points, interactions;
 - navmesh → infected traversal.
 
-Manifest already participates in runtime. Procedural geometry remains fallback until authored `level.glb` exists.
+Manifest already drives player spawn, enemy spawn zones, prototype lights and loot. Procedural geometry remains fallback until authored `level.glb` exists.
 
 ---
 
-# 13. Release architecture
+# 14. Release architecture
 
 ```text
 npm run build:deploy
@@ -389,12 +424,14 @@ CI
 Transition policy:
 
 - production `/` remains stable legacy;
-- engine-next is tested through dedicated previews;
+- engine-next is tested separately;
 - production root switches only after 0.5B parity + latest Android smoke-test.
+
+The current Vercel connector has an inconsistent preview-deploy contract, so a new preview is not considered published unless the deployment call actually succeeds.
 
 ---
 
-# 14. Target structure
+# 15. Target structure
 
 ```text
 src/
@@ -425,11 +462,11 @@ src/
 └── debug/
 ```
 
-`GameApp` is still larger than the target architecture permits. Decomposition continues after parity-critical systems stop moving.
+`GameApp` remains larger than the target architecture permits. Decomposition resumes after parity-critical wiring stabilizes.
 
 ---
 
-# 15. Temporary / legacy pieces
+# 16. Temporary / legacy pieces
 
 Temporary:
 
@@ -438,21 +475,24 @@ Temporary:
 - procedural hero/environment;
 - temporary FaceSystem plane;
 - direct-chase enemy movement;
+- primitive pickup visuals;
 - engine-lab debug status HUD.
 
-They are removed only after functional parity and device verification.
+They are removed/replaced only after functional parity and device verification.
 
 ---
 
-# 16. Change rules
+# 17. Change rules
 
 1. Do not grow `main.ts` or `GameApp` into permanent monoliths.
 2. ProductShell owns browser UI/file APIs; simulation must not.
-3. Visible reticle and actual shot direction share one AimController state.
+3. Visible reticle, player facing and actual shot direction share one AimController state.
 4. Simulation does not create DOM/audio/particles directly.
 5. Collision, crowd lookup and navigation remain separate.
 6. Weapons/enemies/FX remain data-driven.
-7. External code/assets require license tracking.
-8. Generated `dist-next` is build output, never canonical source.
-9. Production switch requires parity + real Android validation.
-10. Update `structure.md`, `dev.md`, `history.md` at large checkpoints.
+7. Level gameplay objects are driven by manifest semantics.
+8. Repeating visual systems must be bounded by pools/batches/budgets.
+9. External code/assets require license tracking.
+10. Generated `dist-next` is build output, never canonical source.
+11. Production switch requires parity + real Android validation.
+12. Update `structure.md`, `dev.md`, `history.md` at large checkpoints.
