@@ -1,3 +1,5 @@
+import { movementFrame } from './MovementFrame';
+
 export type InputAction = 'fire' | 'reload' | 'switchWeapon' | 'toggleCamera' | 'sprint';
 
 export interface InputSnapshot {
@@ -65,9 +67,10 @@ export class InputManager {
   }
 
   snapshot(): InputSnapshot {
+    const movement = movementFrame.map(this.moveX, this.moveY);
     const snapshot = {
-      moveX: this.moveX,
-      moveY: this.moveY,
+      moveX: movement.x,
+      moveY: movement.y,
       aimX: this.aimX,
       aimY: this.aimY,
       pointerX: this.pointerX,
