@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { DamageSystem } from '../combat/DamageSystem';
 import { Health } from '../combat/Health';
 import { LocalAvoidance } from '../navigation/LocalAvoidance';
+import { DirectNavigationQuery, type NavigationQuery } from '../navigation/NavigationQuery';
 import { SpatialHash, type SpatialHashItem } from '../physics/SpatialHash';
 import { ENEMY_ARCHETYPES, type EnemyArchetype, type EnemyId } from './archetypes';
 import { EnemyBrain } from './EnemyBrain';
@@ -34,10 +35,12 @@ export class EnemySystem {
   private readonly brain = new EnemyBrain();
   private readonly avoidance = new LocalAvoidance<EnemySpatialItem>();
   private readonly neighbours: EnemySpatialItem[] = [];
+  private navigation: NavigationQuery = new DirectNavigationQuery();
   private nextId = 1;
   private readonly desired = new THREE.Vector3();
   private readonly steered = new THREE.Vector3();
   private readonly offset = new THREE.Vector3();
+  private readonly waypoint = new THREE.Vector3();
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -45,6 +48,10 @@ export class EnemySystem {
     private readonly options: EnemySystemOptions
   ) {
     this.spatial = new SpatialHash<EnemySpatialItem>(options.spatialCellSize ?? 4);
+  }
+
+  setNavigationQuery(navigation: NavigationQuery): void {
+    this.navigation = navigation;
   }
 
   spawn(type: EnemyId, position: THREE.Vector3): EnemyActor | null {
@@ -101,8 +108,11 @@ export class EnemySystem {
         continue;
       }
 
-      if (distance > 1e-5) {
-        this.desired.copy(this.offset).multiplyScalar(1 / distance).multiplyScalar(actor.archetype.speed);
+      this.navigation.nextWaypoint(actor.root.position, playerPosition, this.waypoint);
+      this.offset.copy(this.waypoint).sub(actor.root.position).setY(0);
+      const waypointDistance = this.offset.length();
+      if (waypointDistance > 1e-5) {
+        this.desired.copy(this.offset).multiplyScalar(1 / waypointDistance).multiplyScalar(actor.archetype.speed);
       } else {
         this.desired.set(0, 0, 0);
       }
