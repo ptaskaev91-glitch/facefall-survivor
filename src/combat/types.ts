@@ -27,10 +27,33 @@ export interface ShotEvent {
   direction: Vector3;
 }
 
+export interface WeaponReloadEvent {
+  weaponId: WeaponId;
+}
+
+export interface EnemyAttackEvent {
+  sourceId: string;
+  position: Vector3;
+  kind: 'walker' | 'runner' | 'brute';
+}
+
+export interface FootstepEvent {
+  position: Vector3;
+  sprinting: boolean;
+}
+
+export interface ThunderEvent {
+  intensity: number;
+}
+
 export type WeaponId = 'pistol' | 'shotgun' | 'bow';
 
 export interface FacefallEvents {
   shot: ShotEvent;
+  weaponReload: WeaponReloadEvent;
   hit: HitEvent;
   kill: HitEvent;
+  enemyAttack: EnemyAttackEvent;
+  footstep: FootstepEvent;
+  thunder: ThunderEvent;
 }

@@ -18,11 +18,21 @@ export class AudioSystem {
 
   constructor(events: EventBus<FacefallEvents>) {
     this.cleanups.push(events.on('shot', (event) => this.onShot(event)));
+    this.cleanups.push(events.on('weaponReload', (event) => this.onReload(event.weaponId)));
     this.cleanups.push(events.on('hit', (event) => {
       if (event.targetId === 'player') this.pulse(88, 0.12, 0.06, 'sawtooth');
       else this.noiseBurst(event.critical ? 0.11 : 0.06, event.critical ? 0.10 : 0.055, 1300);
     }));
     this.cleanups.push(events.on('kill', () => this.pulse(180, 0.08, 0.035, 'triangle')));
+    this.cleanups.push(events.on('enemyAttack', (event) => {
+      const base = event.kind === 'brute' ? 58 : event.kind === 'runner' ? 118 : 84;
+      this.pulse(base, event.kind === 'brute' ? 0.19 : 0.11, event.kind === 'brute' ? 0.08 : 0.045, 'sawtooth');
+      this.noiseBurst(event.kind === 'brute' ? 0.16 : 0.08, event.kind === 'brute' ? 0.08 : 0.035, 680);
+    }));
+    this.cleanups.push(events.on('footstep', (event) => {
+      this.noiseBurst(event.sprinting ? 0.045 : 0.032, event.sprinting ? 0.032 : 0.021, 520);
+    }));
+    this.cleanups.push(events.on('thunder', (event) => this.thunder(event.intensity)));
   }
 
   setVolume(value: number): void {
@@ -116,6 +126,25 @@ export class AudioSystem {
     }
     this.pulse(420, 0.07, 0.035, 'triangle');
     this.noiseBurst(0.035, 0.035, 2600);
+  }
+
+  private onReload(weaponId: 'pistol' | 'shotgun' | 'bow'): void {
+    if (!this.context || this.context.state !== 'running') return;
+    if (weaponId === 'bow') {
+      this.noiseBurst(0.04, 0.018, 2200);
+      this.pulse(340, 0.045, 0.018, 'triangle');
+      return;
+    }
+    const base = weaponId === 'shotgun' ? 165 : 230;
+    this.pulse(base, 0.045, 0.025, 'square');
+    this.noiseBurst(weaponId === 'shotgun' ? 0.075 : 0.05, 0.022, 1100);
+  }
+
+  private thunder(intensity: number): void {
+    if (!this.context || this.context.state !== 'running') return;
+    const strength = Math.max(0.25, Math.min(1, intensity));
+    this.noiseBurst(0.72, 0.12 * strength, 240);
+    this.pulse(42, 0.55, 0.09 * strength, 'sawtooth');
   }
 
   private pulse(frequency: number, duration: number, gainValue: number, type: OscillatorType): void {

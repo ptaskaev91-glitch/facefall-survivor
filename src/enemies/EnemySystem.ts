@@ -17,6 +17,11 @@ export interface EnemyActor {
   root: THREE.Group;
   velocity: THREE.Vector3;
   attackTimer: number;
+  staggerTimer: number;
+  alertTimer: number;
+  wanderTimer: number;
+  lastKnownTarget: THREE.Vector3;
+  wanderTarget: THREE.Vector3;
   alive: boolean;
   unregisterDamage: () => void;
   spatial: EnemySpatialItem;
@@ -26,6 +31,7 @@ export interface EnemySystemOptions {
   shadows: boolean;
   maxActive: number;
   spatialCellSize?: number;
+  canSeeTarget?: (from: THREE.Vector3, to: THREE.Vector3) => boolean;
 }
 
 export class EnemySystem {
@@ -41,6 +47,7 @@ export class EnemySystem {
   private readonly steered = new THREE.Vector3();
   private readonly offset = new THREE.Vector3();
   private readonly waypoint = new THREE.Vector3();
+  private readonly target = new THREE.Vector3();
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -77,6 +84,11 @@ export class EnemySystem {
       root,
       velocity: new THREE.Vector3(),
       attackTimer: 0,
+      staggerTimer: 0,
+      alertTimer: 1.4,
+      wanderTimer: 0,
+      lastKnownTarget: position.clone(),
+      wanderTarget: position.clone(),
       alive: true,
       unregisterDamage,
       spatial
@@ -91,10 +103,36 @@ export class EnemySystem {
     for (const actor of this.actors.values()) {
       if (!actor.alive || !actor.root.visible) continue;
       actor.attackTimer = Math.max(0, actor.attackTimer - dt);
+      actor.staggerTimer = Math.max(0, actor.staggerTimer - dt);
+      actor.alertTimer = Math.max(0, actor.alertTimer - dt);
+      actor.wanderTimer = Math.max(0, actor.wanderTimer - dt);
 
       this.offset.copy(playerPosition).sub(actor.root.position).setY(0);
       const distance = this.offset.length();
-      const intent = this.brain.decide(distance, actor.archetype.attackRange, actor.attackTimer);
+      const sightRange = actor.archetype.id === 'runner' ? 30 : actor.archetype.id === 'brute' ? 25 : 27;
+      const inSightRange = distance <= sightRange;
+      const hasLineOfSight = inSightRange && (this.options.canSeeTarget?.(actor.root.position, playerPosition) ?? true);
+
+      if (hasLineOfSight) {
+        actor.lastKnownTarget.copy(playerPosition);
+        actor.alertTimer = 3.8;
+      }
+
+      const intent = this.brain.decide({
+        distanceToPlayer: distance,
+        attackRange: actor.archetype.attackRange,
+        attackTimer: actor.attackTimer,
+        staggerTimer: actor.staggerTimer,
+        hasLineOfSight,
+        alertTimer: actor.alertTimer
+      });
+
+      if (intent === 'stagger') {
+        actor.velocity.multiplyScalar(Math.exp(-dt * 8));
+        actor.root.position.addScaledVector(actor.velocity, dt);
+        this.spatial.update(actor.spatial);
+        continue;
+      }
 
       if (intent === 'attack') {
         actor.velocity.multiplyScalar(Math.exp(-dt * 12));
@@ -108,11 +146,23 @@ export class EnemySystem {
         continue;
       }
 
-      this.navigation.nextWaypoint(actor.root.position, playerPosition, this.waypoint);
+      if (intent === 'chase') {
+        this.target.copy(playerPosition);
+      } else if (intent === 'investigate') {
+        this.target.copy(actor.lastKnownTarget);
+      } else {
+        this.updateWanderTarget(actor);
+        this.target.copy(actor.wanderTarget);
+      }
+
+      this.navigation.nextWaypoint(actor.root.position, this.target, this.waypoint);
       this.offset.copy(this.waypoint).sub(actor.root.position).setY(0);
       const waypointDistance = this.offset.length();
       if (waypointDistance > 1e-5) {
-        this.desired.copy(this.offset).multiplyScalar(1 / waypointDistance).multiplyScalar(actor.archetype.speed);
+        const speedScale = intent === 'wander' ? 0.42 : intent === 'investigate' ? 0.72 : 1;
+        this.desired.copy(this.offset)
+          .multiplyScalar(1 / waypointDistance)
+          .multiplyScalar(actor.archetype.speed * speedScale);
       } else {
         this.desired.set(0, 0, 0);
       }
@@ -131,6 +181,28 @@ export class EnemySystem {
       if (actor.velocity.lengthSq() > 1e-5) actor.root.rotation.y = Math.atan2(-actor.velocity.x, -actor.velocity.z);
       this.spatial.update(actor.spatial);
     }
+  }
+
+  hearNoise(origin: THREE.Vector3, radius: number, alertSeconds = 4.5): void {
+    const radiusSq = radius * radius;
+    for (const actor of this.actors.values()) {
+      if (!actor.alive || actor.root.position.distanceToSquared(origin) > radiusSq) continue;
+      actor.lastKnownTarget.copy(origin);
+      actor.alertTimer = Math.max(actor.alertTimer, alertSeconds);
+    }
+  }
+
+  stagger(id: string, duration: number, direction?: THREE.Vector3, impulse = 0): boolean {
+    const actor = this.actors.get(id);
+    if (!actor || !actor.alive) return false;
+    const resistance = actor.archetype.id === 'brute' ? 0.48 : actor.archetype.id === 'runner' ? 0.9 : 0.75;
+    actor.staggerTimer = Math.max(actor.staggerTimer, Math.max(0, duration) * resistance);
+    actor.alertTimer = Math.max(actor.alertTimer, 3.5);
+    if (direction && impulse > 0) {
+      this.offset.copy(direction).setY(0);
+      if (this.offset.lengthSq() > 1e-6) actor.velocity.add(this.offset.normalize().multiplyScalar(impulse * resistance));
+    }
+    return true;
   }
 
   kill(id: string): boolean {
@@ -168,6 +240,10 @@ export class EnemySystem {
     return this.hitMeshes;
   }
 
+  get aimTargets(): readonly THREE.Object3D[] {
+    return this.hitMeshes;
+  }
+
   get activeCount(): number {
     let count = 0;
     for (const actor of this.actors.values()) if (actor.alive && actor.root.visible) count++;
@@ -176,6 +252,19 @@ export class EnemySystem {
 
   get occupiedCellCount(): number {
     return this.spatial.occupiedCellCount;
+  }
+
+  private updateWanderTarget(actor: EnemyActor): void {
+    const nearTarget = actor.root.position.distanceToSquared(actor.wanderTarget) < 1.2 * 1.2;
+    if (actor.wanderTimer > 0 && !nearTarget) return;
+    actor.wanderTimer = 1.8 + Math.random() * 2.8;
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 2.5 + Math.random() * 4.5;
+    actor.wanderTarget.copy(actor.root.position).add(new THREE.Vector3(
+      Math.sin(angle) * distance,
+      0,
+      Math.cos(angle) * distance
+    ));
   }
 
   private makeCapsuleMarker(radius: number, bodyLength: number, color: number): THREE.Group {

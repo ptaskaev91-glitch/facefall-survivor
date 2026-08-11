@@ -18,6 +18,8 @@ interface ProductShellDom {
   sensitivityValue: HTMLElement;
   deadzone: HTMLInputElement;
   deadzoneValue: HTMLElement;
+  aimAssist: HTMLInputElement;
+  aimAssistValue: HTMLElement;
   volume: HTMLInputElement;
   volumeValue: HTMLElement;
   loading: HTMLElement;
@@ -51,6 +53,7 @@ export class ProductShell {
     this.dom.cameraThird.addEventListener('click', this.onThird);
     this.dom.sensitivity.addEventListener('input', this.onSettingsInput);
     this.dom.deadzone.addEventListener('input', this.onSettingsInput);
+    this.dom.aimAssist.addEventListener('input', this.onSettingsInput);
     this.dom.volume.addEventListener('input', this.onSettingsInput);
     this.dom.start.addEventListener('click', this.onStart);
     this.show();
@@ -63,6 +66,7 @@ export class ProductShell {
     this.dom.cameraThird.removeEventListener('click', this.onThird);
     this.dom.sensitivity.removeEventListener('input', this.onSettingsInput);
     this.dom.deadzone.removeEventListener('input', this.onSettingsInput);
+    this.dom.aimAssist.removeEventListener('input', this.onSettingsInput);
     this.dom.volume.removeEventListener('input', this.onSettingsInput);
     this.dom.start.removeEventListener('click', this.onStart);
   }
@@ -118,6 +122,7 @@ export class ProductShell {
     this.settings = {
       aimSensitivity: Number(this.dom.sensitivity.value),
       aimDeadzone: Number(this.dom.deadzone.value),
+      aimAssist: Number(this.dom.aimAssist.value),
       masterVolume: Number(this.dom.volume.value)
     };
     this.settingsStore.save(this.settings);
@@ -153,15 +158,18 @@ export class ProductShell {
       sensitivity: this.settings.aimSensitivity,
       deadzone: this.settings.aimDeadzone
     });
+    this.app.configureAimAssist(this.settings.aimAssist);
     this.audio.setVolume(this.settings.masterVolume);
   }
 
   private refreshSettings(): void {
     this.dom.sensitivity.value = String(this.settings.aimSensitivity);
     this.dom.deadzone.value = String(this.settings.aimDeadzone);
+    this.dom.aimAssist.value = String(this.settings.aimAssist);
     this.dom.volume.value = String(this.settings.masterVolume);
     this.dom.sensitivityValue.textContent = `${this.settings.aimSensitivity.toFixed(2)}×`;
     this.dom.deadzoneValue.textContent = `${Math.round(this.settings.aimDeadzone * 100)}%`;
+    this.dom.aimAssistValue.textContent = `${Math.round(this.settings.aimAssist * 100)}%`;
     this.dom.volumeValue.textContent = `${Math.round(this.settings.masterVolume * 100)}%`;
   }
 
@@ -214,6 +222,8 @@ export function resolveProductShellDom(): ProductShellDom {
     sensitivityValue: required<HTMLElement>('aimSensitivityValue'),
     deadzone: required<HTMLInputElement>('aimDeadzone'),
     deadzoneValue: required<HTMLElement>('aimDeadzoneValue'),
+    aimAssist: required<HTMLInputElement>('aimAssist'),
+    aimAssistValue: required<HTMLElement>('aimAssistValue'),
     volume: required<HTMLInputElement>('masterVolume'),
     volumeValue: required<HTMLElement>('masterVolumeValue'),
     loading: required<HTMLElement>('menuLoading'),

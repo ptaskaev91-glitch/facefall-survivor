@@ -62,6 +62,23 @@ export class AimController {
     this.renderReticle();
   }
 
+  /** Small screen-space correction used by soft mobile aim assist. */
+  nudgeNdc(delta: Vector2): void {
+    this.ndc.add(delta);
+    this.clamp();
+    this.renderReticle();
+  }
+
+  /** Visible recoil and actual shot direction stay synchronized via the same NDC state. */
+  applyRecoil(yawDegrees: number, pitchDegrees: number): void {
+    const yawScale = this.mode === 'third' ? 0.010 : 0.0065;
+    const pitchScale = this.mode === 'third' ? 0.011 : 0.007;
+    this.ndc.x += yawDegrees * yawScale;
+    this.ndc.y += pitchDegrees * pitchScale;
+    this.clamp();
+    this.renderReticle();
+  }
+
   getNdc(out = new Vector2()): Vector2 {
     return out.copy(this.ndc);
   }

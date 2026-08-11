@@ -1,14 +1,15 @@
 import * as THREE from 'three';
+import { AimAssist } from '../aim/AimAssist';
 import { aimController } from '../aim/AimController';
-import { FaceSystem } from '../characters/FaceSystem';
 import { CameraCollision } from '../camera/CameraCollision';
 import { CameraDirector, type CameraMode } from '../camera/CameraDirector';
+import { FaceSystem } from '../characters/FaceSystem';
 import { DamageSystem } from '../combat/DamageSystem';
 import { Health } from '../combat/Health';
 import { ProjectileSystem, type ProjectileCollision } from '../combat/ProjectileSystem';
 import { ProjectileVisuals } from '../combat/ProjectileVisuals';
-import type { FacefallEvents, HitZone } from '../combat/types';
-import { WEAPONS } from '../combat/weapons';
+import type { FacefallEvents, HitZone, ShotEvent } from '../combat/types';
+import { WEAPONS, type WeaponDefinition } from '../combat/weapons';
 import { WeaponSystem } from '../combat/WeaponSystem';
 import { EventBus } from '../core/EventBus';
 import { GameLoop } from '../core/GameLoop';
@@ -21,10 +22,12 @@ import { detectQuality, type QualityProfile } from '../graphics/quality';
 import { InputManager } from '../input/InputManager';
 import { KeyboardMouseInput } from '../input/KeyboardMouseInput';
 import { TouchInput } from '../input/TouchInput';
+import { CollisionNavigationQuery } from '../navigation/CollisionNavigationQuery';
 import { PickupSystem } from '../pickups/PickupSystem';
 import { CollisionWorld } from '../physics/CollisionWorld';
 import { PlayerCapsule } from '../physics/PlayerCapsule';
 import { RainField } from '../rendering/RainField';
+import { StormSystem } from '../rendering/StormSystem';
 import { WaveDirector } from '../waves/WaveDirector';
 import { AssetManager } from '../world/AssetManager';
 import { GrassField } from '../world/GrassField';
@@ -59,6 +62,7 @@ export interface StartRunOptions {
 
 export class GameApp {
   readonly state = new GameStateController();
+  readonly events = new EventBus<FacefallEvents>();
 
   private readonly quality: QualityProfile;
   private readonly renderer: THREE.WebGLRenderer;
@@ -70,10 +74,10 @@ export class GameApp {
   private readonly playerController = new PlayerCapsule();
   private readonly grass: GrassField;
   private readonly rain: RainField;
+  private readonly storm: StormSystem;
   private readonly assets = new AssetManager();
   private readonly levelLoader = new LevelLoader(this.assets, this.collisionWorld);
 
-  private readonly events = new EventBus<FacefallEvents>();
   private readonly weaponSystem = new WeaponSystem(this.events);
   private readonly damageSystem = new DamageSystem(this.events);
   private readonly playerHealth = new Health(100);
@@ -90,6 +94,7 @@ export class GameApp {
   private readonly enemySystem: EnemySystem;
   private readonly pickups: PickupSystem;
   private readonly waveDirector = new WaveDirector();
+  private readonly aimAssist = new AimAssist();
   private readonly maxActiveEnemies: number;
   private readonly unregisterPlayerDamage: () => void;
 
@@ -100,16 +105,15 @@ export class GameApp {
   private readonly desired = new THREE.Vector3();
   private readonly temp = new THREE.Vector3();
   private readonly muzzle = new THREE.Vector3();
-  private readonly aimPoint = new THREE.Vector3();
   private readonly aimDirection = new THREE.Vector3();
-  private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly aimNdc = new THREE.Vector2();
-  private readonly aimPlane = new THREE.Plane(this.up, 0);
+  private readonly assistDelta = new THREE.Vector2();
   private readonly raycaster = new THREE.Raycaster();
   private readonly unsubscribeEvents: Array<() => void> = [];
   private readonly levelLights: THREE.Light[] = [];
-
   private readonly loop: GameLoop;
+  private readonly coarsePointer = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+
   private cameraMode: CameraMode = 'top';
   private statusRefresh = 0;
   private disposed = false;
@@ -117,6 +121,9 @@ export class GameApp {
   private manifest: LevelManifest | null = null;
   private score = 0;
   private kills = 0;
+  private aimAssistStrength = 0.72;
+  private movementSpreadMultiplier = 1;
+  private footstepTimer = 0;
 
   constructor(private readonly dom: GameAppDom) {
     this.quality = detectQuality();
@@ -168,6 +175,8 @@ export class GameApp {
 
     this.configureScene();
     this.createWorldGeometry();
+    this.enemySystem.setNavigationQuery(new CollisionNavigationQuery(this.collisionWorld));
+    this.storm = new StormSystem(this.scene, this.events);
     this.createPlayer();
     this.faceSystem = new FaceSystem(this.player);
     this.bindCombatEvents();
@@ -181,6 +190,10 @@ export class GameApp {
       maxFrameDelta: 0.1,
       maxSubSteps: 5
     });
+  }
+
+  configureAimAssist(strength: number): void {
+    this.aimAssistStrength = Math.max(0, Math.min(1, Number.isFinite(strength) ? strength : 0));
   }
 
   enterMenu(): void {
@@ -263,6 +276,7 @@ export class GameApp {
     this.runtimeFx.dispose();
     this.lightPool.dispose();
     this.rain.dispose();
+    this.storm.dispose();
     this.faceSystem.dispose();
     this.assets.clearCache();
     this.scene.traverse((object) => {
@@ -272,6 +286,7 @@ export class GameApp {
       for (const material of materials) material.dispose();
     });
 
+    this.events.clear();
     this.renderer.dispose();
     this.dom.app.replaceChildren();
     if (!this.state.is('disposed')) this.state.transition('disposed');
@@ -365,15 +380,20 @@ export class GameApp {
   private bindCombatEvents(): void {
     this.unsubscribeEvents.push(this.events.on('shot', (shot) => {
       this.effects.play(`${shot.weaponId}-shot`, { origin: shot.origin, direction: shot.direction });
-
       const definition = WEAPONS[shot.weaponId];
+
+      if (shot.sourceId === 'player') this.applyWeaponRecoil(definition);
+
       if (definition.fireModel === 'projectile') {
-        this.projectileSystem.spawnFromShot(shot);
+        const projectileDirection = this.spreadDirection(shot.direction, definition.spread * this.movementSpreadMultiplier);
+        const projectileShot: ShotEvent = { ...shot, direction: projectileDirection };
+        this.projectileSystem.spawnFromShot(projectileShot);
         return;
       }
 
+      const effectiveSpread = definition.spread * this.movementSpreadMultiplier;
       for (let pellet = 0; pellet < definition.pellets; pellet++) {
-        const direction = this.spreadDirection(shot.direction, definition.spread);
+        const direction = this.spreadDirection(shot.direction, effectiveSpread);
         this.raycaster.set(shot.origin, direction);
         this.raycaster.far = 70;
         const intersections = this.raycaster.intersectObjects([...this.enemySystem.meshes], true);
@@ -415,6 +435,8 @@ export class GameApp {
       if (hit.targetId === 'player') {
         this.dom.status.dataset.lastEvent = `PLAYER -${Math.round(hit.amount)} HP`;
       } else {
+        const stagger = hit.critical ? 0.42 : hit.amount >= 60 ? 0.32 : hit.amount >= 25 ? 0.16 : 0.08;
+        this.enemySystem.stagger(hit.targetId, stagger, hit.direction, hit.impulse * 0.16);
         this.dom.status.dataset.lastEvent = `${hit.hitZone.toUpperCase()} ${Math.round(hit.amount)} DMG`;
       }
       this.refreshHud();
@@ -461,6 +483,8 @@ export class GameApp {
 
     const controls = this.input.snapshot();
     this.desired.set(controls.moveX, 0, controls.moveY);
+    const moveAmount = Math.min(1, this.desired.length());
+    this.movementSpreadMultiplier = 1 + moveAmount * (controls.sprint ? 1.35 : 0.55);
     this.updateAim(dt);
 
     const targetSpeed = this.desired.lengthSq() > 0 ? (controls.sprint ? 7.1 : 5.0) : 0;
@@ -476,6 +500,7 @@ export class GameApp {
     );
     this.player.rotation.y = Math.atan2(-this.facing.x, -this.facing.z);
 
+    this.updateFootsteps(dt, targetSpeed, controls.sprint);
     this.weaponSystem.update(dt);
     this.projectileSystem.update(dt);
     this.enemySystem.update(dt, this.player.position, (actor) => this.applyEnemyAttack(actor));
@@ -486,6 +511,7 @@ export class GameApp {
     this.effects.update(dt);
     this.runtimeFx.update(dt);
     this.lightPool.update(dt);
+    this.storm.update(dt);
 
     if (this.input.consumePressed('toggleCamera')) this.setCameraMode(this.cameraMode === 'top' ? 'third' : 'top');
     if (this.input.consumePressed('switchWeapon')) this.weaponSystem.cycle();
@@ -505,6 +531,11 @@ export class GameApp {
   private applyEnemyAttack(actor: EnemyActor): void {
     this.aimDirection.copy(this.player.position).sub(actor.root.position).setY(0);
     if (this.aimDirection.lengthSq() > 1e-5) this.aimDirection.normalize();
+    this.events.emit('enemyAttack', {
+      sourceId: actor.id,
+      position: actor.root.position.clone(),
+      kind: actor.archetype.id
+    });
     this.damageSystem.apply({
       amount: actor.archetype.attackDamage,
       kind: 'melee',
@@ -519,12 +550,45 @@ export class GameApp {
   }
 
   private updateAim(dt: number): void {
+    if (this.coarsePointer && this.aimAssistStrength > 0 && this.enemySystem.activeCount > 0) {
+      aimController.getNdc(this.aimNdc);
+      this.aimAssist.findCorrection(
+        this.camera,
+        this.aimNdc,
+        this.enemySystem.aimTargets,
+        this.aimAssistStrength,
+        this.cameraMode,
+        this.assistDelta
+      );
+      this.assistDelta.multiplyScalar(Math.min(1, dt * 30));
+      aimController.nudgeNdc(this.assistDelta);
+    }
+
     aimController.updateWorldAim(this.camera, this.player.position);
     if (this.cameraMode !== 'top') return;
     this.aimDirection.copy(aimController.getWorldDirection(this.aimDirection)).setY(0);
     if (this.aimDirection.lengthSq() <= 1e-5) return;
     this.aimDirection.normalize();
     this.facing.lerp(this.aimDirection, 1 - Math.exp(-dt * 18)).normalize();
+  }
+
+  private updateFootsteps(dt: number, targetSpeed: number, sprinting: boolean): void {
+    if (targetSpeed <= 0.2) {
+      this.footstepTimer = 0;
+      return;
+    }
+    this.footstepTimer -= dt;
+    if (this.footstepTimer > 0) return;
+    this.footstepTimer = sprinting ? 0.33 : 0.48;
+    this.events.emit('footstep', { position: this.player.position.clone(), sprinting });
+  }
+
+  private applyWeaponRecoil(definition: WeaponDefinition): void {
+    const recoil = definition.recoil;
+    const pitch = recoil.pitchMin + Math.random() * Math.max(0, recoil.pitchMax - recoil.pitchMin);
+    const yaw = recoil.yawMin + Math.random() * Math.max(0, recoil.yawMax - recoil.yawMin);
+    aimController.applyRecoil(yaw, pitch);
+    this.runtimeFx.cameraImpulse.add(recoil.cameraKick);
   }
 
   private render(frameDt: number): void {
@@ -574,6 +638,8 @@ export class GameApp {
     this.pickups.reset();
     this.score = 0;
     this.kills = 0;
+    this.footstepTimer = 0;
+    this.movementSpreadMultiplier = 1;
     this.dom.status.dataset.lastEvent = '';
     this.waveDirector.reset();
     this.dom.gameOver?.setAttribute('data-visible', 'false');
@@ -588,6 +654,7 @@ export class GameApp {
     }
     this.player.position.set(spawn.x, spawn.y, spawn.z);
     this.input.reset();
+    aimController.reset(this.cameraMode);
     this.refreshHud();
   }
 
@@ -709,6 +776,7 @@ export class GameApp {
       `pickups=${this.pickups.activeCount}`,
       `arrows=${this.projectileSystem.active().length}`,
       `spatialCells=${this.enemySystem.occupiedCellCount}`,
+      `aimAssist=${Math.round(this.aimAssistStrength * 100)}%`,
       `fx=${Object.keys(EFFECTS).length}`,
       'Three.js=bundled'
     ].join(' · ') + lastEvent;
