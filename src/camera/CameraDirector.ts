@@ -1,4 +1,5 @@
-import type { PerspectiveCamera, Vector3 } from 'three';
+import { Vector3, type PerspectiveCamera } from 'three';
+import { movementFrame } from '../input/MovementFrame';
 import type { CameraCollision } from './CameraCollision';
 import { ThirdPersonCamera } from './ThirdPersonCamera';
 import { TopDownCamera } from './TopDownCamera';
@@ -10,6 +11,7 @@ export class CameraDirector {
   readonly topDown: TopDownCamera;
   readonly thirdPerson: ThirdPersonCamera;
   private collision: CameraCollision | undefined;
+  private readonly movementForward = new Vector3(0, 0, -1);
 
   constructor(
     private readonly camera: PerspectiveCamera,
@@ -36,8 +38,12 @@ export class CameraDirector {
   update(target: Vector3, facing: Vector3, dt: number): void {
     if (this.mode === 'third') {
       this.thirdPerson.update(this.camera, target, facing, dt, this.collision);
-      return;
+    } else {
+      this.topDown.update(this.camera, target, dt);
     }
-    this.topDown.update(this.camera, target, dt);
+
+    this.camera.getWorldDirection(this.movementForward);
+    this.movementForward.y = 0;
+    movementFrame.setFromCameraForward(this.movementForward);
   }
 }
