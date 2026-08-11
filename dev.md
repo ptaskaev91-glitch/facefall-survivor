@@ -7,11 +7,11 @@ Hosting: **Vercel only**
 Production alias: `https://facefall-survivor-pavels-projects-0b29bb12.vercel.app`
 
 Production game: **legacy 0.5 ALPHA remains active by design**.  
-Engine-next: **0.5B Functional Parity — gameplay, aiming, menu/face flow, pickups and rain are implemented in code**.  
-Latest engine-next checkpoint: **PR #9 → `0876eff1839e9c93a669dc328cf225e200ebf498`**.  
+Engine-next: **0.5B Functional Parity — gameplay, aiming, menu/face flow, pickups, rain and reproducible browser CI are implemented**.  
+Latest engine-next checkpoint: **PR #10 → `018d78c1275f99aec22ef5e4a137ec912806b740`**.  
+Gameplay/atmosphere checkpoint: **PR #9 → `0876eff1839e9c93a669dc328cf225e200ebf498`**.  
 Menu/face checkpoint: **PR #8 → `56f90d50ac488f4227b28305d4b1da419927375a`**.  
-Focused aim checkpoint: **PR #7 → `967993a3c7d57c448e152526d81c9d7f3249789a`**.  
-Release-tooling checkpoint: **PR #4 → `6d051dae`**.
+Focused aim checkpoint: **PR #7 → `967993a3c7d57c448e152526d81c9d7f3249789a`**.
 
 Related source-of-truth files:
 
@@ -92,6 +92,7 @@ Facefall-specific systems such as SpatialHash, CameraCollision, AimController, L
 16. File input/localStorage UI belongs to ProductShell/persistence, not GameApp simulation wiring.
 17. Pickups and other level gameplay objects are spawned from manifest semantics, not hardcoded map coordinates inside systems.
 18. Repeating atmosphere systems such as rain must use bounded batched/pooled geometry and quality budgets.
+19. Every PR must pass locked install, strict typecheck and browser smoke before merge.
 
 ---
 
@@ -122,7 +123,7 @@ Facefall-specific systems such as SpatialHash, CameraCollision, AimController, L
 
 # 6. 0.5A — Engine Foundation
 
-**STATUS: architecture foundation largely complete; remaining work is reproducibility/debug/verification and decomposition.**
+**STATUS: architecture foundation complete enough for parity work; remaining work is decomposition and device verification.**
 
 ## Build / release
 
@@ -136,9 +137,10 @@ Facefall-specific systems such as SpatialHash, CameraCollision, AimController, L
 - [x] combined deploy command: Vite engine-next + stable legacy root in `dist-next`;
 - [x] CI artifact upload;
 - [x] Vercel repository config knows `build:deploy` / `dist-next`;
-- [ ] commit `package-lock.json`;
-- [ ] then change installation from `npm install` to `npm ci`;
-- [ ] add unit-test runner.
+- [x] committed `package-lock.json`;
+- [x] CI installation uses `npm ci`;
+- [x] Playwright Chromium browser smoke;
+- [ ] add focused unit-test runner for pure simulation systems.
 
 ## Lifecycle / core
 
@@ -168,7 +170,6 @@ Facefall-specific systems such as SpatialHash, CameraCollision, AimController, L
 - [x] TopDownCamera;
 - [x] ThirdPersonCamera;
 - [x] CameraDirector;
-- [x] old DualCameraRig shim removed;
 - [x] third-person camera collision / auto push-in;
 - [ ] mobile aim assist;
 - [ ] sensitivity/deadzone settings;
@@ -253,23 +254,24 @@ Facefall-specific systems such as SpatialHash, CameraCollision, AimController, L
 
 ## 0.5A exit criteria
 
-- [ ] lockfile/reproducible install;
+- [x] lockfile/reproducible install;
 - [x] CI green;
 - [x] combined Vercel artifact builds in CI;
+- [x] automated Chromium boot/menu/start/3RD smoke passes;
 - [x] engine-next boot/gameplay was manually exercised on Android in 0.5B.1;
 - [x] one fixed loop;
 - [x] unified combat foundation for all three weapons;
 - [x] real ballistic arrow pipeline;
 - [x] real pooled runtime FX foundation;
 - [x] level manifest participates in runtime;
-- [ ] desktop smoke-test;
-- [?] latest 0.5B.4 Android smoke-test still required.
+- [x] desktop Chromium smoke-test automated in CI;
+- [?] latest 0.5B.5 Android smoke-test still required.
 
 ---
 
 # 7. 0.5B — Legacy Functional Parity
 
-**ACTIVE MILESTONE. PR #7 = aim; PR #8 = menu/face; PR #9 = pickups/rain.**
+**ACTIVE MILESTONE. PR #7 = aim; PR #8 = menu/face; PR #9 = pickups/rain; PR #10 = reproducible browser CI.**
 
 The goal is not final visual polish yet; engine-next must reproduce all important capabilities of the working legacy build on the new architecture.
 
@@ -293,7 +295,7 @@ The goal is not final visual polish yet; engine-next must reproduce all importan
 - [x] TOP movable reticle architecture;
 - [x] TOP facing now follows reticle world aim;
 - [x] 3RD floating reticle / soft-edge turn architecture;
-- [?] latest 0.5B.4 reticle feel still needs user/device confirmation;
+- [?] latest reticle feel still needs user/device confirmation;
 - [ ] mobile aim assist;
 - [ ] sensitivity/deadzone settings;
 - [ ] final fire/reload/swap/camera touch UX polish.
@@ -318,7 +320,7 @@ The goal is not final visual polish yet; engine-next must reproduce all importan
 - [x] manifest-driven ammo pickups;
 - [x] pickup proximity collection and timed respawn;
 - [~] difficulty scaling foundation from wave composition;
-- [ ] navmesh/obstacle-aware movement — belongs to 0.7, direct chase is parity foundation only.
+- [ ] navmesh/obstacle-aware movement — belongs to 0.7.
 
 ## Face parity
 
@@ -342,18 +344,18 @@ The goal is not final visual polish yet; engine-next must reproduce all importan
 
 ## Validation
 
+- [x] automated Chromium smoke: boot → menu → start → `state=playing` → 3RD, no fatal pageerror;
+- [x] locked reproducible CI via `package-lock.json` + `npm ci`;
 - [x] dedicated Vercel engine-next test URLs existed for 0.5B.1 and 0.5B.2;
-- [!] Vercel connector currently exposes an inconsistent deploy contract for a fresh 0.5B.3/0.5B.4 preview; CI build remains valid but no new preview URL is claimed until deployment succeeds;
-- [ ] desktop browser smoke;
-- [?] Android engine-next gameplay was tested on 0.5B.1; latest menu/face/pickups/rain build still requires device check;
-- [?] no infinite loader observed in tested build; verify again with latest menu/face flow;
+- [!] Vercel connector currently exposes an inconsistent deploy contract for a fresh 0.5B preview; no new preview URL is claimed until deployment succeeds;
+- [?] Android engine-next gameplay was tested on 0.5B.1; latest build still requires device check;
 - [ ] compare final parity checklist against legacy.
 
 ---
 
 # 8. 0.5C — Production Migration
 
-Only after 0.5B + Android smoke:
+Only after 0.5B + latest Android smoke:
 
 - [ ] Vite entrypoint becomes `/`;
 - [ ] remove legacy `game-v050.js` from production path;
@@ -364,8 +366,6 @@ Only after 0.5B + Android smoke:
 - [ ] production deploy;
 - [ ] Android verification;
 - [ ] tag/version checkpoint.
-
-Current release setup intentionally supports a transition period: repository CI can build legacy root and engine-next together, while the public root remains legacy until migration criteria are met.
 
 ---
 
@@ -507,8 +507,6 @@ Not MVP: multiplayer, dedicated server, MMO backend, native-engine rewrite, full
 
 # 13. Current technical debt
 
-- [ ] no committed package lock yet;
-- [ ] CI still installs with `npm install`;
 - [ ] GameApp still owns too much integration wiring;
 - [ ] EnemySystem direct-chases through conceptual obstacles until navmesh/local avoidance is added;
 - [ ] fallback procedural world remains until `level.glb`;
@@ -516,14 +514,16 @@ Not MVP: multiplayer, dedicated server, MMO backend, native-engine rewrite, full
 - [ ] Soldier GLB is only a pipeline proof;
 - [ ] legacy production still depends on same-origin CDN proxies;
 - [ ] navmesh integration not selected;
-- [ ] automated browser smoke test absent;
-- [ ] latest engine-next 0.5B.4 not yet manually verified on Android;
+- [ ] latest engine-next not yet manually verified on Android;
 - [ ] Vercel preview deploy connector currently has a schema/backend contract mismatch;
 - [ ] ambient audio system absent;
-- [ ] old unused aim scratch fields in GameApp can be cleaned during decomposition; they do not affect runtime/typecheck.
+- [ ] unit tests for pure simulation systems absent.
 
 Closed debt in recent checkpoints:
 
+- [x] package lock committed;
+- [x] CI uses `npm ci`;
+- [x] automated Playwright Chromium browser smoke;
 - [x] DualCameraRig shim removed;
 - [x] PlayerCapsule/SpatialHash/camera collision added;
 - [x] EffectSystem wired to combat;
@@ -545,16 +545,14 @@ Closed debt in recent checkpoints:
 
 # 14. Official next block
 
-1. Obtain and commit a reproducible `package-lock.json`; switch CI from `npm install` to `npm ci`.
-2. Add automated browser smoke testing for boot → menu → start → gameplay and fatal-console-error detection.
-3. Add base AudioSystem + rain/wind ambient layer; thunder/lightning after audio foundation.
-4. Add configurable aim sensitivity/deadzone and then lightweight mobile aim assist.
-5. Decompose GameApp further once parity-critical wiring stabilizes.
-6. Begin navmesh spike / obstacle-aware enemy movement.
-7. Resolve Vercel preview deployment connector path or deploy through verified Git integration/output artifact route.
-8. Run desktop smoke-test and latest real Android test of 0.5B.4: menu/face/aim/pickups/rain/restart.
-9. Compare final parity checklist against legacy.
-10. Only after parity + smoke-test activate engine-next at production `/`.
+1. Add base `AudioSystem` and rain/wind ambient layer; thunder/lightning after the audio foundation.
+2. Add configurable aim sensitivity/deadzone and lightweight mobile aim assist.
+3. Decompose GameApp further once parity-critical wiring stabilizes.
+4. Begin navmesh spike / obstacle-aware enemy movement.
+5. Resolve Vercel preview deployment path or deploy through a verified Git integration/output-artifact route.
+6. Run latest real Android test: menu/face/aim/pickups/rain/audio/restart.
+7. Compare final parity checklist against legacy.
+8. Only after parity + smoke-test activate engine-next at production `/`.
 
 ---
 
