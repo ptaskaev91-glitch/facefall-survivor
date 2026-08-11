@@ -4,8 +4,8 @@
 Repository: `ptaskaev91-glitch/facefall-survivor`  
 Source of truth: `main`  
 Production root: **legacy 0.5 ALPHA on Vercel**  
-Latest engine-next checkpoint: **PR #9 / `0876eff1839e9c93a669dc328cf225e200ebf498`**  
-Focused aim checkpoint: **PR #7 / `967993a3c7d57c448e152526d81c9d7f3249789a`**
+Latest engine-next checkpoint: **PR #10 / `018d78c1275f99aec22ef5e4a137ec912806b740`**  
+Gameplay/atmosphere checkpoint: **PR #9 / `0876eff1839e9c93a669dc328cf225e200ebf498`**
 
 ---
 
@@ -17,7 +17,7 @@ Focused aim checkpoint: **PR #7 / `967993a3c7d57c448e152526d81c9d7f3249789a`**
 
 # 2. Итоговая технологическая формула
 
-> **TypeScript + Vite + npm Three.js + GLB/manifest levels + static Octree/Capsule collision + SpatialHash + navmesh AI + data-driven combat + event-driven presentation + pooled/batched FX + local-first face system + mobile-first controls/performance.**
+> **TypeScript + Vite + npm Three.js + GLB/manifest levels + static Octree/Capsule collision + SpatialHash + navmesh AI + data-driven combat + event-driven presentation + pooled/batched FX + local-first face system + mobile-first controls/performance + locked CI/browser smoke.**
 
 GitHub `main` остаётся source-of-truth. Vercel — единственный hosting target.
 
@@ -39,47 +39,39 @@ facefall-survivor/
 │               └── level.manifest.json
 │
 ├── scripts/
-│   └── copy-legacy.mjs
+│   ├── copy-legacy.mjs
+│   └── smoke-engine.mjs
 │
 ├── src/
 │   ├── main.ts
-│   │
 │   ├── app/
 │   │   ├── Bootstrap.ts
 │   │   ├── GameApp.ts
 │   │   ├── GameState.ts
 │   │   └── ProductShell.ts
-│   │
 │   ├── aim/
 │   │   └── AimController.ts
-│   │
 │   ├── characters/
 │   │   └── FaceSystem.ts
-│   │
 │   ├── persistence/
 │   │   └── FaceStore.ts
-│   │
 │   ├── core/
 │   │   ├── EventBus.ts
 │   │   └── GameLoop.ts
-│   │
 │   ├── input/
 │   │   ├── InputManager.ts
 │   │   ├── KeyboardMouseInput.ts
 │   │   ├── TouchInput.ts
 │   │   └── MovementFrame.ts
-│   │
 │   ├── physics/
 │   │   ├── CollisionWorld.ts
 │   │   ├── PlayerCapsule.ts
 │   │   └── SpatialHash.ts
-│   │
 │   ├── camera/
 │   │   ├── CameraCollision.ts
 │   │   ├── CameraDirector.ts
 │   │   ├── TopDownCamera.ts
 │   │   └── ThirdPersonCamera.ts
-│   │
 │   ├── combat/
 │   │   ├── types.ts
 │   │   ├── weapons.ts
@@ -89,17 +81,13 @@ facefall-survivor/
 │   │   ├── ProjectileSystem.ts
 │   │   ├── ProjectileVisuals.ts
 │   │   └── CombatFeedback.ts
-│   │
 │   ├── enemies/
 │   │   ├── archetypes.ts
 │   │   └── EnemySystem.ts
-│   │
 │   ├── waves/
 │   │   └── WaveDirector.ts
-│   │
 │   ├── pickups/
 │   │   └── PickupSystem.ts
-│   │
 │   ├── effects/
 │   │   ├── recipes.ts
 │   │   ├── EffectSystem.ts
@@ -108,13 +96,10 @@ facefall-survivor/
 │   │   ├── DecalPool.ts
 │   │   ├── LightPool.ts
 │   │   └── WindField.ts
-│   │
 │   ├── rendering/
 │   │   └── RainField.ts
-│   │
 │   ├── graphics/
 │   │   └── quality.ts
-│   │
 │   └── world/
 │       ├── AssetManager.ts
 │       ├── LevelLoader.ts
@@ -126,6 +111,7 @@ facefall-survivor/
 ├── styles-safe.css             # stable legacy UI
 ├── engine-lab.html             # current engine-next product/test entrypoint
 ├── package.json
+├── package-lock.json            # canonical npm dependency lock
 ├── tsconfig.json
 ├── vite.config.ts
 ├── vercel.json
@@ -136,14 +122,14 @@ facefall-survivor/
 └── history.md
 ```
 
-Generated CI/build output, not source-of-truth:
+Generated CI/build output is not source-of-truth:
 
 ```text
 dist-next/
-├── index.html                  # copied legacy production root
+├── index.html
 ├── game-v050.js
 ├── styles-safe.css
-├── engine-lab.html             # compiled Vite engine-next
+├── engine-lab.html
 └── assets/...
 ```
 
@@ -176,64 +162,27 @@ ERROR → MENU
 # 5. Face architecture
 
 ```text
-ProductShell
-  ↓ file selection
-FaceStore
-  ↓ localStorage dataURL
-ProductShell preview
-  ↓ start({ faceDataUrl })
-GameApp
-  ↓
-FaceSystem
-  ↓
-prototype hero face mesh/texture
+ProductShell → FaceStore(localStorage) → preview → GameApp.start({faceDataUrl}) → FaceSystem
 ```
 
-Current `FaceSystem` is a functional-parity implementation. Final production integration must fit the face to the real character head/UV instead of keeping the temporary plane.
-
-Privacy rule remains local-first: the face image is not required to leave the browser.
+Current `FaceSystem` is functional parity only. Final production integration must fit the face to the real character head/UV instead of keeping the temporary plane.
 
 ---
 
-# 6. Aim architecture
-
-The reticle is gameplay state, not decoration.
-
-```text
-Mouse / touch swipe
-  ↓
-Input adapters
-  ↓
-AimController screen-space NDC
-  ├── visible reticle
-  ├── TOP → camera ray → world aim
-  │          └── hero facing follows same world direction
-  └── 3RD → camera ray + floating-reticle soft edge
-                   ↓
-             CameraDirector turn demand
-                   ↓
-            world-space aim direction
-                   ↓
-              WeaponSystem
-                   ↓
-                ShotEvent
-```
-
-Invariant:
-
-> **Visible reticle, procedural hero facing and actual player ShotEvent all derive from the same AimController state.**
-
----
-
-# 7. Input / movement / camera
+# 6. Aim / input / camera
 
 ```text
 KeyboardMouseInput ─┐
                     ├→ InputManager → MovementFrame → simulation
 TouchInput ─────────┘
+                         ↓
+                    AimController
+                 reticle = fire direction
+                         ↓
+                   WeaponSystem
 ```
 
-`MovementFrame` maps joystick/WASD relative to the active camera, so screen-up means forward in both TOP and 3RD.
+`MovementFrame` maps movement relative to the active camera. The visible reticle, player facing and actual player shot direction use one AimController state.
 
 ```text
 CameraDirector
@@ -242,19 +191,12 @@ CameraDirector
       └── CameraCollision → CollisionWorld
 ```
 
-Both cameras use one player/world simulation.
-
 ---
 
-# 8. Core runtime
+# 7. Core runtime
 
 ```text
-src/main.ts
-  ↓
-Bootstrap
-  ├── binds AimController reticle
-  ├── creates GameApp
-  └── creates ProductShell
+src/main.ts → Bootstrap → ProductShell + GameApp
 
 GameLoop fixed tick
   ↓
@@ -269,127 +211,67 @@ Events
 FX / HUD / atmosphere / camera / render
 ```
 
-There must never be a second independent gameplay/physics loop.
+A second gameplay/physics loop is forbidden.
 
 ---
 
-# 9. Physics / spatial / navigation
+# 8. Physics / navigation
 
 Current:
 
 ```text
-Static world → CollisionWorld / Octree
-                         ↑
-                   PlayerCapsule
-
+Static world → CollisionWorld/Octree ← PlayerCapsule
 EnemySystem → moving actors → SpatialHash
 ```
 
-Raycast/segmentCast are reused for camera collision, hitscan occlusion and ballistic projectile collision.
-
-Current infected movement is direct chase. Target:
+Target:
 
 ```text
-EnemyBrain
-  ↓
-NavMeshQuery
-  ↓
-Path corridor
-  ↓
-LocalAvoidance + SpatialHash
-  ↓
-Desired velocity
+EnemyBrain → NavMeshQuery → path corridor → LocalAvoidance + SpatialHash → desired velocity
 ```
 
-Collision and navigation remain separate.
+Collision, crowd lookup and navigation stay separate.
 
 ---
 
-# 10. Combat / enemies / waves
+# 9. Combat / enemy / wave / pickup
 
 ```text
-AimController/Input.fire
-  ↓
-WeaponSystem
-  ↓
-ShotEvent
+AimController/Input.fire → WeaponSystem → ShotEvent
   ├── pistol → hitscan
   ├── shotgun → multi-hitscan
-  └── bow → ProjectileSystem → ballistic segment collision
-                                   ↓
-                              DamageSystem
-                               ↓       ↓
-                             Hit      Kill
+  └── bow → ProjectileSystem
+                     ↓
+                DamageSystem → Hit/Kill
 ```
 
 Player receives infected melee through the same DamageSystem/Health pipeline.
 
 ```text
-LevelManifest enemy-spawn markers
-  ↓
-WaveDirector
-  ↓
-EnemySystem.spawn(Walker / Runner / Brute)
+LevelManifest enemy-spawn → WaveDirector → EnemySystem.spawn(Walker/Runner/Brute)
+LevelManifest loot → PickupSystem → Health.heal / WeaponSystem.addReserve
 ```
-
-WaveDirector owns wave composition/timing; final navmesh will not change that contract.
 
 ---
 
-# 11. Pickup architecture
-
-Pickups are semantic level objects, not coordinates hardcoded inside `PickupSystem`.
+# 10. Presentation / atmosphere
 
 ```text
-LevelManifest kind=loot
-  ↓
-PickupSystem.configure()
-  ├── health → Health.heal()
-  └── ammo → WeaponSystem.addReserve()
-       ↓
-proximity collection
-       ↓
-hide / timed respawn / reset with run
+Shot/Hit → EffectSystem recipes
+          ├── particles
+          ├── decals
+          ├── transient lights
+          ├── wind
+          └── camera impulse
+
+RainField → quality budget → one recycled Points geometry around player
 ```
 
-Current Abandoned Outskirts manifest contains health and ammo loot markers. The system supports bounded simple visuals and an 18-second respawn prototype.
+Audio remains the next presentation adapter and must not move into simulation logic.
 
 ---
 
-# 12. Presentation / atmosphere
-
-Combat presentation:
-
-```text
-Shot / Hit event
-  ↓
-EffectSystem + recipe
-  ├── particles
-  ├── decals
-  ├── transient lights
-  ├── wind
-  └── camera impulse
-```
-
-Atmosphere currently adds:
-
-```text
-RainField
-  ↓ quality profile
-single Points geometry
-  ↓
-420 / 760 / 1200 approximate drops by profile
-  ↓
-recycled around player anchor
-```
-
-Rain intentionally avoids one Mesh per drop. Audio will become a separate presentation adapter later.
-
----
-
-# 13. Level architecture
-
-Target:
+# 11. Level architecture
 
 ```text
 public/assets/levels/abandoned-outskirts/
@@ -400,38 +282,44 @@ public/assets/levels/abandoned-outskirts/
 ```
 
 - GLB → visual/collision geometry;
-- manifest → player/enemy spawns, lights, loot, wind/audio zones, choke points, interactions;
+- manifest → player/enemy spawns, lights, loot, wind/audio zones, interactions;
 - navmesh → infected traversal.
 
-Manifest already drives player spawn, enemy spawn zones, prototype lights and loot. Procedural geometry remains fallback until authored `level.glb` exists.
+Manifest already drives gameplay data. Procedural geometry remains fallback until authored `level.glb` exists.
 
 ---
 
-# 14. Release architecture
+# 12. Build / QA architecture
+
+Canonical dependency path:
 
 ```text
-npm run build:deploy
-  ├── Vite engine-next → dist-next
-  └── copy stable legacy root → dist-next
-
-CI
-  ↓ install
-  ↓ strict TypeScript
-  ↓ combined Vercel build
-  ↓ artifact upload
+package.json + package-lock.json
+          ↓
+        npm ci
+          ↓
+   strict TypeScript
+          ↓
+Playwright Chromium smoke
+ boot → menu → start → playing → 3RD
+ no fatal pageerror
+          ↓
+ npm run build:deploy
+          ↓
+ facefall-dist-next artifact
 ```
+
+This is now a merge gate for subsequent development PRs. PR #10 run #63 passed the complete path.
 
 Transition policy:
 
 - production `/` remains stable legacy;
 - engine-next is tested separately;
-- production root switches only after 0.5B parity + latest Android smoke-test.
-
-The current Vercel connector has an inconsistent preview-deploy contract, so a new preview is not considered published unless the deployment call actually succeeds.
+- production root switches only after functional parity + latest Android smoke-test.
 
 ---
 
-# 15. Target structure
+# 13. Target structure
 
 ```text
 src/
@@ -466,9 +354,7 @@ src/
 
 ---
 
-# 16. Temporary / legacy pieces
-
-Temporary:
+# 14. Temporary / legacy pieces
 
 - `game-v050.js` and legacy root;
 - same-origin Three/GLTF runtime proxies used by legacy;
@@ -478,11 +364,9 @@ Temporary:
 - primitive pickup visuals;
 - engine-lab debug status HUD.
 
-They are removed/replaced only after functional parity and device verification.
-
 ---
 
-# 17. Change rules
+# 15. Change rules
 
 1. Do not grow `main.ts` or `GameApp` into permanent monoliths.
 2. ProductShell owns browser UI/file APIs; simulation must not.
@@ -493,6 +377,8 @@ They are removed/replaced only after functional parity and device verification.
 7. Level gameplay objects are driven by manifest semantics.
 8. Repeating visual systems must be bounded by pools/batches/budgets.
 9. External code/assets require license tracking.
-10. Generated `dist-next` is build output, never canonical source.
-11. Production switch requires parity + real Android validation.
-12. Update `structure.md`, `dev.md`, `history.md` at large checkpoints.
+10. `package-lock.json` is canonical; CI uses `npm ci`.
+11. Every development PR must pass strict typecheck + Chromium smoke + build.
+12. Generated `dist-next` is build output, never canonical source.
+13. Production switch requires parity + real Android validation.
+14. Update `structure.md`, `dev.md`, `history.md` at large checkpoints.
