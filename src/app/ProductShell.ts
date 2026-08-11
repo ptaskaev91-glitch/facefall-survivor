@@ -1,5 +1,8 @@
+import { aimController } from '../aim/AimController';
 import type { CameraMode } from '../camera/CameraDirector';
 import { FaceStore } from '../persistence/FaceStore';
+import { SettingsStore, type FacefallSettings } from '../persistence/SettingsStore';
+import type { AudioSystem } from '../presentation/audio/AudioSystem';
 import type { GameApp } from './GameApp';
 
 interface ProductShellDom {
@@ -11,26 +14,44 @@ interface ProductShellDom {
   removeFace: HTMLButtonElement;
   cameraTop: HTMLButtonElement;
   cameraThird: HTMLButtonElement;
+  sensitivity: HTMLInputElement;
+  sensitivityValue: HTMLElement;
+  deadzone: HTMLInputElement;
+  deadzoneValue: HTMLElement;
+  volume: HTMLInputElement;
+  volumeValue: HTMLElement;
   loading: HTMLElement;
   error: HTMLElement;
 }
 
 export class ProductShell {
-  private readonly store = new FaceStore();
+  private readonly faceStore = new FaceStore();
+  private readonly settingsStore = new SettingsStore();
   private faceDataUrl: string | null = null;
   private cameraMode: CameraMode = 'top';
+  private settings: FacefallSettings = this.settingsStore.defaults();
   private busy = false;
 
-  constructor(private readonly app: GameApp, private readonly dom: ProductShellDom) {}
+  constructor(
+    private readonly app: GameApp,
+    private readonly dom: ProductShellDom,
+    private readonly audio: AudioSystem
+  ) {}
 
   attach(): void {
-    this.faceDataUrl = this.store.load();
+    this.faceDataUrl = this.faceStore.load();
+    this.settings = this.settingsStore.load();
+    this.applySettings();
     this.refreshFace();
     this.refreshCamera();
+    this.refreshSettings();
     this.dom.faceInput.addEventListener('change', this.onFaceChange);
     this.dom.removeFace.addEventListener('click', this.onRemoveFace);
     this.dom.cameraTop.addEventListener('click', this.onTop);
     this.dom.cameraThird.addEventListener('click', this.onThird);
+    this.dom.sensitivity.addEventListener('input', this.onSettingsInput);
+    this.dom.deadzone.addEventListener('input', this.onSettingsInput);
+    this.dom.volume.addEventListener('input', this.onSettingsInput);
     this.dom.start.addEventListener('click', this.onStart);
     this.show();
   }
@@ -40,6 +61,9 @@ export class ProductShell {
     this.dom.removeFace.removeEventListener('click', this.onRemoveFace);
     this.dom.cameraTop.removeEventListener('click', this.onTop);
     this.dom.cameraThird.removeEventListener('click', this.onThird);
+    this.dom.sensitivity.removeEventListener('input', this.onSettingsInput);
+    this.dom.deadzone.removeEventListener('input', this.onSettingsInput);
+    this.dom.volume.removeEventListener('input', this.onSettingsInput);
     this.dom.start.removeEventListener('click', this.onStart);
   }
 
@@ -64,7 +88,7 @@ export class ProductShell {
 
     try {
       this.faceDataUrl = await this.readFile(file);
-      this.store.save(this.faceDataUrl);
+      this.faceStore.save(this.faceDataUrl);
       this.dom.error.textContent = '';
       this.refreshFace();
     } catch {
@@ -76,7 +100,7 @@ export class ProductShell {
 
   private onRemoveFace = (): void => {
     this.faceDataUrl = null;
-    this.store.remove();
+    this.faceStore.remove();
     this.refreshFace();
   };
 
@@ -90,6 +114,17 @@ export class ProductShell {
     this.refreshCamera();
   };
 
+  private onSettingsInput = (): void => {
+    this.settings = {
+      aimSensitivity: Number(this.dom.sensitivity.value),
+      aimDeadzone: Number(this.dom.deadzone.value),
+      masterVolume: Number(this.dom.volume.value)
+    };
+    this.settingsStore.save(this.settings);
+    this.applySettings();
+    this.refreshSettings();
+  };
+
   private onStart = async (): Promise<void> => {
     if (this.busy) return;
     this.busy = true;
@@ -98,6 +133,7 @@ export class ProductShell {
     this.dom.loading.textContent = 'ЗАГРУЖАЕМ УРОВЕНЬ…';
 
     try {
+      await this.audio.resume();
       await this.app.start({ cameraMode: this.cameraMode, faceDataUrl: this.faceDataUrl });
       this.dom.overlay.dataset.visible = 'false';
       this.dom.loading.textContent = '';
@@ -111,6 +147,23 @@ export class ProductShell {
       this.dom.start.disabled = false;
     }
   };
+
+  private applySettings(): void {
+    aimController.configure({
+      sensitivity: this.settings.aimSensitivity,
+      deadzone: this.settings.aimDeadzone
+    });
+    this.audio.setVolume(this.settings.masterVolume);
+  }
+
+  private refreshSettings(): void {
+    this.dom.sensitivity.value = String(this.settings.aimSensitivity);
+    this.dom.deadzone.value = String(this.settings.aimDeadzone);
+    this.dom.volume.value = String(this.settings.masterVolume);
+    this.dom.sensitivityValue.textContent = `${this.settings.aimSensitivity.toFixed(2)}×`;
+    this.dom.deadzoneValue.textContent = `${Math.round(this.settings.aimDeadzone * 100)}%`;
+    this.dom.volumeValue.textContent = `${Math.round(this.settings.masterVolume * 100)}%`;
+  }
 
   private refreshFace(): void {
     if (this.faceDataUrl) {
@@ -157,6 +210,12 @@ export function resolveProductShellDom(): ProductShellDom {
     removeFace: required<HTMLButtonElement>('removeFace'),
     cameraTop: required<HTMLButtonElement>('menuCamTop'),
     cameraThird: required<HTMLButtonElement>('menuCamThird'),
+    sensitivity: required<HTMLInputElement>('aimSensitivity'),
+    sensitivityValue: required<HTMLElement>('aimSensitivityValue'),
+    deadzone: required<HTMLInputElement>('aimDeadzone'),
+    deadzoneValue: required<HTMLElement>('aimDeadzoneValue'),
+    volume: required<HTMLInputElement>('masterVolume'),
+    volumeValue: required<HTMLElement>('masterVolumeValue'),
     loading: required<HTMLElement>('menuLoading'),
     error: required<HTMLElement>('menuError')
   };

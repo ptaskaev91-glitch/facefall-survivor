@@ -15,11 +15,21 @@ export class AimController {
   private readonly torsoOffset = new Vector3(0, 1.15, 0);
   private reticle: HTMLElement | undefined;
   private mode: CameraMode = 'top';
-  private readonly touchSensitivity = 1.05;
+  private touchSensitivity = 1.05;
+  private thirdPersonDeadzone = 0.12;
 
   setReticle(reticle: HTMLElement | undefined): void {
     this.reticle = reticle;
     this.renderReticle();
+  }
+
+  configure(options: { sensitivity?: number; deadzone?: number }): void {
+    if (typeof options.sensitivity === 'number' && Number.isFinite(options.sensitivity)) {
+      this.touchSensitivity = Math.max(0.45, Math.min(2.2, options.sensitivity));
+    }
+    if (typeof options.deadzone === 'number' && Number.isFinite(options.deadzone)) {
+      this.thirdPersonDeadzone = Math.max(0.04, Math.min(0.28, options.deadzone));
+    }
   }
 
   setMode(mode: CameraMode): void {
@@ -60,16 +70,10 @@ export class AimController {
     return out.copy(this.worldDirection);
   }
 
-  /**
-   * Converts the current visible reticle into the world-space direction used by
-   * WeaponSystem. Crosshair position and ShotEvent therefore stay synchronized.
-   */
   updateWorldAim(camera: PerspectiveCamera, playerPosition: Vector3): void {
     this.raycaster.setFromCamera(this.ndc, camera);
 
     if (this.mode === 'top') {
-      // Aim at torso height rather than at the ground, otherwise a top camera ray
-      // would make every shot dive into the asphalt directly in front of the hero.
       this.aimPlane.constant = -(playerPosition.y + 0.95);
       const hit = this.raycaster.ray.intersectPlane(this.aimPlane, this.aimPoint);
       if (!hit) return;
@@ -78,8 +82,6 @@ export class AimController {
       return;
     }
 
-    // 3RD keeps vertical aiming. Using an approximate muzzle position makes close
-    // targets line up better than simply copying the camera ray direction.
     this.raycaster.ray.at(70, this.aimPoint);
     this.muzzleApprox.copy(playerPosition).add(this.torsoOffset);
     this.worldDirection.copy(this.aimPoint).sub(this.muzzleApprox);
@@ -88,10 +90,10 @@ export class AimController {
 
   getThirdPersonTurnDemand(): number {
     if (this.mode !== 'third') return 0;
-    const deadZone = 0.12;
     const magnitude = Math.abs(this.ndc.x);
-    if (magnitude <= deadZone) return 0;
-    const normalized = Math.min(1, (magnitude - deadZone) / 0.36);
+    if (magnitude <= this.thirdPersonDeadzone) return 0;
+    const turnRange = Math.max(0.12, 0.48 - this.thirdPersonDeadzone);
+    const normalized = Math.min(1, (magnitude - this.thirdPersonDeadzone) / turnRange);
     return Math.sign(this.ndc.x) * normalized;
   }
 
