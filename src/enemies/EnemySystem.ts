@@ -1,8 +1,10 @@
 import * as THREE from 'three';
 import type { DamageSystem } from '../combat/DamageSystem';
 import { Health } from '../combat/Health';
+import { LocalAvoidance } from '../navigation/LocalAvoidance';
 import { SpatialHash, type SpatialHashItem } from '../physics/SpatialHash';
 import { ENEMY_ARCHETYPES, type EnemyArchetype, type EnemyId } from './archetypes';
+import { EnemyBrain } from './EnemyBrain';
 
 interface EnemySpatialItem extends SpatialHashItem {
   root: THREE.Object3D;
@@ -29,8 +31,12 @@ export class EnemySystem {
   private readonly actors = new Map<string, EnemyActor>();
   private readonly hitMeshes: THREE.Object3D[] = [];
   private readonly spatial: SpatialHash<EnemySpatialItem>;
+  private readonly brain = new EnemyBrain();
+  private readonly avoidance = new LocalAvoidance<EnemySpatialItem>();
+  private readonly neighbours: EnemySpatialItem[] = [];
   private nextId = 1;
   private readonly desired = new THREE.Vector3();
+  private readonly steered = new THREE.Vector3();
   private readonly offset = new THREE.Vector3();
 
   constructor(
@@ -81,20 +87,38 @@ export class EnemySystem {
 
       this.offset.copy(playerPosition).sub(actor.root.position).setY(0);
       const distance = this.offset.length();
-      if (distance <= actor.archetype.attackRange) {
+      const intent = this.brain.decide(distance, actor.archetype.attackRange, actor.attackTimer);
+
+      if (intent === 'attack') {
         actor.velocity.multiplyScalar(Math.exp(-dt * 12));
-        if (actor.attackTimer <= 0) {
-          actor.attackTimer = actor.archetype.attackCooldown;
-          onAttack(actor);
-        }
+        actor.attackTimer = actor.archetype.attackCooldown;
+        onAttack(actor);
         continue;
       }
 
-      if (distance > 1e-5) this.desired.copy(this.offset).multiplyScalar(1 / distance).multiplyScalar(actor.archetype.speed);
+      if (intent === 'hold') {
+        actor.velocity.multiplyScalar(Math.exp(-dt * 12));
+        continue;
+      }
+
+      if (distance > 1e-5) {
+        this.desired.copy(this.offset).multiplyScalar(1 / distance).multiplyScalar(actor.archetype.speed);
+      } else {
+        this.desired.set(0, 0, 0);
+      }
+
+      const separationRadius = actor.archetype.id === 'brute' ? 1.75 : actor.archetype.id === 'runner' ? 1.15 : 1.35;
+      const separationStrength = actor.archetype.id === 'brute' ? 4.4 : actor.archetype.id === 'runner' ? 3.0 : 3.5;
+      this.spatial.queryRadius(actor.root.position, separationRadius, this.neighbours);
+      this.avoidance.apply(actor.spatial, this.neighbours, this.desired, separationRadius, separationStrength, this.steered);
+      if (this.steered.lengthSq() > actor.archetype.speed * actor.archetype.speed) {
+        this.steered.setLength(actor.archetype.speed);
+      }
+
       const blend = 1 - Math.exp(-actor.archetype.acceleration * dt);
-      actor.velocity.lerp(this.desired, blend);
+      actor.velocity.lerp(this.steered, blend);
       actor.root.position.addScaledVector(actor.velocity, dt);
-      actor.root.rotation.y = Math.atan2(-actor.velocity.x, -actor.velocity.z);
+      if (actor.velocity.lengthSq() > 1e-5) actor.root.rotation.y = Math.atan2(-actor.velocity.x, -actor.velocity.z);
       this.spatial.update(actor.spatial);
     }
   }
