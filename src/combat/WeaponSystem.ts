@@ -72,6 +72,13 @@ export class WeaponSystem {
     return this.selected;
   }
 
+  addReserve(amount: number, id: WeaponId = this.selected): boolean {
+    if (amount <= 0) return false;
+    const runtime = this.runtime(id);
+    runtime.reserve += Math.floor(amount);
+    return true;
+  }
+
   fire(sourceId: string, origin: Vector3, fallbackDirection: Vector3): boolean {
     const definition = this.definition();
     const runtime = this.runtime();
