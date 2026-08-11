@@ -69,6 +69,10 @@ jobs:
             echo 'package-lock.json already tracked'
             exit 0
           fi
+          cp package-lock.json /tmp/facefall-package-lock.json
+          git fetch origin "${HEAD_REF}:refs/remotes/origin/${HEAD_REF}"
+          git checkout -B "${HEAD_REF}" "refs/remotes/origin/${HEAD_REF}"
+          cp /tmp/facefall-package-lock.json package-lock.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add package-lock.json
