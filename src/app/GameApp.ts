@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { aimController } from '../aim/AimController';
 import { FaceSystem } from '../characters/FaceSystem';
 import { CameraCollision } from '../camera/CameraCollision';
 import { CameraDirector, type CameraMode } from '../camera/CameraDirector';
@@ -20,8 +21,10 @@ import { detectQuality, type QualityProfile } from '../graphics/quality';
 import { InputManager } from '../input/InputManager';
 import { KeyboardMouseInput } from '../input/KeyboardMouseInput';
 import { TouchInput } from '../input/TouchInput';
+import { PickupSystem } from '../pickups/PickupSystem';
 import { CollisionWorld } from '../physics/CollisionWorld';
 import { PlayerCapsule } from '../physics/PlayerCapsule';
+import { RainField } from '../rendering/RainField';
 import { WaveDirector } from '../waves/WaveDirector';
 import { AssetManager } from '../world/AssetManager';
 import { GrassField } from '../world/GrassField';
@@ -66,6 +69,7 @@ export class GameApp {
   private readonly collisionWorld = new CollisionWorld();
   private readonly playerController = new PlayerCapsule();
   private readonly grass: GrassField;
+  private readonly rain: RainField;
   private readonly assets = new AssetManager();
   private readonly levelLoader = new LevelLoader(this.assets, this.collisionWorld);
 
@@ -84,6 +88,7 @@ export class GameApp {
   private readonly projectileSystem: ProjectileSystem;
   private readonly projectileVisuals: ProjectileVisuals;
   private readonly enemySystem: EnemySystem;
+  private readonly pickups: PickupSystem;
   private readonly waveDirector = new WaveDirector();
   private readonly maxActiveEnemies: number;
   private readonly unregisterPlayerDamage: () => void;
@@ -121,6 +126,7 @@ export class GameApp {
     this.cameraRig = new CameraDirector(this.camera);
     this.cameraRig.setCollision(new CameraCollision(this.collisionWorld));
     this.grass = new GrassField(this.quality);
+    this.rain = new RainField(this.scene, this.quality);
     this.keyboard = new KeyboardMouseInput(this.input);
     this.lightPool = new LightPool(this.scene, Math.max(1, this.quality.maxDynamicLights));
     this.runtimeFx = new RuntimeFx(
@@ -149,6 +155,14 @@ export class GameApp {
     this.enemySystem = new EnemySystem(this.scene, this.damageSystem, {
       shadows: this.quality.shadows,
       maxActive: this.maxActiveEnemies
+    });
+    this.pickups = new PickupSystem(this.scene, {
+      heal: (amount) => this.playerHealth.heal(amount) > 0,
+      ammo: (amount) => this.weaponSystem.addReserve(amount),
+      collected: (kind, amount) => {
+        this.dom.status.dataset.lastEvent = kind === 'health' ? `MEDKIT +${amount}` : `AMMO +${amount}`;
+        this.refreshHud();
+      }
     });
     this.unregisterPlayerDamage = this.damageSystem.register({ id: 'player', health: this.playerHealth });
 
@@ -244,9 +258,11 @@ export class GameApp {
     this.unregisterPlayerDamage();
     this.waveDirector.stop();
     this.enemySystem.reset();
+    this.pickups.dispose();
     this.projectileVisuals.dispose();
     this.runtimeFx.dispose();
     this.lightPool.dispose();
+    this.rain.dispose();
     this.faceSystem.dispose();
     this.assets.clearCache();
     this.scene.traverse((object) => {
@@ -445,12 +461,7 @@ export class GameApp {
 
     const controls = this.input.snapshot();
     this.desired.set(controls.moveX, 0, controls.moveY);
-    this.updateAim(controls, dt);
-
-    if (this.cameraMode === 'top' && !controls.hasPointer && this.desired.lengthSq() > 0) {
-      this.desired.normalize();
-      this.facing.lerp(this.temp.copy(this.desired), 1 - Math.exp(-dt * 12)).normalize();
-    }
+    this.updateAim(dt);
 
     const targetSpeed = this.desired.lengthSq() > 0 ? (controls.sprint ? 7.1 : 5.0) : 0;
     if (this.desired.lengthSq() > 0) this.desired.normalize();
@@ -468,6 +479,7 @@ export class GameApp {
     this.weaponSystem.update(dt);
     this.projectileSystem.update(dt);
     this.enemySystem.update(dt, this.player.position, (actor) => this.applyEnemyAttack(actor));
+    this.pickups.update(dt, this.player.position);
     for (const request of this.waveDirector.update(dt, this.enemySystem.activeCount, this.maxActiveEnemies)) {
       this.enemySystem.spawn(request.type, request.position);
     }
@@ -506,21 +518,10 @@ export class GameApp {
     });
   }
 
-  private updateAim(controls: ReturnType<InputManager['snapshot']>, dt: number): void {
-    if (this.cameraMode === 'third') {
-      if (Math.abs(controls.aimX) > 0.001) {
-        this.facing.applyAxisAngle(this.up, -controls.aimX * 0.0045).normalize();
-      }
-      return;
-    }
-
-    if (!controls.hasPointer) return;
-    this.aimNdc.set(controls.pointerX, controls.pointerY);
-    this.raycaster.setFromCamera(this.aimNdc, this.camera);
-    const hit = this.raycaster.ray.intersectPlane(this.aimPlane, this.aimPoint);
-    if (!hit) return;
-
-    this.aimDirection.copy(hit).sub(this.player.position).setY(0);
+  private updateAim(dt: number): void {
+    aimController.updateWorldAim(this.camera, this.player.position);
+    if (this.cameraMode !== 'top') return;
+    this.aimDirection.copy(aimController.getWorldDirection(this.aimDirection)).setY(0);
     if (this.aimDirection.lengthSq() <= 1e-5) return;
     this.aimDirection.normalize();
     this.facing.lerp(this.aimDirection, 1 - Math.exp(-dt * 18)).normalize();
@@ -531,6 +532,7 @@ export class GameApp {
     this.runtimeFx.cameraImpulse.apply(this.camera, frameDt);
     this.projectileVisuals.sync(this.projectileSystem.active());
     this.grass.update(this.camera.position);
+    this.rain.update(frameDt, this.player.position);
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -550,6 +552,7 @@ export class GameApp {
 
   private applyLevelManifest(manifest: LevelManifest): void {
     this.waveDirector.configure(manifest.markers);
+    this.pickups.configure(manifest.markers);
 
     for (const light of this.levelLights.splice(0)) light.removeFromParent();
     for (const marker of manifest.markers.filter((item) => item.kind === 'light')) {
@@ -568,6 +571,7 @@ export class GameApp {
     this.weaponSystem.reset();
     this.projectileSystem.reset();
     this.playerHealth.reset();
+    this.pickups.reset();
     this.score = 0;
     this.kills = 0;
     this.dom.status.dataset.lastEvent = '';
@@ -674,7 +678,9 @@ export class GameApp {
       { id: 'fallback-player', kind: 'player-spawn', position: { x: 0, y: 0, z: 10 }, rotationY: Math.PI },
       { id: 'fallback-north', kind: 'enemy-spawn', position: { x: 0, y: 0, z: -28 }, radius: 5 },
       { id: 'fallback-west', kind: 'enemy-spawn', position: { x: -24, y: 0, z: -8 }, radius: 6 },
-      { id: 'fallback-east', kind: 'enemy-spawn', position: { x: 24, y: 0, z: 8 }, radius: 6 }
+      { id: 'fallback-east', kind: 'enemy-spawn', position: { x: 24, y: 0, z: 8 }, radius: 6 },
+      { id: 'fallback-health', kind: 'loot', position: { x: 4, y: 0, z: 4 }, data: { type: 'health', amount: 35 } },
+      { id: 'fallback-ammo', kind: 'loot', position: { x: -6, y: 0, z: 1 }, data: { type: 'ammo', amount: 24 } }
     ];
     return { id: 'lab-fallback', name: 'Lab Fallback', version: 1, markers };
   }
@@ -700,6 +706,7 @@ export class GameApp {
       `camera=${this.cameraMode}`,
       `${WEAPONS[this.weaponSystem.selected].label} ${runtime.magazine}/${runtime.reserve}`,
       `enemies=${this.enemySystem.activeCount}/${this.maxActiveEnemies}`,
+      `pickups=${this.pickups.activeCount}`,
       `arrows=${this.projectileSystem.active().length}`,
       `spatialCells=${this.enemySystem.occupiedCellCount}`,
       `fx=${Object.keys(EFFECTS).length}`,
