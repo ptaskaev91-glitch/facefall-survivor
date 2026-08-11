@@ -1,3 +1,4 @@
+import { aimController } from '../aim/AimController';
 import { InputManager, type InputAction } from './InputManager';
 
 export interface TouchInputElements {
@@ -100,7 +101,9 @@ export class TouchInput {
     this.aimLastX = event.clientX;
     this.aimLastY = event.clientY;
     this.elements.aimSurface?.setPointerCapture?.(event.pointerId);
-    this.updatePointerNdc(event.clientX, event.clientY);
+    // Do not teleport the reticle under the finger. Mobile aiming is a virtual
+    // trackpad: a swipe moves the existing reticle from its current position.
+    this.input.clearPointer();
   };
 
   private onPointerMove = (event: PointerEvent): void => {
@@ -112,10 +115,13 @@ export class TouchInput {
 
     if (event.pointerId === this.aimPointer) {
       event.preventDefault();
-      this.input.setAimDelta(event.clientX - this.aimLastX, event.clientY - this.aimLastY);
+      const dx = event.clientX - this.aimLastX;
+      const dy = event.clientY - this.aimLastY;
       this.aimLastX = event.clientX;
       this.aimLastY = event.clientY;
-      this.updatePointerNdc(event.clientX, event.clientY);
+      aimController.addTouchDelta(dx, dy);
+      const ndc = aimController.getNdc();
+      this.input.setPointerNdc(ndc.x, ndc.y);
     }
   };
 
@@ -135,12 +141,6 @@ export class TouchInput {
     }
     this.elements.stick.style.transform = `translate(${dx}px, ${dy}px)`;
     this.input.setMove(dx / this.maxRadius, dy / this.maxRadius);
-  }
-
-  private updatePointerNdc(clientX: number, clientY: number): void {
-    const width = Math.max(1, window.innerWidth);
-    const height = Math.max(1, window.innerHeight);
-    this.input.setPointerNdc(clientX / width * 2 - 1, -(clientY / height * 2 - 1));
   }
 
   private resetJoystick(): void {

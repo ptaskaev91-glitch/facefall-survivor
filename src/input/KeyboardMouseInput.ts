@@ -1,3 +1,4 @@
+import { aimController } from '../aim/AimController';
 import type { InputAction } from './InputManager';
 import { InputManager } from './InputManager';
 
@@ -68,11 +69,11 @@ export class KeyboardMouseInput {
   };
 
   private onMouseMove = (event: MouseEvent): void => {
-    this.input.setAimDelta(event.movementX, event.movementY);
-    this.input.setPointerNdc(
-      event.clientX / Math.max(1, this.target.innerWidth) * 2 - 1,
-      -(event.clientY / Math.max(1, this.target.innerHeight) * 2 - 1)
-    );
+    const x = event.clientX / Math.max(1, this.target.innerWidth) * 2 - 1;
+    const y = -(event.clientY / Math.max(1, this.target.innerHeight) * 2 - 1);
+    aimController.setPointerNdc(x, y);
+    const ndc = aimController.getNdc();
+    this.input.setPointerNdc(ndc.x, ndc.y);
   };
 
   private onMouseDown = (event: MouseEvent): void => {
