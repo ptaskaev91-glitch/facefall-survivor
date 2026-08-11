@@ -1,5 +1,6 @@
 import type { CameraMode } from '../camera/CameraDirector';
 import { FaceStore } from '../persistence/FaceStore';
+import { SettingsStore, type GameSettings } from '../persistence/SettingsStore';
 import type { GameApp } from './GameApp';
 
 interface ProductShellDom {
@@ -11,26 +12,42 @@ interface ProductShellDom {
   removeFace: HTMLButtonElement;
   cameraTop: HTMLButtonElement;
   cameraThird: HTMLButtonElement;
+  sensitivity: HTMLInputElement;
+  sensitivityValue: HTMLElement;
+  deadzone: HTMLInputElement;
+  deadzoneValue: HTMLElement;
+  aimAssist: HTMLInputElement;
+  aimAssistValue: HTMLElement;
+  audioVolume: HTMLInputElement;
+  audioVolumeValue: HTMLElement;
   loading: HTMLElement;
   error: HTMLElement;
 }
 
 export class ProductShell {
-  private readonly store = new FaceStore();
+  private readonly faceStore = new FaceStore();
+  private readonly settingsStore = new SettingsStore();
   private faceDataUrl: string | null = null;
   private cameraMode: CameraMode = 'top';
+  private settings: GameSettings = this.settingsStore.load();
   private busy = false;
 
   constructor(private readonly app: GameApp, private readonly dom: ProductShellDom) {}
 
   attach(): void {
-    this.faceDataUrl = this.store.load();
+    this.faceDataUrl = this.faceStore.load();
+    this.settings = this.settingsStore.load();
     this.refreshFace();
     this.refreshCamera();
+    this.refreshSettings();
     this.dom.faceInput.addEventListener('change', this.onFaceChange);
     this.dom.removeFace.addEventListener('click', this.onRemoveFace);
     this.dom.cameraTop.addEventListener('click', this.onTop);
     this.dom.cameraThird.addEventListener('click', this.onThird);
+    this.dom.sensitivity.addEventListener('input', this.onSettingsInput);
+    this.dom.deadzone.addEventListener('input', this.onSettingsInput);
+    this.dom.aimAssist.addEventListener('input', this.onSettingsInput);
+    this.dom.audioVolume.addEventListener('input', this.onSettingsInput);
     this.dom.start.addEventListener('click', this.onStart);
     this.show();
   }
@@ -40,6 +57,10 @@ export class ProductShell {
     this.dom.removeFace.removeEventListener('click', this.onRemoveFace);
     this.dom.cameraTop.removeEventListener('click', this.onTop);
     this.dom.cameraThird.removeEventListener('click', this.onThird);
+    this.dom.sensitivity.removeEventListener('input', this.onSettingsInput);
+    this.dom.deadzone.removeEventListener('input', this.onSettingsInput);
+    this.dom.aimAssist.removeEventListener('input', this.onSettingsInput);
+    this.dom.audioVolume.removeEventListener('input', this.onSettingsInput);
     this.dom.start.removeEventListener('click', this.onStart);
   }
 
@@ -64,7 +85,7 @@ export class ProductShell {
 
     try {
       this.faceDataUrl = await this.readFile(file);
-      this.store.save(this.faceDataUrl);
+      this.faceStore.save(this.faceDataUrl);
       this.dom.error.textContent = '';
       this.refreshFace();
     } catch {
@@ -76,7 +97,7 @@ export class ProductShell {
 
   private onRemoveFace = (): void => {
     this.faceDataUrl = null;
-    this.store.remove();
+    this.faceStore.remove();
     this.refreshFace();
   };
 
@@ -90,6 +111,17 @@ export class ProductShell {
     this.refreshCamera();
   };
 
+  private onSettingsInput = (): void => {
+    this.settings = {
+      aimSensitivity: Number(this.dom.sensitivity.value),
+      aimDeadzone: Number(this.dom.deadzone.value),
+      aimAssist: Number(this.dom.aimAssist.value),
+      audioVolume: Number(this.dom.audioVolume.value)
+    };
+    this.settingsStore.save(this.settings);
+    this.refreshSettingsLabels();
+  };
+
   private onStart = async (): Promise<void> => {
     if (this.busy) return;
     this.busy = true;
@@ -98,7 +130,11 @@ export class ProductShell {
     this.dom.loading.textContent = 'ЗАГРУЖАЕМ УРОВЕНЬ…';
 
     try {
-      await this.app.start({ cameraMode: this.cameraMode, faceDataUrl: this.faceDataUrl });
+      await this.app.start({
+        cameraMode: this.cameraMode,
+        faceDataUrl: this.faceDataUrl,
+        settings: this.settings
+      });
       this.dom.overlay.dataset.visible = 'false';
       this.dom.loading.textContent = '';
     } catch (error) {
@@ -131,6 +167,21 @@ export class ProductShell {
     this.dom.cameraThird.dataset.active = String(this.cameraMode === 'third');
   }
 
+  private refreshSettings(): void {
+    this.dom.sensitivity.value = String(this.settings.aimSensitivity);
+    this.dom.deadzone.value = String(this.settings.aimDeadzone);
+    this.dom.aimAssist.value = String(this.settings.aimAssist);
+    this.dom.audioVolume.value = String(this.settings.audioVolume);
+    this.refreshSettingsLabels();
+  }
+
+  private refreshSettingsLabels(): void {
+    this.dom.sensitivityValue.textContent = this.settings.aimSensitivity.toFixed(2);
+    this.dom.deadzoneValue.textContent = this.settings.aimDeadzone.toFixed(2);
+    this.dom.aimAssistValue.textContent = `${Math.round(this.settings.aimAssist * 100)}%`;
+    this.dom.audioVolumeValue.textContent = `${Math.round(this.settings.audioVolume * 100)}%`;
+  }
+
   private readFile(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -157,6 +208,14 @@ export function resolveProductShellDom(): ProductShellDom {
     removeFace: required<HTMLButtonElement>('removeFace'),
     cameraTop: required<HTMLButtonElement>('menuCamTop'),
     cameraThird: required<HTMLButtonElement>('menuCamThird'),
+    sensitivity: required<HTMLInputElement>('aimSensitivity'),
+    sensitivityValue: required<HTMLElement>('aimSensitivityValue'),
+    deadzone: required<HTMLInputElement>('aimDeadzone'),
+    deadzoneValue: required<HTMLElement>('aimDeadzoneValue'),
+    aimAssist: required<HTMLInputElement>('aimAssist'),
+    aimAssistValue: required<HTMLElement>('aimAssistValue'),
+    audioVolume: required<HTMLInputElement>('audioVolume'),
+    audioVolumeValue: required<HTMLElement>('audioVolumeValue'),
     loading: required<HTMLElement>('menuLoading'),
     error: required<HTMLElement>('menuError')
   };
