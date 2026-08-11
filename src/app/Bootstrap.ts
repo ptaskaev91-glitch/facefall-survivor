@@ -16,6 +16,7 @@ export function resolveGameAppDom(): GameAppDom {
     status: required<HTMLDivElement>('#status'),
     topButton: required<HTMLButtonElement>('#camTop'),
     thirdButton: required<HTMLButtonElement>('#camThird'),
+    reticle: optional<HTMLElement>('#aimReticle'),
     hp: optional<HTMLElement>('#runHp'),
     wave: optional<HTMLElement>('#runWave'),
     kills: optional<HTMLElement>('#runKills'),
