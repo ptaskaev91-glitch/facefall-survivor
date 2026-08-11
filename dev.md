@@ -7,8 +7,9 @@ Hosting: **Vercel only**
 Production alias: `https://facefall-survivor-pavels-projects-0b29bb12.vercel.app`
 
 Production game: **legacy 0.5 ALPHA remains active by design**.  
-Engine-next: **0.5B Functional Parity — gameplay loop, focused aiming and product menu/face flow are implemented in code**.  
-Latest engine-next checkpoint: **PR #8 → `56f90d50ac488f4227b28305d4b1da419927375a`**.  
+Engine-next: **0.5B Functional Parity — gameplay, aiming, menu/face flow, pickups and rain are implemented in code**.  
+Latest engine-next checkpoint: **PR #9 → `0876eff1839e9c93a669dc328cf225e200ebf498`**.  
+Menu/face checkpoint: **PR #8 → `56f90d50ac488f4227b28305d4b1da419927375a`**.  
 Focused aim checkpoint: **PR #7 → `967993a3c7d57c448e152526d81c9d7f3249789a`**.  
 Release-tooling checkpoint: **PR #4 → `6d051dae`**.
 
@@ -67,7 +68,7 @@ Direct MIT adaptations already recorded:
 - Capsule/Octree collision-response pattern → `PlayerCapsule.ts`;
 - GLTF loading/traverse preparation → `AssetManager.ts` / `LevelLoader.ts`.
 
-Facefall-specific systems such as SpatialHash, CameraCollision, touch/pointer aim, LevelManifest, EnemySystem, WaveDirector, ProductShell, FaceStore and current combat/FX orchestration are original project implementations.
+Facefall-specific systems such as SpatialHash, CameraCollision, AimController, LevelManifest, EnemySystem, WaveDirector, ProductShell, FaceStore, PickupSystem, RainField and current combat/FX orchestration are original project implementations.
 
 ---
 
@@ -89,6 +90,8 @@ Facefall-specific systems such as SpatialHash, CameraCollision, touch/pointer ai
 14. Major checkpoints update `dev.md`, `structure.md`, `history.md`.
 15. Visible reticle is gameplay state: actual weapon direction must be derived from the same AimController state.
 16. File input/localStorage UI belongs to ProductShell/persistence, not GameApp simulation wiring.
+17. Pickups and other level gameplay objects are spawned from manifest semantics, not hardcoded map coordinates inside systems.
+18. Repeating atmosphere systems such as rain must use bounded batched/pooled geometry and quality budgets.
 
 ---
 
@@ -146,20 +149,21 @@ Facefall-specific systems such as SpatialHash, CameraCollision, touch/pointer ai
 - [x] resilient Bootstrap;
 - [x] pause/resume/background handling;
 - [x] cleanup/dispose foundation;
-- [x] `gameover` state added;
+- [x] `gameover` state;
 - [x] explicit `menu` / `face_setup` states;
-- [~] loading/error states with product-shell feedback;
+- [~] loading/error states with product-shell feedback.
 
-## Input / cameras
+## Input / cameras / aim
 
 - [x] InputManager;
 - [x] keyboard/mouse adapter;
 - [x] detachable touch adapter;
 - [x] joystick foundation;
 - [x] camera-relative movement;
-- [x] focused AimController shared by visible reticle and actual fire direction;
+- [x] AimController shared by visible reticle and actual fire direction;
 - [x] TOP free movable reticle from mouse/touch;
-- [x] 3RD floating reticle with soft edge camera/character turn;
+- [x] TOP hero facing follows the same AimController world direction as shots;
+- [x] 3RD floating reticle with soft-edge camera/character turn;
 - [x] vertical 3RD reticle contributes to shot direction;
 - [x] TopDownCamera;
 - [x] ThirdPersonCamera;
@@ -177,7 +181,7 @@ Facefall-specific systems such as SpatialHash, CameraCollision, touch/pointer ai
 - [x] world raycast;
 - [x] world segment cast;
 - [x] SpatialHash;
-- [x] moving enemies now update SpatialHash cells;
+- [x] moving enemies update SpatialHash cells;
 - [~] wall sliding;
 - [ ] slopes/steps policy;
 - [ ] dynamic colliders;
@@ -188,6 +192,7 @@ Facefall-specific systems such as SpatialHash, CameraCollision, touch/pointer ai
 - [x] data-driven pistol/shotgun/bow;
 - [x] WeaponSystem ammo/cooldown/reload/switch foundation;
 - [x] WeaponSystem reset between runs;
+- [x] reserve ammo refill API for pickups;
 - [x] Health / DamageSystem;
 - [x] player Health registered in the same DamageSystem;
 - [x] Hit/Kill events;
@@ -222,6 +227,7 @@ Facefall-specific systems such as SpatialHash, CameraCollision, touch/pointer ai
 - [x] camera impulse/shake implementation;
 - [x] smoke/casing/blood/debris/spark runtime effects;
 - [x] world surface-hit recipe;
+- [x] quality-scaled bounded `RainField` using one Points geometry;
 - [ ] improve decal surface orientation;
 - [ ] controlled hit-stop integration into the loop;
 - [ ] sound adapter;
@@ -238,6 +244,7 @@ Facefall-specific systems such as SpatialHash, CameraCollision, touch/pointer ai
 - [x] player spawn comes from manifest;
 - [x] wave spawn zones come from enemy-spawn markers;
 - [x] prototype level lights come from manifest;
+- [x] health/ammo loot points come from manifest;
 - [x] fallback procedural geometry remains if authored GLB is not yet present;
 - [ ] actual `level.glb`;
 - [ ] replace fallback lab geometry with authored location;
@@ -256,15 +263,15 @@ Facefall-specific systems such as SpatialHash, CameraCollision, touch/pointer ai
 - [x] real pooled runtime FX foundation;
 - [x] level manifest participates in runtime;
 - [ ] desktop smoke-test;
-- [?] latest 0.5B.3 Android smoke-test still required.
+- [?] latest 0.5B.4 Android smoke-test still required.
 
 ---
 
 # 7. 0.5B — Legacy Functional Parity
 
-**ACTIVE MILESTONE. PR #7 established focused dual-mode aiming; PR #8 established menu + local face flow.**
+**ACTIVE MILESTONE. PR #7 = aim; PR #8 = menu/face; PR #9 = pickups/rain.**
 
-The goal is not visual polish yet; engine-next must reproduce all important capabilities of the working 0.5 legacy build.
+The goal is not final visual polish yet; engine-next must reproduce all important capabilities of the working legacy build on the new architecture.
 
 ## Lifecycle / UI
 
@@ -284,8 +291,9 @@ The goal is not visual polish yet; engine-next must reproduce all important capa
 - [~] desktop movement;
 - [x] camera-relative touch movement foundation verified visually on Android;
 - [x] TOP movable reticle architecture;
+- [x] TOP facing now follows reticle world aim;
 - [x] 3RD floating reticle / soft-edge turn architecture;
-- [?] latest 0.5B.2 reticle feel still needs user/device confirmation;
+- [?] latest 0.5B.4 reticle feel still needs user/device confirmation;
 - [ ] mobile aim assist;
 - [ ] sensitivity/deadzone settings;
 - [ ] final fire/reload/swap/camera touch UX polish.
@@ -306,7 +314,9 @@ The goal is not visual polish yet; engine-next must reproduce all important capa
 - [x] quality-dependent max-active enemy budget;
 - [x] kills / score;
 - [x] restart resets HP/weapons/projectiles/enemies/wave/run stats;
-- [ ] health/ammo pickups;
+- [x] manifest-driven health pickup;
+- [x] manifest-driven ammo pickups;
+- [x] pickup proximity collection and timed respawn;
 - [~] difficulty scaling foundation from wave composition;
 - [ ] navmesh/obstacle-aware movement — belongs to 0.7, direct chase is parity foundation only.
 
@@ -314,7 +324,7 @@ The goal is not visual polish yet; engine-next must reproduce all important capa
 
 - [x] local face picker/storage migrated to engine-next;
 - [x] face preview persists through `localStorage`;
-- [~] face texture is integrated into the current prototype hero through `FaceSystem`;
+- [~] face texture integrated into current prototype hero through `FaceSystem`;
 - [x] neutral fallback face;
 - [x] replace/remove image;
 - [ ] final fitted head/UV integration belongs to Face System 2.0 / visual vertical slice.
@@ -325,17 +335,18 @@ The goal is not visual polish yet; engine-next must reproduce all important capa
 - [x] lighting foundation;
 - [x] grass foundation;
 - [x] runtime combat FX foundation;
-- [ ] rain;
+- [x] bounded visual rain with mobile/desktop density profiles;
+- [ ] rain/wind ambient audio;
 - [ ] lightning/thunder;
-- [ ] environment ambience.
+- [ ] broader environment ambience.
 
 ## Validation
 
-- [x] dedicated Vercel engine-next test URLs exist for 0.5B.1 and 0.5B.2;
-- [ ] dedicated 0.5B.3 menu/face preview;
+- [x] dedicated Vercel engine-next test URLs existed for 0.5B.1 and 0.5B.2;
+- [!] Vercel connector currently exposes an inconsistent deploy contract for a fresh 0.5B.3/0.5B.4 preview; CI build remains valid but no new preview URL is claimed until deployment succeeds;
 - [ ] desktop browser smoke;
-- [?] Android engine-next gameplay was tested on 0.5B.1; latest menu/face build still requires check;
-- [?] no infinite loader observed in tested build; verify again with menu/face loading flow;
+- [?] Android engine-next gameplay was tested on 0.5B.1; latest menu/face/pickups/rain build still requires device check;
+- [?] no infinite loader observed in tested build; verify again with latest menu/face flow;
 - [ ] compare final parity checklist against legacy.
 
 ---
@@ -345,7 +356,7 @@ The goal is not visual polish yet; engine-next must reproduce all important capa
 Only after 0.5B + Android smoke:
 
 - [ ] Vite entrypoint becomes `/`;
-- [ ] remove legacy game-v050 runtime from production path;
+- [ ] remove legacy `game-v050.js` from production path;
 - [ ] remove legacy Three/GLTF external runtime proxies;
 - [ ] simplify Vercel config;
 - [ ] engine-lab becomes debug-only or removed;
@@ -403,7 +414,8 @@ Definition: a still screenshot must look like a game rather than a procedural en
 - [x] active-enemy budget;
 - [~] difficulty curve foundation;
 - [~] inter-wave downtime foundation;
-- [ ] pickups/mini-events.
+- [x] basic health/ammo pickup loop;
+- [ ] mini-events / richer drops.
 
 ## 0.8 Combat feel + audio
 
@@ -435,7 +447,7 @@ Definition: a still screenshot must look like a game rather than a procedural en
 
 - compact mobile HUD;
 - safe areas;
-- crosshair;
+- crosshair polish;
 - settings/quality/sensitivity/audio;
 - loading progress and clear errors.
 
@@ -465,7 +477,7 @@ Definition: a still screenshot must look like a game rather than a procedural en
 - [x] wave progression/run stats foundation;
 - [ ] best score;
 - [ ] lightweight upgrade choices;
-- [ ] local persistence.
+- [ ] local progression persistence.
 
 ---
 
@@ -500,13 +512,15 @@ Not MVP: multiplayer, dedicated server, MMO backend, native-engine rewrite, full
 - [ ] GameApp still owns too much integration wiring;
 - [ ] EnemySystem direct-chases through conceptual obstacles until navmesh/local avoidance is added;
 - [ ] fallback procedural world remains until `level.glb`;
-- [ ] current FaceSystem uses a temporary face plane on the prototype hero; final head-fit is still pending;
+- [ ] current FaceSystem uses a temporary face plane on the prototype hero; final head-fit is pending;
 - [ ] Soldier GLB is only a pipeline proof;
 - [ ] legacy production still depends on same-origin CDN proxies;
 - [ ] navmesh integration not selected;
 - [ ] automated browser smoke test absent;
-- [ ] latest engine-next 0.5B.3 not yet manually verified on Android;
-- [ ] Vercel deployment polling connector can be unreliable for some fresh deployment IDs.
+- [ ] latest engine-next 0.5B.4 not yet manually verified on Android;
+- [ ] Vercel preview deploy connector currently has a schema/backend contract mismatch;
+- [ ] ambient audio system absent;
+- [ ] old unused aim scratch fields in GameApp can be cleaned during decomposition; they do not affect runtime/typecheck.
 
 Closed debt in recent checkpoints:
 
@@ -522,23 +536,25 @@ Closed debt in recent checkpoints:
 - [x] EnemySystem/WaveDirector/player damage/game-over/restart foundation added;
 - [x] camera-relative joystick movement added;
 - [x] movable dual-mode AimController linked to actual shot direction;
-- [x] product menu/pre-game camera/local face flow added.
+- [x] product menu/pre-game camera/local face flow added;
+- [x] manifest pickups added;
+- [x] bounded quality-scaled rain added;
+- [x] TOP hero facing reconciled with shared AimController state.
 
 ---
 
 # 14. Official next block
 
-1. Publish and verify a dedicated **engine-next 0.5B.3 menu/face Vercel test URL**.
-2. Test face select → preview → launch → persisted reload → remove/replace on Android.
-3. Validate 0.5B.2/0.5B.3 aiming feel in both TOP and 3RD and tune sensitivity/deadzones if needed.
-4. Add health/ammo pickups to close legacy gameplay parity.
-5. Add rain + ambient atmosphere parity; lightning/thunder after the base ambient layer works.
-6. Obtain and commit reproducible `package-lock.json`, then CI → `npm ci`.
-7. Add browser smoke automation.
-8. Begin navmesh spike / obstacle-aware enemy movement.
-9. Desktop + latest real Android smoke-test.
-10. Compare final parity checklist against legacy.
-11. Only after parity + smoke-test activate engine-next at production `/`.
+1. Obtain and commit a reproducible `package-lock.json`; switch CI from `npm install` to `npm ci`.
+2. Add automated browser smoke testing for boot → menu → start → gameplay and fatal-console-error detection.
+3. Add base AudioSystem + rain/wind ambient layer; thunder/lightning after audio foundation.
+4. Add configurable aim sensitivity/deadzone and then lightweight mobile aim assist.
+5. Decompose GameApp further once parity-critical wiring stabilizes.
+6. Begin navmesh spike / obstacle-aware enemy movement.
+7. Resolve Vercel preview deployment connector path or deploy through verified Git integration/output artifact route.
+8. Run desktop smoke-test and latest real Android test of 0.5B.4: menu/face/aim/pickups/rain/restart.
+9. Compare final parity checklist against legacy.
+10. Only after parity + smoke-test activate engine-next at production `/`.
 
 ---
 
