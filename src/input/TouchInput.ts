@@ -100,7 +100,9 @@ export class TouchInput {
     this.aimLastX = event.clientX;
     this.aimLastY = event.clientY;
     this.elements.aimSurface?.setPointerCapture?.(event.pointerId);
-    this.updatePointerNdc(event.clientX, event.clientY);
+    // Touch aim is intentionally relative: the finger may start anywhere on the
+    // free screen area without teleporting the reticle under the finger.
+    this.input.clearPointer();
   };
 
   private onPointerMove = (event: PointerEvent): void => {
@@ -115,7 +117,6 @@ export class TouchInput {
       this.input.setAimDelta(event.clientX - this.aimLastX, event.clientY - this.aimLastY);
       this.aimLastX = event.clientX;
       this.aimLastY = event.clientY;
-      this.updatePointerNdc(event.clientX, event.clientY);
     }
   };
 
@@ -135,12 +136,6 @@ export class TouchInput {
     }
     this.elements.stick.style.transform = `translate(${dx}px, ${dy}px)`;
     this.input.setMove(dx / this.maxRadius, dy / this.maxRadius);
-  }
-
-  private updatePointerNdc(clientX: number, clientY: number): void {
-    const width = Math.max(1, window.innerWidth);
-    const height = Math.max(1, window.innerHeight);
-    this.input.setPointerNdc(clientX / width * 2 - 1, -(clientY / height * 2 - 1));
   }
 
   private resetJoystick(): void {
