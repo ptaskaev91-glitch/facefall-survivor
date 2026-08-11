@@ -1,4 +1,7 @@
 import { aimController } from '../aim/AimController';
+import type { FacefallEvents } from '../combat/types';
+import type { EventBus } from '../core/EventBus';
+import { AudioSystem } from '../presentation/audio/AudioSystem';
 import { GameApp, type GameAppDom } from './GameApp';
 import { ProductShell, resolveProductShellDom } from './ProductShell';
 
@@ -44,15 +47,25 @@ export async function bootstrapEngineNext(): Promise<GameApp | null> {
     dom.status.textContent = 'ENGINE NEXT · готовим меню…';
     app = new GameApp(dom);
 
-    const shell = new ProductShell(app, resolveProductShellDom());
+    // Temporary integration boundary until GameApp exposes a dedicated presentation
+    // port. The EventBus stays private to simulation code; bootstrap owns adapters.
+    const events = (app as unknown as { events: EventBus<FacefallEvents> }).events;
+    const audio = new AudioSystem(events);
+    const shell = new ProductShell(app, resolveProductShellDom(), audio);
     shell.attach();
+
+    const unlockAudio = (): void => { void audio.resume(); };
+    document.addEventListener('pointerdown', unlockAudio, { once: true, passive: true });
+    window.addEventListener('pagehide', () => audio.dispose(), { once: true });
 
     const runtimeWindow = window as Window & {
       __facefallApp?: GameApp;
       __facefallShell?: ProductShell;
+      __facefallAudio?: AudioSystem;
     };
     runtimeWindow.__facefallApp = app;
     runtimeWindow.__facefallShell = shell;
+    runtimeWindow.__facefallAudio = audio;
     return app;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
