@@ -1,3 +1,4 @@
+import { aimController } from '../aim/AimController';
 import { GameApp, type GameAppDom } from './GameApp';
 
 function required<T extends HTMLElement>(selector: string): T {
@@ -39,6 +40,7 @@ export async function bootstrapEngineNext(): Promise<GameApp | null> {
 
   try {
     dom = resolveGameAppDom();
+    aimController.setReticle(dom.reticle);
     dom.status.textContent = 'ENGINE NEXT · bootstrap…';
     app = new GameApp(dom);
     await app.start();
