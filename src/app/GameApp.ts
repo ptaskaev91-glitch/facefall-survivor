@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { FaceSystem } from '../characters/FaceSystem';
 import { CameraCollision } from '../camera/CameraCollision';
 import { CameraDirector, type CameraMode } from '../camera/CameraDirector';
 import { DamageSystem } from '../combat/DamageSystem';
@@ -48,6 +49,11 @@ export interface GameAppDom {
   touchCamera?: HTMLElement;
 }
 
+export interface StartRunOptions {
+  cameraMode?: CameraMode;
+  faceDataUrl?: string | null;
+}
+
 export class GameApp {
   readonly state = new GameStateController();
 
@@ -70,6 +76,7 @@ export class GameApp {
   private readonly input = new InputManager();
   private readonly keyboard: KeyboardMouseInput;
   private touch: TouchInput | null = null;
+  private runtimeInputAttached = false;
 
   private readonly lightPool: LightPool;
   private readonly runtimeFx: RuntimeFx;
@@ -82,6 +89,7 @@ export class GameApp {
   private readonly unregisterPlayerDamage: () => void;
 
   private readonly player = new THREE.Group();
+  private readonly faceSystem: FaceSystem;
   private readonly facing = new THREE.Vector3(0, 0, -1);
   private readonly move = new THREE.Vector3();
   private readonly desired = new THREE.Vector3();
@@ -147,6 +155,7 @@ export class GameApp {
     this.configureScene();
     this.createWorldGeometry();
     this.createPlayer();
+    this.faceSystem = new FaceSystem(this.player);
     this.bindCombatEvents();
     this.bindUi();
 
@@ -160,18 +169,33 @@ export class GameApp {
     });
   }
 
-  async start(): Promise<void> {
+  enterMenu(): void {
+    if (this.disposed || this.state.is('menu')) return;
+    this.loop.stop();
+    this.waveDirector.stop();
+    this.input.reset();
+    this.dom.gameOver?.setAttribute('data-visible', 'false');
+
+    if (this.state.is('boot') || this.state.is('error') || this.state.is('gameover') || this.state.is('playing') || this.state.is('paused')) {
+      this.state.transition('menu');
+    }
+    this.refreshStatus();
+  }
+
+  async start(options: StartRunOptions = {}): Promise<void> {
     if (this.disposed) throw new Error('Cannot start a disposed GameApp');
-    if (!this.state.is('boot') && !this.state.is('error')) return;
+    if (this.state.is('boot')) this.enterMenu();
+    if (!this.state.is('menu') && !this.state.is('face_setup') && !this.state.is('error')) return;
 
     this.state.transition('loading');
     this.dom.status.textContent = 'ENGINE NEXT · загружаем уровень и gameplay manifest…';
 
     try {
-      await this.loadLevelManifest();
+      if (!this.manifest) await this.loadLevelManifest();
+      await this.faceSystem.setDataUrl(options.faceDataUrl ?? null);
       this.attachRuntimeInput();
       this.resetRun();
-      this.setCameraMode('top');
+      this.setCameraMode(options.cameraMode ?? 'top');
       this.state.transition('playing');
       this.loop.start();
       this.refreshStatus();
@@ -223,6 +247,7 @@ export class GameApp {
     this.projectileVisuals.dispose();
     this.runtimeFx.dispose();
     this.lightPool.dispose();
+    this.faceSystem.dispose();
     this.assets.clearCache();
     this.scene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
@@ -237,6 +262,8 @@ export class GameApp {
   }
 
   private attachRuntimeInput(): void {
+    if (this.runtimeInputAttached) return;
+    this.runtimeInputAttached = true;
     this.keyboard.attach();
     this.attachTouchInput();
     window.addEventListener('resize', this.onResize);
