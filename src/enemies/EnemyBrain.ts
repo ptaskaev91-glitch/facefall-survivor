@@ -1,13 +1,30 @@
-export type EnemyIntent = 'chase' | 'hold' | 'attack';
+export type EnemyIntent = 'wander' | 'investigate' | 'chase' | 'hold' | 'attack' | 'stagger';
+
+export interface EnemyBrainContext {
+  distanceToPlayer: number;
+  attackRange: number;
+  attackTimer: number;
+  staggerTimer: number;
+  hasLineOfSight: boolean;
+  alertTimer: number;
+}
 
 /**
- * Lightweight state boundary before navmesh/perception work.
- * EnemySystem executes movement; EnemyBrain decides the high-level intent.
+ * Small explicit state tree inspired by the audited gameplay architectures.
+ * It deliberately stays data-light: pathfinding and movement remain EnemySystem concerns.
  */
 export class EnemyBrain {
-  decide(distanceToPlayer: number, attackRange: number, attackTimer: number): EnemyIntent {
-    if (distanceToPlayer > attackRange) return 'chase';
-    if (attackTimer <= 0) return 'attack';
-    return 'hold';
+  decide(context: EnemyBrainContext): EnemyIntent {
+    if (context.staggerTimer > 0) return 'stagger';
+
+    if (context.hasLineOfSight) {
+      if (context.distanceToPlayer <= context.attackRange) {
+        return context.attackTimer <= 0 ? 'attack' : 'hold';
+      }
+      return 'chase';
+    }
+
+    if (context.alertTimer > 0) return 'investigate';
+    return 'wander';
   }
 }
