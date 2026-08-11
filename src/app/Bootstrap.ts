@@ -1,5 +1,6 @@
 import { aimController } from '../aim/AimController';
 import { GameApp, type GameAppDom } from './GameApp';
+import { ProductShell, resolveProductShellDom } from './ProductShell';
 
 function required<T extends HTMLElement>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -40,11 +41,18 @@ export async function bootstrapEngineNext(): Promise<GameApp | null> {
   try {
     aimController.setReticle(optional<HTMLElement>('#aimReticle'));
     dom = resolveGameAppDom();
-    dom.status.textContent = 'ENGINE NEXT · bootstrap…';
+    dom.status.textContent = 'ENGINE NEXT · готовим меню…';
     app = new GameApp(dom);
-    await app.start();
 
-    (window as Window & { __facefallApp?: GameApp }).__facefallApp = app;
+    const shell = new ProductShell(app, resolveProductShellDom());
+    shell.attach();
+
+    const runtimeWindow = window as Window & {
+      __facefallApp?: GameApp;
+      __facefallShell?: ProductShell;
+    };
+    runtimeWindow.__facefallApp = app;
+    runtimeWindow.__facefallShell = shell;
     return app;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
