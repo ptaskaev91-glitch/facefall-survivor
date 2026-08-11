@@ -49,35 +49,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
-        shell: bash
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci --no-audit --no-fund
-          else
-            npm install --no-audit --no-fund
-          fi
-
-      - name: Persist generated lockfile on same-repository PR
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        shell: bash
-        env:
-          HEAD_REF: ${{ github.head_ref }}
-        run: |
-          if git ls-files --error-unmatch package-lock.json >/dev/null 2>&1; then
-            echo 'package-lock.json already tracked'
-            exit 0
-          fi
-          cp package-lock.json /tmp/facefall-package-lock.json
-          git fetch origin "${HEAD_REF}:refs/remotes/origin/${HEAD_REF}"
-          git checkout -B "${HEAD_REF}" "refs/remotes/origin/${HEAD_REF}"
-          cp /tmp/facefall-package-lock.json package-lock.json
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
-          git commit -m "Lock npm dependencies"
-          git push origin "HEAD:${HEAD_REF}"
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
 
       - name: Typecheck
         run: npm run typecheck
