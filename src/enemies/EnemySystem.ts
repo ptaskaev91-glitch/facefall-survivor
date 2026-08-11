@@ -17,6 +17,7 @@ export interface EnemyActor {
   root: THREE.Group;
   velocity: THREE.Vector3;
   attackTimer: number;
+  staggerTimer: number;
   alive: boolean;
   unregisterDamage: () => void;
   spatial: EnemySpatialItem;
@@ -77,6 +78,7 @@ export class EnemySystem {
       root,
       velocity: new THREE.Vector3(),
       attackTimer: 0,
+      staggerTimer: 0,
       alive: true,
       unregisterDamage,
       spatial
@@ -91,6 +93,14 @@ export class EnemySystem {
     for (const actor of this.actors.values()) {
       if (!actor.alive || !actor.root.visible) continue;
       actor.attackTimer = Math.max(0, actor.attackTimer - dt);
+      actor.staggerTimer = Math.max(0, actor.staggerTimer - dt);
+
+      if (actor.staggerTimer > 0) {
+        actor.velocity.multiplyScalar(Math.exp(-dt * 8));
+        actor.root.position.addScaledVector(actor.velocity, dt);
+        this.spatial.update(actor.spatial);
+        continue;
+      }
 
       this.offset.copy(playerPosition).sub(actor.root.position).setY(0);
       const distance = this.offset.length();
@@ -133,6 +143,18 @@ export class EnemySystem {
     }
   }
 
+  stagger(id: string, duration: number, direction?: THREE.Vector3, impulse = 0): boolean {
+    const actor = this.actors.get(id);
+    if (!actor || !actor.alive) return false;
+    const resistance = actor.archetype.id === 'brute' ? 0.48 : actor.archetype.id === 'runner' ? 0.9 : 0.75;
+    actor.staggerTimer = Math.max(actor.staggerTimer, Math.max(0, duration) * resistance);
+    if (direction && impulse > 0) {
+      this.offset.copy(direction).setY(0);
+      if (this.offset.lengthSq() > 1e-6) actor.velocity.add(this.offset.normalize().multiplyScalar(impulse * resistance));
+    }
+    return true;
+  }
+
   kill(id: string): boolean {
     const actor = this.actors.get(id);
     if (!actor || !actor.alive) return false;
@@ -165,6 +187,11 @@ export class EnemySystem {
   }
 
   get meshes(): readonly THREE.Object3D[] {
+    return this.hitMeshes;
+  }
+
+  /** Visible roots used by the screen-space aim-assist query. */
+  get aimTargets(): readonly THREE.Object3D[] {
     return this.hitMeshes;
   }
 
