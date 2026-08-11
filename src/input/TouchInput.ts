@@ -1,3 +1,4 @@
+import { aimController } from '../aim/AimController';
 import { InputManager, type InputAction } from './InputManager';
 
 export interface TouchInputElements {
@@ -100,8 +101,8 @@ export class TouchInput {
     this.aimLastX = event.clientX;
     this.aimLastY = event.clientY;
     this.elements.aimSurface?.setPointerCapture?.(event.pointerId);
-    // Touch aim is intentionally relative: the finger may start anywhere on the
-    // free screen area without teleporting the reticle under the finger.
+    // Do not teleport the reticle under the finger. Mobile aiming is a virtual
+    // trackpad: a swipe moves the existing reticle from its current position.
     this.input.clearPointer();
   };
 
@@ -114,9 +115,13 @@ export class TouchInput {
 
     if (event.pointerId === this.aimPointer) {
       event.preventDefault();
-      this.input.setAimDelta(event.clientX - this.aimLastX, event.clientY - this.aimLastY);
+      const dx = event.clientX - this.aimLastX;
+      const dy = event.clientY - this.aimLastY;
       this.aimLastX = event.clientX;
       this.aimLastY = event.clientY;
+      aimController.addTouchDelta(dx, dy);
+      const ndc = aimController.getNdc();
+      this.input.setPointerNdc(ndc.x, ndc.y);
     }
   };
 
