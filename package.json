@@ -8,12 +8,14 @@
     "build:next": "vite build --config vite.config.ts",
     "build:deploy": "npm run build:next && node scripts/copy-legacy.mjs",
     "preview:next": "vite preview --config vite.config.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:smoke": "playwright test tests/smoke"
   },
   "dependencies": {
     "three": "0.160.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.54.0",
     "@types/node": "^22.0.0",
     "@types/three": "0.160.0",
     "typescript": "^5.5.4",
