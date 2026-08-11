@@ -35,13 +35,7 @@ Source of truth: `main`
 
 # 3. GitHub Pages → Vercel
 
-Первоначальная попытка GitHub Pages создавала 404/лишнюю инфраструктуру. Пользователь выбрал Vercel-only hosting.
-
-Зафиксировано:
-
-- GitHub = source/version history;
-- Vercel = production;
-- GitHub Pages не используется.
+GitHub = source/version history. Vercel = production. GitHub Pages не используется.
 
 Primary production alias:
 
@@ -51,118 +45,47 @@ Primary production alias:
 
 # 4. Ранние cinematic/browser prototypes
 
-В 0.3 были сделаны gameplay/visual prototypes:
+В 0.3 были сделаны face persistence, pistol/shotgun/bow, waves, rain/fog/night lighting, muzzle FX/casings, blood/decals, pickups, mobile controls/auto aim и procedural sound/environment.
 
-- face persistence;
-- pistol/shotgun/bow;
-- waves;
-- rain/fog/night lighting;
-- muzzle FX/casings;
-- blood/decals;
-- pickups;
-- mobile controls/auto aim;
-- procedural sound/environment.
-
-Появились первые architecture bugs: initialization order и lighting compositing. Они были исправлены, но стало ясно, что большой monolithic runtime быстро становится хрупким.
+Появились initialization-order и lighting bugs; стало ясно, что monolithic runtime не подходит как долговременная база.
 
 ---
 
 # 5. Переход в Three.js и 3D
 
-По запросу пользователя были добавлены:
+Добавлены Three.js/WebGL, 3D terrain, TOP + third-person cameras, grass/materials, trees/props, rain/fog/lights и mobile controls.
 
-- Three.js/WebGL;
-- 3D terrain;
-- TOP + third-person cameras;
-- camera switching;
-- grass/materials;
-- trees/props;
-- rain/fog/lights;
-- mobile controls.
-
-После merge на реальном Android возникли проблемы: сначала не нажимались кнопки, затем движок мог зависать на бесконечной загрузке.
-
-Для стабилизации были введены independent UI bootstrap, timeout/error fallback и Vercel same-origin proxy для Three/GLTF assets.
+После merge на Android были проблемы с bootstrap и бесконечной загрузкой. Для стабилизации введены independent UI bootstrap, timeout/error fallback и Vercel same-origin proxy для Three/GLTF assets.
 
 Главный урок: runtime CDN + один большой JS-файл — плохая долговременная база.
 
 ---
 
-# 6. Visual audit текущего prototype
+# 6. Visual audit prototype
 
-После пользовательского скриншота зафиксированы проблемы:
+Зафиксированы procedural mannequin, слабая face integration, слишком тёмная сцена, слабые материалы, неудобная 3RD camera, плохая читаемость weapons, одинаковые infected silhouettes, пустой мир и web-like HUD.
 
-- procedural mannequin вместо полноценного героя;
-- face как визуальная накладка;
-- слишком тёмная сцена;
-- слабая читаемость материалов/травы;
-- неудобная third-person camera;
-- плохая читаемость weapon silhouettes;
-- одинаковые infected silhouettes;
-- пустой мир;
-- web-like HUD.
-
-Принято решение перестать бесконечно улучшать BoxGeometry/SphereGeometry и перейти к GLB characters/weapons/environment.
+Принято решение перейти к GLB characters/weapons/environment.
 
 ---
 
 # 7. 0.5 ALPHA Character prototype
 
-Был прототипирован GLB character pipeline:
+Прототипированы humanoid GLB, AnimationMixer, idle/walk/run, weapon visuals, face attachment, improved 3RD camera и procedural fallback.
 
-- humanoid GLB;
-- AnimationMixer;
-- idle/walk/run;
-- weapon visuals;
-- face attachment;
-- improved third-person camera;
-- fallback procedural model.
-
-Three.js Soldier использовался как pipeline proof и не является final Facefall asset.
-
-Этот build остался стабильной production legacy контрольной точкой.
+Three.js Soldier использовался как pipeline proof, а legacy build остался production-контрольной точкой.
 
 ---
 
 # 8. Три архитектурных аудита
 
-## `ivanoskov/shooter`
+`ivanoskov/shooter` дал browser foundation: TypeScript/Vite/npm Three.js, GLB loading, Octree/Capsule, quality/debug architecture.
 
-Главная ценность — browser foundation:
+`Unvanquished/Unvanquished` дал gameplay architecture: simulation vs presentation, data-driven weapons/entities, Damage/Hit/Kill, projectiles, navmesh, AI state/behavior, animation transitions. GPL code напрямую не переносится.
 
-- TypeScript/Vite/npm Three.js;
-- GLB loading;
-- Octree/Capsule;
-- quality/debug architecture.
+`redeclipse/base` дал combat/FX/environment philosophy: weapon states/recoil/spread, hitscan vs projectile, hit zones, particles/light/sound/decal/wind recipes, bounded budgets, level semantic markers.
 
-Не копировались его double-update physics, FPS camera и desktop-only input assumptions.
-
-## `Unvanquished/Unvanquished`
-
-Главная ценность — gameplay architecture:
-
-- simulation vs presentation;
-- data-driven weapons/entities;
-- Damage/Hit/Kill pipeline;
-- projectiles;
-- navmesh;
-- state/behavior AI;
-- animation transitions.
-
-GPL game code напрямую не переносится.
-
-## `redeclipse/base`
-
-Главная ценность — combat/FX/environment philosophy:
-
-- weapon states/recoil/spread;
-- hitscan vs projectile;
-- head/torso/limb zones;
-- particles/light/sound/decal/wind as one FX recipe;
-- bounded stains/grass budgets;
-- level semantic markers.
-
-Итоговая архитектура Facefall:
+Итоговая архитектура:
 
 > TypeScript/Vite browser foundation + event/component gameplay systems + data-driven combat + pooled FX + GLB/manifest levels + mobile-first budgets.
 
@@ -170,48 +93,23 @@ GPL game code напрямую не переносится.
 
 # 9. Documentation Freeze
 
-По запросу пользователя были созданы и зафиксированы:
-
-- `structure.md`;
-- `history.md`;
-- полный `dev.md` roadmap.
-
-После подготовки пользователь разрешил продолжить coding.
+Созданы `structure.md`, `history.md`, полный `dev.md`. После подготовки пользователь разрешил coding.
 
 ---
 
 # 10. PR #1 — lifecycle / camera / EffectSystem
 
-Branch: `engine-next/0.5a-foundation`.
+Добавлены GameApp/GameState/Bootstrap, thin `src/main.ts`, pause/resume/dispose, TouchInput detach, TopDownCamera / ThirdPersonCamera / CameraDirector, LightPool, EffectSystem.
 
-Добавлены:
-
-- GameApp/GameState/Bootstrap;
-- thin `src/main.ts`;
-- pause/resume/dispose;
-- clean TouchInput detach;
-- TopDownCamera / ThirdPersonCamera / CameraDirector;
-- LightPool;
-- EffectSystem.
-
-CI install/typecheck/Vite build прошёл успешно.
-
-PR #1 squash-merged → checkpoint `0a599032`.
-
-Production legacy не переключался.
+CI green. PR #1 squash-merged → `0a599032`.
 
 ---
 
 # 11. Пользовательское правило reuse
 
-Пользователь уточнил: там, где совместимый блок можно безопасно скопировать — копировать; где нельзя — писать с нуля.
+Где совместимый блок можно безопасно скопировать — копировать; где нельзя — писать с нуля.
 
-Принята политика:
-
-- permissive compatible isolated code may be reused with notices;
-- GPL/incompatible code not copied;
-- external media licenses checked independently;
-- architecture ideas may be reimplemented cleanly.
+Permissive isolated code может reused с notices; GPL/incompatible code не копируется; media licenses проверяются отдельно.
 
 Создан `THIRD_PARTY_NOTICES.md`.
 
@@ -219,38 +117,17 @@ Production legacy не переключался.
 
 # 12. PR #2 — physics / aim / level foundation
 
-Branch: `engine-next/0.5a-core-physics`.
+Direct MIT adaptations from `ivanoskov/shooter`: Capsule/Octree collision response → `PlayerCapsule`; GLTF loading/traverse pattern → AssetManager/LevelLoader.
 
-Direct MIT adaptations from `ivanoskov/shooter`:
+Original Facefall: SpatialHash, CameraCollision, pointer/touch aiming, LevelManifest, combat/FX integration.
 
-- Capsule/Octree collision response → `PlayerCapsule`;
-- GLTF loading/traverse pattern → AssetManager/LevelLoader.
-
-Original Facefall implementations:
-
-- SpatialHash;
-- CameraCollision;
-- pointer/touch aiming;
-- LevelManifest;
-- combat/FX integration.
-
-Также добавлены static world ray/segment queries, third-person camera push-in, hitscan world occlusion, EffectSystem integration, Abandoned Outskirts manifest skeleton и media attribution registry.
-
-CI green. PR #2 squash-merged → checkpoint `29008e7d`.
+CI green. PR #2 squash-merged → `29008e7d`.
 
 ---
 
-# 13. PR #3 — большой 0.5A projectile / FX / level block
+# 13. PR #3 — projectile / FX / level block
 
-По просьбе пользователя сделать большой связанный блок добавлены:
-
-- ballistic bow runtime;
-- projectile gravity/lifetime/segment collision;
-- pooled visible arrows;
-- concrete RuntimeFx particles/decals/camera impulse;
-- surface-hit recipe;
-- manifest-first runtime loading;
-- player spawn / enemy spawn / lights из manifest.
+Добавлены ballistic bow, projectile gravity/lifetime/segment collision, pooled arrows, RuntimeFx particles/decals/camera impulse, surface-hit recipe, manifest-first runtime loading, player/enemy spawn и lights из manifest.
 
 CI green. PR #3 squash-merged → `bec7b5f8c0110876df2d54b60c7fbb839ee453ca`.
 
@@ -258,247 +135,140 @@ CI green. PR #3 squash-merged → `bec7b5f8c0110876df2d54b60c7fbb839ee453ca`.
 
 # 14. PR #4 — release tooling
 
-Добавлены:
-
-- `scripts/copy-legacy.mjs`;
-- `npm run build:deploy`;
-- combined `dist-next`;
-- CI artifact `facefall-dist-next`;
-- Vercel output config для переходного периода.
+Добавлены `scripts/copy-legacy.mjs`, `npm run build:deploy`, combined `dist-next`, CI artifact `facefall-dist-next`, Vercel output config.
 
 PR #4 squash-merged → `6d051dae8febbfd61bf2b3cb826bb595edbcbc31`.
 
-Production root намеренно остался legacy до functional parity + Android smoke-test.
+Production root остался legacy до parity + Android smoke.
 
 ---
 
 # 15. Vercel refresh после 0.5A
 
-Production refresh был сделан безопасно без преждевременного переключения `/` на engine-next.
+Production refresh сделан без переключения `/` на engine-next. Зафиксирован deployment request `dpl_2SmWVpkqFmuZL2BBrpQ7v2UbRcEb`.
 
-Зафиксированный deployment request:
-
-`dpl_2SmWVpkqFmuZL2BBrpQ7v2UbRcEb`
-
-Vercel connector иногда возвращал `404 not_found` при последующем polling свежих deployment IDs, поэтому READY никогда не считался подтверждённым без фактической проверки.
+Vercel connector иногда возвращал 404 при polling свежих deployment IDs, поэтому READY не считался подтверждённым без проверки.
 
 ---
 
 # 16. PR #5 — первый полноценный 0.5B gameplay loop
 
-Branch: `engine-next/0.5b-gameplay-loop`.  
-PR: **#5**.  
-Squash merge checkpoint: `dcdee8b058726743ba2e518602e2b8cce458f0d1`.
+Добавлены EnemySystem, Walker/Runner/Brute runtime, chase + melee, moving SpatialHash, player Health/Damage, WaveDirector, manifest spawn zones, enemy cap, kills/score, gameover/restart, HP/WAVE/KILLS/SCORE HUD.
 
-Добавлено:
+CI green. PR #5 squash-merged → `dcdee8b058726743ba2e518602e2b8cce458f0d1`.
 
-- EnemySystem;
-- Walker / Runner / Brute runtime;
-- chase + melee attacks;
-- moving SpatialHash update;
-- player Health/Damage;
-- WaveDirector;
-- manifest spawn zones;
-- quality-dependent enemy cap;
-- kills / score;
-- gameover/restart;
-- HP/WAVE/KILLS/SCORE HUD.
-
-CI полностью green.
-
-Ограничение: navigation пока direct chase без navmesh.
+Navigation пока direct chase без navmesh.
 
 ---
 
-# 17. Реальный Android feedback — movement и reticle
+# 17. Android feedback — movement и reticle
 
-Пользователь протестировал engine-next на Android и сообщил две конкретные проблемы:
+Пользователь сообщил, что joystick movement непонятен относительно экрана и нужен небольшой прицел.
 
-1. joystick movement был непонятен относительно экрана;
-2. не хватало небольшого прицела.
-
-В 0.5B.1 введён camera-relative `MovementFrame`: joystick/WASD теперь преобразуются относительно активной камеры. Добавлен компактный reticle и визуальная стрелка `MOVE` на joystick.
-
-PR #6 squash-merged → checkpoint `276ef78c3e894890c9c75796f9420c8158a91536`.
-
-Этот Android test подтвердил browser/mobile runtime, но выявил недостаток самой aim architecture.
+В 0.5B.1 добавлены camera-relative MovementFrame и compact reticle. PR #6 squash-merged → `276ef78c3e894890c9c75796f9420c8158a91536`.
 
 ---
 
 # 18. PR #7 — focused dual-mode AimSystem
 
-Пользователь показал скриншоты и уточнил, что прицел не двигается при свайпе и наведение в обоих режимах нужно исправить отдельно.
+По пользовательскому feedback наведение вынесено в `AimController`.
 
-Добавлен `AimController`.
+Invariant:
 
-Ключевой принцип:
+> visible reticle и actual ShotEvent используют одно aim state.
 
-> **видимый reticle и фактическое направление ShotEvent используют одно и то же aim state.**
+TOP: free reticle, relative touch trackpad, camera ray → world aim.
 
-TOP:
+3RD: floating reticle, vertical shot contribution, soft edge turn.
 
-- свободно перемещаемый screen-space reticle;
-- touch swipe работает как relative trackpad;
-- reticle → camera ray → world aim.
-
-3RD:
-
-- floating reticle в ограниченной зоне;
-- вертикальное положение влияет на shot direction;
-- выход из central deadzone создаёт soft turn demand для героя/камеры.
-
-WeaponSystem для player shot получает direction из AimController.
-
-PR #7 CI green. Squash merge checkpoint:
-
-`967993a3c7d57c448e152526d81c9d7f3249789a`
+PR #7 CI green. Squash merge → `967993a3c7d57c448e152526d81c9d7f3249789a`.
 
 ---
 
 # 19. PR #8 — menu + local face parity
 
-После команды пользователя «Продолжай dev» development вернулся к 0.5B parity.
+Добавлены menu/face_setup states, ProductShell, pre-game TOP/3RD, local face picker/preview, replace/remove, FaceStore/localStorage, loading/error feedback, `GameApp.start({ cameraMode, faceDataUrl })`, FaceSystem + neutral fallback.
 
-Добавлены:
+Первый CI поймал material typing mismatch; после исправления CI green.
 
-- `menu` и `face_setup` states;
-- `ProductShell`;
-- engine-next перестал auto-start gameplay;
-- pre-game TOP / 3RD selection;
-- local face picker/preview;
-- replace/remove;
-- `FaceStore` через `localStorage`;
-- loading/error feedback;
-- `GameApp.start({ cameraMode, faceDataUrl })`;
-- runtime input attaches после start;
-- `FaceSystem` применяет фото к prototype hero;
-- neutral fallback face.
-
-`FaceSystem` временный: это parity face plane. Final Face System 2.0 должен интегрировать лицо в production head/UV.
-
-Первый CI поймал strict TypeScript material mismatch. После исправления CI полностью green.
-
-PR #8 squash-merged:
-
-`56f90d50ac488f4227b28305d4b1da419927375a`
+PR #8 squash-merged → `56f90d50ac488f4227b28305d4b1da419927375a`.
 
 ---
 
 # 20. Vercel preview contract issue
 
-После PR #8 CI-built `engine-next-preview` был проверен и содержал compiled `0.5B.3 MENU+FACE` bundle.
+CI-built engine-next-preview содержал 0.5B.3 bundle. Fresh preview deploy выявил schema/backend mismatch у connector: внешняя схема не принимала параметры, backend требовал `target/name/files`.
 
-Попытка создать новый Vercel preview выявила отдельную проблему connector contract: видимая схема `deploy_to_vercel` не принимала параметры, а backend требовал `target`, `name`, `files`.
-
-Это не build failure. Новый 0.5B.3 preview URL не был объявлен как созданный. Production не менялся.
+Это не build failure. Production не менялся.
 
 ---
 
 # 21. PR #9 — manifest pickups + bounded rain
 
-Development продолжен по `dev.md` несмотря на Vercel connector issue.
+Добавлены PickupSystem, manifest health/ammo loot, proximity collection, timed respawn, `WeaponSystem.addReserve()`, bounded RainField на одной Points geometry, quality-dependent density и TOP facing через общий AimController.
 
-Branch: `engine-next/0.5b4-pickups-rain`.  
-PR: **#9**.  
-Squash merge checkpoint:
-
-`0876eff1839e9c93a669dc328cf225e200ebf498`
-
-Добавлено:
-
-## Pickups
-
-- новый `PickupSystem`;
-- health/ammo как `LevelManifest kind=loot` markers;
-- Abandoned Outskirts получил один health и два ammo markers;
-- health использует общий `Health.heal()`;
-- ammo пополняет reserve выбранного оружия через `WeaponSystem.addReserve()`;
-- proximity collection;
-- simple bounded visuals;
-- hide + prototype 18-second respawn;
-- reset между run-ами.
-
-## Rain
-
-Добавлен `RainField`:
-
-- одна `Points` geometry вместо Mesh на каждую каплю;
-- reusable typed arrays positions/speeds;
-- quality-dependent density: примерно 420 / 760 / 1200 drops;
-- rain volume recycle вокруг player anchor;
-- mobile-first budget;
-- корректный dispose.
-
-## Aim consistency
-
-Закрыта ещё одна integration gap из focused aim-pass: в TOP фактический ShotEvent уже шёл в visible reticle, но procedural герой мог визуально не следовать touch-reticle. Теперь TOP facing также берётся из `AimController` world direction.
-
-Итоговый invariant:
-
-```text
-visible reticle
-→ AimController
-→ world aim
-├→ hero facing
-└→ WeaponSystem ShotEvent
-```
-
-## CI
-
-PR #9 полностью green:
-
-- dependencies install — success;
-- strict TypeScript — success;
-- combined Vercel build — success;
-- deploy artifact upload — success.
-
-После merge engine-lab build label обновлён на:
-
-`FACEFALL // ENGINE NEXT 0.5B.4 PICKUPS+RAIN`
+PR #9 CI green. Squash merge → `0876eff1839e9c93a669dc328cf225e200ebf498`.
 
 ---
 
-# 22. Текущая точка
+# 22. PR #10 — reproducible npm + Chromium smoke
 
-Engine-next теперь имеет:
+Перед navmesh и дальнейшей parity-разработкой закрыт инфраструктурный риск воспроизводимости.
 
-- modular TypeScript/Vite runtime;
-- product menu/start flow;
-- local face picker/persistence;
-- TOP/3RD camera selection;
-- camera-relative movement;
-- shared reticle/facing/shot AimController contract;
-- pistol/shotgun/bow pipeline;
-- ballistic arrows;
-- EnemySystem + Walker/Runner/Brute;
-- WaveDirector;
-- player damage/gameover/restart;
-- score/kills;
-- manifest-driven health/ammo pickups;
-- bounded quality-scaled rain;
-- pooled FX/projectiles;
-- manifest-driven runtime markers.
+Добавлены:
+
+- committed `package-lock.json`;
+- CI installation через `npm ci`;
+- Playwright Chromium;
+- `scripts/smoke-engine.mjs`;
+- реальный browser smoke: открыть engine-next → увидеть menu → нажать start → дождаться `state=playing` → переключить 3RD → fail при fatal `pageerror`;
+- combined Vercel build/artifact остаются после browser smoke.
+
+При bootstrap lockfile CI дважды выявил workflow-specific проблемы: сначала `setup-node` cache требовал lockfile до его генерации, затем synthetic PR merge commit мешал fast-forward push. Workflow был исправлен, lockfile создан в head branch, после чего одноразовый bootstrap-step удалён.
+
+Финальный контрольный run **#63** прошёл полностью:
+
+```text
+npm ci
+→ strict TypeScript
+→ Playwright Chromium install
+→ browser smoke
+→ combined Vercel build
+→ artifact upload
+```
+
+PR #10 squash-merged в `main`.
+
+Checkpoint:
+
+`018d78c1275f99aec22ef5e4a137ec912806b740`
+
+Это первый checkpoint, где engine-next проверяется не только компилятором, но и реальным headless browser flow на каждом development PR.
+
+---
+
+# 23. Текущая точка
+
+Engine-next имеет modular TypeScript/Vite runtime, product menu, local face flow, TOP/3RD, camera-relative movement, shared AimController, pistol/shotgun/bow, ballistic arrows, EnemySystem/WaveDirector, player damage/gameover/restart, pickups, bounded rain, pooled FX, manifest runtime и воспроизводимый `npm ci` + Chromium smoke CI.
 
 Production `/` остаётся legacy 0.5 ALPHA до завершения parity и свежего Android smoke-test.
 
 ---
 
-# 23. Следующий порядок
+# 24. Следующий порядок
 
-1. Закрепить reproducible `package-lock.json` и перевести CI на `npm ci`.
-2. Добавить automated browser smoke: boot → menu → start → gameplay + fatal console checks.
-3. Создать базовый AudioSystem и rain/wind ambient layer; затем lightning/thunder.
-4. Добавить aim sensitivity/deadzone config и лёгкий mobile aim assist после device tuning.
-5. Продолжить decomposition GameApp.
-6. Начать navmesh spike и obstacle-aware enemy movement.
-7. Решить Vercel preview deployment path через рабочий connector/Git integration/artifact route.
-8. Провести latest desktop + Android smoke-test 0.5B.4.
-9. Сравнить functional parity с legacy.
-10. Только затем переключать production `/` на engine-next.
+1. Base AudioSystem + rain/wind ambient layer; затем lightning/thunder.
+2. Aim sensitivity/deadzone config + lightweight mobile aim assist.
+3. GameApp decomposition после стабилизации parity wiring.
+4. Navmesh spike / obstacle-aware enemy movement.
+5. Рабочий путь fresh Vercel preview.
+6. Latest real Android smoke-test.
+7. Final parity comparison against legacy.
+8. Только после этого production migration.
 
 ---
 
-# 24. Future history format
+# 25. Future history format
 
 ```text
 ## YYYY-MM-DD — checkpoint
