@@ -109,6 +109,7 @@ export class WeaponSystem {
     if (runtime.state !== 'idle' || runtime.reserve <= 0 || runtime.magazine >= definition.magazine) return false;
     runtime.state = 'reloading';
     runtime.stateTime = definition.reloadTime;
+    this.events.emit('weaponReload', { weaponId: definition.id });
     return true;
   }
 
