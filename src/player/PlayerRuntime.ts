@@ -10,10 +10,7 @@ export interface PlayerMovementResult {
   movementSpreadMultiplier: number;
 }
 
-/**
- * Owns the player's transform/collider/visual/face lifecycle.
- * Aim, weapons and session rules intentionally remain outside this class.
- */
+/** Owns player transform, collider, visual and face lifecycle. */
 export class PlayerRuntime {
   readonly root = new THREE.Group();
   readonly controller = new PlayerCapsule();
@@ -55,7 +52,7 @@ export class PlayerRuntime {
     return { targetSpeed, movementSpreadMultiplier };
   }
 
-  reset(spawnMarker: LevelMarker | undefined): void {
+  reset(spawnMarker: LevelMarker | undefined, _compatCameraMode?: unknown): void {
     const spawn = spawnMarker?.position ?? { x: 0, y: 0, z: 10 };
     this.controller.teleport(new THREE.Vector3(spawn.x, spawn.y + 0.35, spawn.z));
     if (typeof spawnMarker?.rotationY === 'number') {
