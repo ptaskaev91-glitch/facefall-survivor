@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import type { CameraMode } from '../camera/CameraDirector';
 import { FaceSystem } from '../characters/FaceSystem';
 import type { QualityProfile } from '../graphics/quality';
 import { CollisionWorld } from '../physics/CollisionWorld';
@@ -23,6 +22,7 @@ export class PlayerRuntime {
   private readonly faceSystem: FaceSystem;
   private readonly desired = new THREE.Vector3();
   private readonly velocity = new THREE.Vector3();
+  private readonly muzzleOffset = new THREE.Vector3(0, 1.15, 0);
 
   constructor(scene: THREE.Scene, quality: QualityProfile) {
     const marker = this.makeCapsuleMarker(0.36, 0.85, 0x8d9c8d, quality.shadows);
@@ -37,36 +37,25 @@ export class PlayerRuntime {
     this.faceSystem = new FaceSystem(this.root);
   }
 
-  get position(): THREE.Vector3 {
-    return this.root.position;
-  }
+  get position(): THREE.Vector3 { return this.root.position; }
 
-  async setFaceDataUrl(dataUrl: string | null): Promise<void> {
-    await this.faceSystem.setDataUrl(dataUrl);
-  }
+  async setFaceDataUrl(dataUrl: string | null): Promise<void> { await this.faceSystem.setDataUrl(dataUrl); }
 
   move(moveX: number, moveY: number, sprint: boolean, dt: number, collisionWorld: CollisionWorld): PlayerMovementResult {
     this.desired.set(moveX, 0, moveY);
     const moveAmount = Math.min(1, this.desired.length());
     const movementSpreadMultiplier = 1 + moveAmount * (sprint ? 1.35 : 0.55);
     const targetSpeed = this.desired.lengthSq() > 0 ? (sprint ? 7.1 : 5.0) : 0;
-
     if (this.desired.lengthSq() > 0) this.desired.normalize();
     this.velocity.copy(this.desired).multiplyScalar(targetSpeed);
     this.controller.moveToward(this.velocity, dt);
     this.controller.integrate(dt, collisionWorld);
-
-    this.root.position.set(
-      this.controller.position.x,
-      this.controller.position.y - 0.35,
-      this.controller.position.z
-    );
+    this.root.position.set(this.controller.position.x, this.controller.position.y - 0.35, this.controller.position.z);
     this.root.rotation.y = Math.atan2(-this.facing.x, -this.facing.z);
-
     return { targetSpeed, movementSpreadMultiplier };
   }
 
-  reset(spawnMarker: LevelMarker | undefined, cameraMode: CameraMode): void {
+  reset(spawnMarker: LevelMarker | undefined): void {
     const spawn = spawnMarker?.position ?? { x: 0, y: 0, z: 10 };
     this.controller.teleport(new THREE.Vector3(spawn.x, spawn.y + 0.35, spawn.z));
     if (typeof spawnMarker?.rotationY === 'number') {
@@ -76,15 +65,20 @@ export class PlayerRuntime {
     }
     this.root.position.set(spawn.x, spawn.y, spawn.z);
     this.root.rotation.y = Math.atan2(-this.facing.x, -this.facing.z);
-    void cameraMode;
   }
 
   muzzle(out: THREE.Vector3): THREE.Vector3 {
-    return out.copy(this.root.position).add(new THREE.Vector3(0, 1.15, 0)).addScaledVector(this.facing, 0.5);
+    return out.copy(this.root.position).add(this.muzzleOffset).addScaledVector(this.facing, 0.5);
   }
 
   dispose(): void {
     this.faceSystem.dispose();
+    this.root.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      object.geometry.dispose();
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      for (const material of materials) material.dispose();
+    });
     this.root.removeFromParent();
   }
 
