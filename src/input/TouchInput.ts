@@ -101,8 +101,6 @@ export class TouchInput {
     this.aimLastX = event.clientX;
     this.aimLastY = event.clientY;
     this.elements.aimSurface?.setPointerCapture?.(event.pointerId);
-    // Do not teleport the reticle under the finger. Mobile aiming is a virtual
-    // trackpad: a swipe moves the existing reticle from its current position.
     this.input.clearPointer();
   };
 
@@ -119,6 +117,7 @@ export class TouchInput {
       const dy = event.clientY - this.aimLastY;
       this.aimLastX = event.clientX;
       this.aimLastY = event.clientY;
+      // In 3RD AimController ignores dy completely and converts dx into yaw rotation.
       aimController.addTouchDelta(dx, dy);
       const ndc = aimController.getNdc();
       this.input.setPointerNdc(ndc.x, ndc.y);

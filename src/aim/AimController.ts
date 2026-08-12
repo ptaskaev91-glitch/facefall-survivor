@@ -2,8 +2,9 @@ import { Plane, Raycaster, Vector2, Vector3, type PerspectiveCamera } from 'thre
 import type { CameraMode } from '../camera/CameraDirector';
 
 /**
- * Shared aim state. The visible reticle is the source of truth for the weapon ray.
- * TOP uses a free screen cursor. 3RD uses a floating reticle with soft-edge turning.
+ * Shared aim state.
+ * TOP: free aim point represented by a faint laser from the player, no crosshair.
+ * 3RD: crosshair is fixed in the exact screen center; swipe/mouse only rotates yaw.
  */
 export class AimController {
   private readonly ndc = new Vector2(0, 0);
@@ -13,14 +14,18 @@ export class AimController {
   private readonly aimPoint = new Vector3();
   private readonly muzzleApprox = new Vector3();
   private readonly torsoOffset = new Vector3(0, 1.15, 0);
+  private readonly projectedPlayer = new Vector3();
   private reticle: HTMLElement | undefined;
+  private laser: HTMLDivElement | undefined;
   private mode: CameraMode = 'top';
   private touchSensitivity = 1.05;
   private thirdPersonDeadzone = 0.12;
+  private thirdTurnDelta = 0;
 
   setReticle(reticle: HTMLElement | undefined): void {
     this.reticle = reticle;
-    this.renderReticle();
+    this.ensureLaser();
+    this.renderAimUi();
   }
 
   configure(options: { sensitivity?: number; deadzone?: number }): void {
@@ -28,6 +33,7 @@ export class AimController {
       this.touchSensitivity = Math.max(0.45, Math.min(2.2, options.sensitivity));
     }
     if (typeof options.deadzone === 'number' && Number.isFinite(options.deadzone)) {
+      // Kept for persisted settings compatibility. 3RD no longer uses a floating-reticle deadzone.
       this.thirdPersonDeadzone = Math.max(0.04, Math.min(0.28, options.deadzone));
     }
   }
@@ -35,48 +41,76 @@ export class AimController {
   setMode(mode: CameraMode): void {
     if (this.mode === mode) return;
     this.mode = mode;
+    this.thirdTurnDelta = 0;
     if (mode === 'third') this.ndc.set(0, 0);
     this.clamp();
-    this.renderReticle();
+    this.renderAimUi();
+  }
+
+  getMode(): CameraMode {
+    return this.mode;
   }
 
   reset(mode: CameraMode = this.mode): void {
     this.mode = mode;
     this.ndc.set(0, 0);
+    this.thirdTurnDelta = 0;
     this.worldDirection.set(0, 0, -1);
-    this.renderReticle();
+    this.renderAimUi();
   }
 
   setPointerNdc(x: number, y: number): void {
+    if (this.mode === 'third') {
+      this.ndc.set(0, 0);
+      this.renderAimUi();
+      return;
+    }
     this.ndc.set(x, y);
     this.clamp();
-    this.renderReticle();
+    this.renderAimUi();
   }
 
   addTouchDelta(dx: number, dy: number): void {
     const width = Math.max(1, window.innerWidth);
     const height = Math.max(1, window.innerHeight);
+
+    if (this.mode === 'third') {
+      // Third-person is horizontal body/camera rotation only.
+      this.thirdTurnDelta += (dx / width) * this.touchSensitivity * 1.8;
+      this.thirdTurnDelta = Math.max(-0.36, Math.min(0.36, this.thirdTurnDelta));
+      this.ndc.set(0, 0);
+      this.renderAimUi();
+      return;
+    }
+
     this.ndc.x += (dx / width) * 2 * this.touchSensitivity;
     this.ndc.y -= (dy / height) * 2 * this.touchSensitivity;
     this.clamp();
-    this.renderReticle();
+    this.renderAimUi();
+  }
+
+  addMouseLookDelta(dx: number): void {
+    if (this.mode !== 'third') return;
+    const width = Math.max(1, window.innerWidth);
+    this.thirdTurnDelta += (dx / width) * this.touchSensitivity * 1.8;
+    this.thirdTurnDelta = Math.max(-0.36, Math.min(0.36, this.thirdTurnDelta));
   }
 
   /** Small screen-space correction used by soft mobile aim assist. */
   nudgeNdc(delta: Vector2): void {
+    if (this.mode === 'third') return;
     this.ndc.add(delta);
     this.clamp();
-    this.renderReticle();
+    this.renderAimUi();
   }
 
-  /** Visible recoil and actual shot direction stay synchronized via the same NDC state. */
+  /** TOP recoil can move the laser aim point. 3RD keeps the crosshair fixed. */
   applyRecoil(yawDegrees: number, pitchDegrees: number): void {
-    const yawScale = this.mode === 'third' ? 0.010 : 0.0065;
-    const pitchScale = this.mode === 'third' ? 0.011 : 0.007;
-    this.ndc.x += yawDegrees * yawScale;
-    this.ndc.y += pitchDegrees * pitchScale;
+    if (this.mode === 'third') return;
+    this.ndc.x += yawDegrees * 0.0065;
+    this.ndc.y += pitchDegrees * 0.007;
     this.clamp();
-    this.renderReticle();
+    this.renderAimUi();
   }
 
   getNdc(out = new Vector2()): Vector2 {
@@ -88,6 +122,7 @@ export class AimController {
   }
 
   updateWorldAim(camera: PerspectiveCamera, playerPosition: Vector3): void {
+    if (this.mode === 'third') this.ndc.set(0, 0);
     this.raycaster.setFromCamera(this.ndc, camera);
 
     if (this.mode === 'top') {
@@ -96,6 +131,7 @@ export class AimController {
       if (!hit) return;
       this.worldDirection.copy(hit).sub(playerPosition).setY(0);
       if (this.worldDirection.lengthSq() > 1e-6) this.worldDirection.normalize();
+      this.renderLaser(camera, playerPosition);
       return;
     }
 
@@ -103,15 +139,23 @@ export class AimController {
     this.muzzleApprox.copy(playerPosition).add(this.torsoOffset);
     this.worldDirection.copy(this.aimPoint).sub(this.muzzleApprox);
     if (this.worldDirection.lengthSq() > 1e-6) this.worldDirection.normalize();
+    this.renderAimUi();
   }
 
+  /** Consumed once per render update; delta already represents pointer travel. */
+  consumeThirdPersonTurnDelta(): number {
+    if (this.mode !== 'third') {
+      this.thirdTurnDelta = 0;
+      return 0;
+    }
+    const value = this.thirdTurnDelta;
+    this.thirdTurnDelta = 0;
+    return value;
+  }
+
+  /** Compatibility for older callers. */
   getThirdPersonTurnDemand(): number {
-    if (this.mode !== 'third') return 0;
-    const magnitude = Math.abs(this.ndc.x);
-    if (magnitude <= this.thirdPersonDeadzone) return 0;
-    const turnRange = Math.max(0.12, 0.48 - this.thirdPersonDeadzone);
-    const normalized = Math.min(1, (magnitude - this.thirdPersonDeadzone) / turnRange);
-    return Math.sign(this.ndc.x) * normalized;
+    return this.mode === 'third' ? this.thirdTurnDelta : 0;
   }
 
   private clamp(): void {
@@ -120,17 +164,69 @@ export class AimController {
       this.ndc.y = Math.max(-0.58, Math.min(0.70, this.ndc.y));
       return;
     }
-    this.ndc.x = Math.max(-0.48, Math.min(0.48, this.ndc.x));
-    this.ndc.y = Math.max(-0.34, Math.min(0.34, this.ndc.y));
+    this.ndc.set(0, 0);
   }
 
-  private renderReticle(): void {
-    if (!this.reticle) return;
-    const x = (this.ndc.x * 0.5 + 0.5) * 100;
-    const y = (-this.ndc.y * 0.5 + 0.5) * 100;
-    this.reticle.style.left = `${x}%`;
-    this.reticle.style.top = `${y}%`;
-    this.reticle.dataset.mode = this.mode;
+  private ensureLaser(): void {
+    if (this.laser || !this.reticle?.parentElement) return;
+    const laser = document.createElement('div');
+    laser.setAttribute('aria-hidden', 'true');
+    laser.dataset.aimLaser = 'true';
+    Object.assign(laser.style, {
+      position: 'absolute',
+      left: '0px',
+      top: '0px',
+      width: '0px',
+      height: '1px',
+      transformOrigin: '0 50%',
+      pointerEvents: 'none',
+      opacity: '0',
+      zIndex: '3',
+      background: 'linear-gradient(90deg, rgba(217,242,125,.07), rgba(217,242,125,.22))',
+      boxShadow: '0 0 4px rgba(217,242,125,.08)'
+    });
+    this.reticle.parentElement.appendChild(laser);
+    this.laser = laser;
+  }
+
+  private renderLaser(camera: PerspectiveCamera, playerPosition: Vector3): void {
+    if (this.mode !== 'top' || !this.laser) {
+      if (this.laser) this.laser.style.opacity = '0';
+      return;
+    }
+
+    this.projectedPlayer.copy(playerPosition).add(this.torsoOffset).project(camera);
+    const width = Math.max(1, window.innerWidth);
+    const height = Math.max(1, window.innerHeight);
+    const startX = (this.projectedPlayer.x * 0.5 + 0.5) * width;
+    const startY = (-this.projectedPlayer.y * 0.5 + 0.5) * height;
+    const endX = (this.ndc.x * 0.5 + 0.5) * width;
+    const endY = (-this.ndc.y * 0.5 + 0.5) * height;
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const length = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+    this.laser.style.left = `${startX}px`;
+    this.laser.style.top = `${startY}px`;
+    this.laser.style.width = `${length}px`;
+    this.laser.style.transform = `rotate(${angle}deg)`;
+    this.laser.style.opacity = '0.42';
+    this.renderAimUi();
+  }
+
+  private renderAimUi(): void {
+    if (this.reticle) {
+      if (this.mode === 'third') {
+        this.reticle.style.left = '50%';
+        this.reticle.style.top = '50%';
+        this.reticle.style.opacity = '0.92';
+      } else {
+        this.reticle.style.opacity = '0';
+      }
+      this.reticle.dataset.mode = this.mode;
+    }
+    if (this.laser && this.mode !== 'top') this.laser.style.opacity = '0';
   }
 }
 
