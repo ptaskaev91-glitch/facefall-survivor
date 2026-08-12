@@ -41,7 +41,8 @@ export const WEAPONS: Record<WeaponId, WeaponDefinition> = {
     reserve: 84,
     damage: 38,
     pellets: 1,
-    spread: 0.012,
+    // Small natural deviation around the fixed aim point. Movement multiplier is applied at runtime.
+    spread: 0.0075,
     fireInterval: 0.21,
     reloadTime: 1.35,
     impulse: 2.5,
@@ -59,7 +60,8 @@ export const WEAPONS: Record<WeaponId, WeaponDefinition> = {
     reserve: 32,
     damage: 24,
     pellets: 8,
-    spread: 0.13,
+    // Real cone is resolved pellet-by-pellet; several pellets can hit the same infected at distinct points.
+    spread: 0.09,
     fireInterval: 0.72,
     reloadTime: 1.9,
     impulse: 8.5,
