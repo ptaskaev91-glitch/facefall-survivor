@@ -12,80 +12,32 @@ jobs:
   inspect-public-download:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect itch download-button implementation
+      - name: Locate itch upload-download endpoint builder
         shell: bash
         run: |
           set -euo pipefail
           UA='Mozilla/5.0 FacefallAssetAudit/1.0'
-          PURCHASE='https://quaternius.itch.io/universal-base-characters/purchase'
-          ENDPOINT='https://quaternius.itch.io/universal-base-characters/download_url'
-
-          curl -fsSL --compressed -A "$UA" -c /tmp/cookies.txt "$PURCHASE" -o /tmp/purchase.html
-
-          CSRF="$(python3 - <<'PY'
-          from pathlib import Path
-          import html as html_lib
-          import re
-          text = Path('/tmp/purchase.html').read_text('utf-8', errors='replace')
-          match = re.search(r'<meta[^>]+name=["\']csrf_token["\'][^>]+value=["\']([^"\']+)', text, re.I)
-          if not match:
-              match = re.search(r'<meta[^>]+value=["\']([^"\']+)["\'][^>]+name=["\']csrf_token["\']', text, re.I)
-          if not match:
-              raise SystemExit('csrf meta not found')
-          print(html_lib.unescape(match.group(1)))
-          PY
-          )"
-
-          curl -fsS --compressed -A "$UA" \
-            -b /tmp/cookies.txt -c /tmp/cookies.txt \
-            -e "$PURCHASE" -H 'X-Requested-With: XMLHttpRequest' \
-            --data-urlencode "csrf_token=$CSRF" \
-            --data-urlencode 'reward_id=' \
-            "$ENDPOINT" -o /tmp/download-url.json
-
-          DOWNLOAD_PAGE="$(python3 - <<'PY'
-          import json
-          from pathlib import Path
-          data = json.loads(Path('/tmp/download-url.json').read_text('utf-8'))
-          url = data.get('url')
-          if not url:
-              raise SystemExit(f'no download URL in response: {sorted(data)}')
-          print(url)
-          PY
-          )"
-
-          curl -fsSL --compressed -A "$UA" -b /tmp/cookies.txt "$DOWNLOAD_PAGE" -o /tmp/download.html
-          curl -fsSL --compressed -A "$UA" 'https://static.itch.io/bundle.min.js' -o /tmp/bundle.js
           curl -fsSL --compressed -A "$UA" 'https://static.itch.io/extern.min.js' -o /tmp/extern.js
 
           python3 - <<'PY'
           from pathlib import Path
           import re
 
-          html = Path('/tmp/download.html').read_text('utf-8', errors='replace')
-          bundle = Path('/tmp/bundle.js').read_text('utf-8', errors='replace')
-          extern = Path('/tmp/extern.js').read_text('utf-8', errors='replace')
+          source = Path('/tmp/extern.js').read_text('utf-8', errors='replace')
+          print('extern-bytes:', len(source.encode('utf-8')))
 
-          print('standard-upload-id: 15861669')
-          print('download-html-bytes:', len(html.encode('utf-8')))
-
-          needles = (
-              'download_btn', 'upload_id', 'uploadId', 'download_url',
-              'upload/download', 'download/upload', '/upload/', 'uploads/'
+          patterns = (
+              r'Yt\s*=', r'function\s+Yt\s*\(', r'Yt=function',
+              r'generate_download', r'upload_id', r'game_download'
           )
-          for label, source in (('bundle', bundle), ('extern', extern)):
-              print(f'{label}-bytes:', len(source.encode('utf-8')))
-              seen = set()
-              for needle in needles:
-                  for match in list(re.finditer(re.escape(needle), source, re.I))[:3]:
-                      key = (needle.lower(), match.start())
-                      if key in seen:
-                          continue
-                      seen.add(key)
-                      start = max(0, match.start() - 1000)
-                      end = min(len(source), match.end() + 2200)
-                      snippet = source[start:end]
-                      snippet = re.sub(r'([?&](?:key|token|download_key)=)[^&"\']+', r'\1[redacted]', snippet, flags=re.I)
-                      print(f'--- {label} context {needle} @ {match.start()} ---')
-                      print(snippet.replace('\n', ' '))
+          for pattern in patterns:
+              matches = list(re.finditer(pattern, source, re.I))
+              print(f'pattern {pattern!r}: {len(matches)} matches')
+              for match in matches[:6]:
+                  start = max(0, match.start() - 1800)
+                  end = min(len(source), match.end() + 3200)
+                  snippet = source[start:end]
+                  snippet = re.sub(r'([?&](?:key|token|download_key)=)[^&"\']+', r'\1[redacted]', snippet, flags=re.I)
+                  print(f'--- context {pattern} @ {match.start()} ---')
+                  print(snippet.replace('\n', ' '))
           PY
