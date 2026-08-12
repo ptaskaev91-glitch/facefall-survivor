@@ -41,6 +41,8 @@ export class CharacterModel {
 
   constructor(private readonly shadows: boolean) {
     this.root.name = 'player-production-character';
+    // Quaternius base characters face local +Z, while Facefall gameplay-facing is local -Z.
+    this.root.rotation.y = Math.PI;
     this.root.visible = false;
   }
 
