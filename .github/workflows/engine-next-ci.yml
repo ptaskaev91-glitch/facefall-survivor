@@ -77,8 +77,9 @@ jobs:
 
       - name: Verify engine-next is sole deployment root
         run: |
-          grep -q "ENGINE NEXT 0.8" dist-next/index.html
+          test -f dist-next/index.html
           test -f dist-next/engine-lab.html
+          cmp -s dist-next/index.html dist-next/engine-lab.html
           test ! -e dist-next/legacy
 
       - name: Upload deploy artifact
