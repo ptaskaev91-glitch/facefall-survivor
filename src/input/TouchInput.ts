@@ -26,11 +26,15 @@ export class TouchInput {
 
   constructor(private readonly input: InputManager, private readonly elements: TouchInputElements) {}
 
+  private get surface(): HTMLElement | undefined {
+    return this.elements.movementSurface ?? this.elements.aimSurface;
+  }
+
   attach(): void {
     if (this.attached) return;
     this.attached = true;
     this.elements.joystick.style.display = 'none';
-    this.elements.movementSurface?.addEventListener('pointerdown', this.onSurfaceDown);
+    this.surface?.addEventListener('pointerdown', this.onSurfaceDown);
     window.addEventListener('pointermove', this.onPointerMove, { passive: false });
     window.addEventListener('pointerup', this.onPointerUp);
     window.addEventListener('pointercancel', this.onPointerUp);
@@ -45,7 +49,7 @@ export class TouchInput {
   detach(): void {
     if (!this.attached) return;
     this.attached = false;
-    this.elements.movementSurface?.removeEventListener('pointerdown', this.onSurfaceDown);
+    this.surface?.removeEventListener('pointerdown', this.onSurfaceDown);
     window.removeEventListener('pointermove', this.onPointerMove);
     window.removeEventListener('pointerup', this.onPointerUp);
     window.removeEventListener('pointercancel', this.onPointerUp);
@@ -90,12 +94,12 @@ export class TouchInput {
 
     const mode = aimController.getMode();
     if (mode === 'top') {
-      // Survivor-style TOP controls: the first free touch is always movement.
+      // Survivor-style TOP controls: first free touch becomes a joystick exactly there.
       if (this.joystickPointer === null) this.beginJoystick(event);
       return;
     }
 
-    // Third person: left/central touch starts movement; right touch rotates yaw.
+    // Third-person: left/central touch moves, right-side touch rotates yaw.
     const movementZone = event.clientX <= window.innerWidth * 0.58;
     if (this.joystickPointer === null && movementZone) {
       this.beginJoystick(event);
@@ -106,7 +110,7 @@ export class TouchInput {
       this.aimPointer = event.pointerId;
       this.aimLastX = event.clientX;
       this.aimLastY = event.clientY;
-      this.elements.aimSurface?.setPointerCapture?.(event.pointerId);
+      this.surface?.setPointerCapture?.(event.pointerId);
     }
   };
 
@@ -126,7 +130,7 @@ export class TouchInput {
       bottom: 'auto'
     });
 
-    this.elements.movementSurface?.setPointerCapture?.(event.pointerId);
+    this.surface?.setPointerCapture?.(event.pointerId);
     this.updateJoystick(event.clientX, event.clientY);
   }
 
