@@ -6,6 +6,7 @@ import { DirectNavigationQuery, type NavigationQuery } from '../navigation/Navig
 import { SpatialHash, type SpatialHashItem } from '../physics/SpatialHash';
 import { ENEMY_ARCHETYPES, type EnemyArchetype, type EnemyId } from './archetypes';
 import { EnemyBrain } from './EnemyBrain';
+import { animateEnemyVisual, createEnemyVisual } from './EnemyVisualFactory';
 
 interface EnemySpatialItem extends SpatialHashItem {
   root: THREE.Object3D;
@@ -66,12 +67,8 @@ export class EnemySystem {
 
     const archetype = ENEMY_ARCHETYPES[type];
     const id = `enemy-${type}-${this.nextId++}`;
-    const radius = type === 'brute' ? 0.55 : 0.34;
-    const bodyLength = type === 'brute' ? 1.15 : 0.82;
-    const color = type === 'brute' ? 0x765246 : type === 'runner' ? 0x725b4a : 0x66564d;
-    const root = this.makeCapsuleMarker(radius, bodyLength, color);
+    const root = createEnemyVisual(type, this.options.shadows);
     root.position.copy(position);
-    root.scale.setScalar(type === 'runner' ? 0.88 : type === 'brute' ? 1.18 : 1);
     root.traverse((object) => { object.userData.damageTargetId = id; });
     this.scene.add(root);
     this.hitMeshes.push(root);
@@ -106,6 +103,7 @@ export class EnemySystem {
       actor.staggerTimer = Math.max(0, actor.staggerTimer - dt);
       actor.alertTimer = Math.max(0, actor.alertTimer - dt);
       actor.wanderTimer = Math.max(0, actor.wanderTimer - dt);
+      animateEnemyVisual(actor.root, actor.velocity.length(), dt);
 
       this.offset.copy(playerPosition).sub(actor.root.position).setY(0);
       const distance = this.offset.length();
@@ -265,19 +263,5 @@ export class EnemySystem {
       0,
       Math.cos(angle) * distance
     ));
-  }
-
-  private makeCapsuleMarker(radius: number, bodyLength: number, color: number): THREE.Group {
-    const group = new THREE.Group();
-    const material = new THREE.MeshStandardMaterial({ color, roughness: 0.78 });
-    const cylinder = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, bodyLength, 10), material);
-    cylinder.position.y = bodyLength / 2 + radius;
-    const lower = new THREE.Mesh(new THREE.SphereGeometry(radius, 10, 8), material);
-    lower.position.y = radius;
-    const upper = new THREE.Mesh(new THREE.SphereGeometry(radius, 10, 8), material);
-    upper.position.y = bodyLength + radius;
-    for (const mesh of [cylinder, lower, upper]) mesh.castShadow = this.options.shadows;
-    group.add(cylinder, lower, upper);
-    return group;
   }
 }
