@@ -63,6 +63,10 @@ export class FaceSystem {
     parent.add(this.root);
   }
 
+  setVisible(visible: boolean): void {
+    this.root.visible = visible;
+  }
+
   async setDataUrl(dataUrl: string | null): Promise<void> {
     const generation = ++this.generation;
     this.clearTexture();
