@@ -1,6 +1,6 @@
 # Third-party notices
 
-Facefall Survivor primarily contains original project code. Where a small compatible implementation is directly adapted from an external permissively licensed project, the source and license are recorded here.
+Facefall Survivor primarily contains original project code. Where a small compatible implementation is directly adapted from an external permissively licensed project, or a production-direction asset is vendored from an external source, the source and license are recorded here.
 
 ## Web-Based First Person Shooter Engine (`ivanoskov/shooter`)
 
@@ -38,3 +38,32 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+## Quaternius — Universal Base Characters
+
+Official source: `https://quaternius.com/packs/universalbasecharacters.html`  
+Official itch distribution: `https://quaternius.itch.io/universal-base-characters`
+
+Facefall vendors the male runtime subset used by the 0.9.0 hero vertical slice under:
+
+`public/assets/characters/quaternius-universal-base-male/`
+
+Source archive verification and the small upstream URI compatibility patch are documented in that folder's `ASSET_SOURCE.md`. The original pack license is retained as `License_Standard.txt`.
+
+License: **CC0 1.0 Universal / Public Domain Dedication**.
+
+---
+
+## Quaternius — Universal Animation Library
+
+Official distribution: `https://quaternius.itch.io/universal-animation-library`
+
+Facefall vendors the non-root-motion Standard GLB used for hero locomotion under:
+
+`public/assets/animations/quaternius-universal-animation-library/`
+
+The non-root-motion variant is intentional because movement remains authoritative in Facefall's `PlayerRuntime`/collision simulation. The source archive SHA-256 and provenance are recorded in that folder's `ASSET_SOURCE.md`; the original license and README are retained verbatim.
+
+License: **CC0 1.0 Universal / Public Domain Dedication**.
