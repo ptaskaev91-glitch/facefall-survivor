@@ -21,7 +21,7 @@ test.use({
   isMobile: true
 });
 
-test('capture mobile TOP, 3RD, pistol-fire and uploaded-face checkpoints', async ({ page }) => {
+test('capture mobile TOP, 3RD, pistol fire/reload and uploaded-face checkpoints', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
 
@@ -63,8 +63,7 @@ test('capture mobile TOP, 3RD, pistol-fire and uploaded-face checkpoints', async
     return app.weaponSystem.status().magazine as number;
   });
 
-  // Trigger the normal input path, then freeze the resulting pose for a deterministic
-  // close inspection. This validates touch-FIRE → WeaponSystem → shot event → animation.
+  // Real mobile input route: touch FIRE must consume ammo and emit the shot event used by animation.
   await page.locator('#touchFire').tap();
   await page.waitForTimeout(90);
 
@@ -75,11 +74,24 @@ test('capture mobile TOP, 3RD, pistol-fire and uploaded-face checkpoints', async
     return app.weaponSystem.status().magazine as number;
   });
   expect(magazineAfter).toBe(magazineBefore - 1);
+  await page.screenshot({ path: `${artifactDir}/mobile-pistol-fire-third.png`, fullPage: true });
 
+  // Real mobile reload route: one spent round makes reload legal; R must enter reloading state.
+  await page.locator('#touchReload').tap();
+  await page.waitForTimeout(110);
+  const reloading = await page.evaluate(() => {
+    const runtimeWindow = window as Window & { __facefallApp?: any };
+    const app = runtimeWindow.__facefallApp;
+    if (!app) throw new Error('Facefall runtime is unavailable for reload inspection');
+    return app.weaponSystem.status().reloading as boolean;
+  });
+  expect(reloading).toBe(true);
+
+  // Freeze reload pose and inspect the hero/front face deterministically.
   await page.evaluate(() => {
     const runtimeWindow = window as Window & { __facefallApp?: any };
     const app = runtimeWindow.__facefallApp;
-    if (!app) throw new Error('Facefall runtime is unavailable for fire inspection');
+    if (!app) throw new Error('Facefall runtime is unavailable for reload inspection');
     app.pause();
 
     const player = app.player;
@@ -99,9 +111,7 @@ test('capture mobile TOP, 3RD, pistol-fire and uploaded-face checkpoints', async
     world.render();
   });
   await page.waitForTimeout(80);
-  await page.screenshot({ path: `${artifactDir}/mobile-pistol-fire-front.png`, fullPage: true });
-
-  // Same front view also remains the uploaded-face inspection checkpoint.
+  await page.screenshot({ path: `${artifactDir}/mobile-pistol-reload-front.png`, fullPage: true });
   await page.screenshot({ path: `${artifactDir}/mobile-face-front.png`, fullPage: true });
 
   expect(errors, `Fatal browser errors: ${errors.join(' | ')}`).toEqual([]);
