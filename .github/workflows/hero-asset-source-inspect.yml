@@ -25,6 +25,7 @@ jobs:
           from pathlib import Path
           from html.parser import HTMLParser
           from urllib.parse import urljoin
+          import re
 
           html = Path('/tmp/quaternius-purchase.html').read_text('utf-8', errors='replace')
           base = 'https://quaternius.itch.io/universal-base-characters/purchase'
@@ -34,16 +35,32 @@ jobs:
                   data = dict(attrs)
                   if tag in {'a', 'form', 'script'}:
                       target = data.get('href') or data.get('action') or data.get('src')
-                      if target and any(word in target.lower() for word in ('download', 'purchase', 'file', 'api')):
-                          print(f'{tag}: {urljoin(base, target)}')
-                  interesting = {
+                      if target:
+                          print(f'{tag}-target: {urljoin(base, target)}')
+                  if tag in {'input', 'button'}:
+                      name = data.get('name')
+                      kind = data.get('type')
+                      value = data.get('value') if kind in {'submit', 'button'} else None
+                      print(f'control: tag={tag} name={name!r} type={kind!r} submit-value={value!r}')
+                  public_meta = {
                       k: v for k, v in data.items()
-                      if k.lower() in {'data-upload_id', 'data-upload-id', 'data-game_id', 'data-game-id'}
+                      if any(token in k.lower() for token in ('upload', 'game-id', 'game_id', 'download'))
+                      and 'token' not in k.lower()
                   }
-                  if interesting:
-                      print(f'{tag} metadata: {interesting}')
+                  if public_meta:
+                      print(f'{tag}-metadata: {public_meta}')
 
           Parser().feed(html)
+
+          for needle in ('No thanks', 'Standard].zip', 'upload_id', 'uploadId', 'download_url', 'downloadUrl', 'skip_payment'):
+              match = re.search(re.escape(needle), html, re.I)
+              if not match:
+                  continue
+              start = max(0, match.start() - 320)
+              end = min(len(html), match.end() + 520)
+              snippet = re.sub(r'value=["\'][^"\']{20,}["\']', 'value="[redacted]"', html[start:end], flags=re.I)
+              print(f'--- context {needle} ---')
+              print(snippet.replace('\n', ' '))
+
           print(f'html-bytes: {len(html.encode("utf-8"))}')
-          print('filename-present:', 'Universal Base Characters[Standard].zip' in html)
           PY
