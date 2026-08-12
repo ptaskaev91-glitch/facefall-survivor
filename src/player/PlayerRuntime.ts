@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CharacterModel, type CharacterLoadResult } from '../characters/CharacterModel';
 import { FaceSystem } from '../characters/FaceSystem';
 import type { QualityProfile } from '../graphics/quality';
 import { CollisionWorld } from '../physics/CollisionWorld';
@@ -17,9 +18,11 @@ export class PlayerRuntime {
   readonly facing = new THREE.Vector3(0, 0, -1);
 
   private readonly faceSystem: FaceSystem;
+  private readonly characterModel: CharacterModel;
   private readonly desired = new THREE.Vector3();
   private readonly velocity = new THREE.Vector3();
   private readonly muzzleOffset = new THREE.Vector3(0, 1.15, 0);
+  private productionVisualActive = false;
 
   constructor(scene: THREE.Scene, quality: QualityProfile) {
     const marker = this.makeCapsuleMarker(0.36, 0.85, 0x8d9c8d, quality.shadows);
@@ -31,12 +34,34 @@ export class PlayerRuntime {
     marker.add(weaponMesh);
     this.root.add(marker);
     scene.add(this.root);
+
+    // FaceSystem remains the production-safe visual until a GLB head is verified
+    // to preserve the user's uploaded-face hook during the vertical-slice migration.
     this.faceSystem = new FaceSystem(this.root);
+    this.characterModel = new CharacterModel(quality.shadows);
+    this.root.add(this.characterModel.root);
   }
 
   get position(): THREE.Vector3 { return this.root.position; }
+  get hasProductionCharacter(): boolean { return this.characterModel.isLoaded; }
 
   async setFaceDataUrl(dataUrl: string | null): Promise<void> { await this.faceSystem.setDataUrl(dataUrl); }
+
+  /**
+   * Loads a rigged GLTF/GLB behind the player runtime boundary.
+   * The caller must opt into visual activation after face/head compatibility is verified.
+   */
+  async loadProductionCharacter(url: string, activate = false): Promise<CharacterLoadResult> {
+    const result = await this.characterModel.load(url);
+    this.setProductionVisualActive(activate);
+    return result;
+  }
+
+  setProductionVisualActive(active: boolean): void {
+    this.productionVisualActive = active && this.characterModel.isLoaded;
+    this.characterModel.setVisible(this.productionVisualActive);
+    this.faceSystem.setVisible(!this.productionVisualActive);
+  }
 
   move(moveX: number, moveY: number, sprint: boolean, dt: number, collisionWorld: CollisionWorld): PlayerMovementResult {
     this.desired.set(moveX, 0, moveY);
@@ -49,6 +74,7 @@ export class PlayerRuntime {
     this.controller.integrate(dt, collisionWorld);
     this.root.position.set(this.controller.position.x, this.controller.position.y - 0.35, this.controller.position.z);
     this.root.rotation.y = Math.atan2(-this.facing.x, -this.facing.z);
+    this.characterModel.update(dt, targetSpeed);
     return { targetSpeed, movementSpreadMultiplier };
   }
 
@@ -69,6 +95,7 @@ export class PlayerRuntime {
   }
 
   dispose(): void {
+    this.characterModel.dispose();
     this.faceSystem.dispose();
     this.root.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
