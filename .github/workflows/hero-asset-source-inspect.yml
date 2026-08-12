@@ -12,7 +12,7 @@ jobs:
   inspect-public-download:
     runs-on: ubuntu-latest
     steps:
-      - name: Resolve official Quaternius free download page
+      - name: Inspect itch download-button implementation
         shell: bash
         run: |
           set -euo pipefail
@@ -55,40 +55,37 @@ jobs:
           )"
 
           curl -fsSL --compressed -A "$UA" -b /tmp/cookies.txt "$DOWNLOAD_PAGE" -o /tmp/download.html
+          curl -fsSL --compressed -A "$UA" 'https://static.itch.io/bundle.min.js' -o /tmp/bundle.js
+          curl -fsSL --compressed -A "$UA" 'https://static.itch.io/extern.min.js' -o /tmp/extern.js
 
           python3 - <<'PY'
           from pathlib import Path
-          from html.parser import HTMLParser
-          from urllib.parse import urlsplit
           import re
 
-          text = Path('/tmp/download.html').read_text('utf-8', errors='replace')
+          html = Path('/tmp/download.html').read_text('utf-8', errors='replace')
+          bundle = Path('/tmp/bundle.js').read_text('utf-8', errors='replace')
+          extern = Path('/tmp/extern.js').read_text('utf-8', errors='replace')
 
-          class Parser(HTMLParser):
-              def handle_starttag(self, tag, attrs):
-                  data = dict(attrs)
-                  if tag == 'script' and data.get('src'):
-                      parts = urlsplit(data['src'])
-                      print('script:', f'{parts.scheme}://{parts.netloc}{parts.path}')
-                  if tag != 'a':
-                      return
-                  href = data.get('href')
-                  upload_id = data.get('data-upload_id') or data.get('data-upload-id')
-                  if not href and not upload_id:
-                      return
-                  parts = urlsplit(href or '')
-                  safe_href = f'{parts.scheme}://{parts.netloc}{parts.path}' if parts.scheme else parts.path
-                  if upload_id:
-                      print(f'file-link: upload_id={upload_id!r} href={safe_href!r}')
+          print('standard-upload-id: 15861669')
+          print('download-html-bytes:', len(html.encode('utf-8')))
 
-          Parser().feed(text)
-          for needle in ('15861669', 'download_btn', 'upload_id', 'uploadId'):
-              match = re.search(re.escape(needle), text, re.I)
-              if not match:
-                  continue
-              start = max(0, match.start() - 900)
-              end = min(len(text), match.end() + 1800)
-              snippet = re.sub(r'([?&](?:key|token|download_key)=)[^&"\']+', r'\1[redacted]', text[start:end], flags=re.I)
-              print(f'--- context {needle} ---')
-              print(snippet.replace('\n', ' '))
+          needles = (
+              'download_btn', 'upload_id', 'uploadId', 'download_url',
+              'upload/download', 'download/upload', '/upload/', 'uploads/'
+          )
+          for label, source in (('bundle', bundle), ('extern', extern)):
+              print(f'{label}-bytes:', len(source.encode('utf-8')))
+              seen = set()
+              for needle in needles:
+                  for match in list(re.finditer(re.escape(needle), source, re.I))[:3]:
+                      key = (needle.lower(), match.start())
+                      if key in seen:
+                          continue
+                      seen.add(key)
+                      start = max(0, match.start() - 1000)
+                      end = min(len(source), match.end() + 2200)
+                      snippet = source[start:end]
+                      snippet = re.sub(r'([?&](?:key|token|download_key)=)[^&"\']+', r'\1[redacted]', snippet, flags=re.I)
+                      print(f'--- {label} context {needle} @ {match.start()} ---')
+                      print(snippet.replace('\n', ' '))
           PY
