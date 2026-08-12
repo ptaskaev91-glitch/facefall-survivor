@@ -1,0 +1,49 @@
+name: Hero Asset Source Inspect
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/hero-asset-source-inspect.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-public-download:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect Quaternius public download page
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --compressed \
+            -A 'Mozilla/5.0 FacefallAssetAudit/1.0' \
+            'https://quaternius.itch.io/universal-base-characters/purchase' \
+            -o /tmp/quaternius-purchase.html
+
+          python3 - <<'PY'
+          from pathlib import Path
+          from html.parser import HTMLParser
+          from urllib.parse import urljoin
+
+          html = Path('/tmp/quaternius-purchase.html').read_text('utf-8', errors='replace')
+          base = 'https://quaternius.itch.io/universal-base-characters/purchase'
+
+          class Parser(HTMLParser):
+              def handle_starttag(self, tag, attrs):
+                  data = dict(attrs)
+                  if tag in {'a', 'form', 'script'}:
+                      target = data.get('href') or data.get('action') or data.get('src')
+                      if target and any(word in target.lower() for word in ('download', 'purchase', 'file', 'api')):
+                          print(f'{tag}: {urljoin(base, target)}')
+                  interesting = {
+                      k: v for k, v in data.items()
+                      if k.lower() in {'data-upload_id', 'data-upload-id', 'data-game_id', 'data-game-id'}
+                  }
+                  if interesting:
+                      print(f'{tag} metadata: {interesting}')
+
+          Parser().feed(html)
+          print(f'html-bytes: {len(html.encode("utf-8"))}')
+          print('filename-present:', 'Universal Base Characters[Standard].zip' in html)
+          PY
