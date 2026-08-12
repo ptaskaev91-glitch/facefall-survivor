@@ -6,13 +6,19 @@ on:
       - '.github/workflows/hero-asset-source-inspect.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  inspect-public-download:
+  vendor-official-hero:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect official Quaternius male hero glTF
+      - uses: actions/checkout@v4
+        with:
+          ref: visual/0.9.0-hero-glb-spike
+          fetch-depth: 0
+
+      - name: Download verified official Quaternius Standard pack
         shell: bash
         run: |
           set -euo pipefail
@@ -57,59 +63,64 @@ jobs:
           PY
           )"
           curl -fL --retry 3 --retry-delay 2 -A "$UA" "$FILE_URL" -o "$ARCHIVE"
+          echo 'fdbf1804c90dfc1ea03e992bff7da2dfd1a79318e13270a660180f9308455f40  /tmp/universal-base-characters-standard.zip' | sha256sum -c -
 
+      - name: Extract only the male runtime asset and provenance
+        shell: bash
+        run: |
+          set -euo pipefail
           python3 - <<'PY'
           import json, zipfile
-          from pathlib import PurePosixPath
+          from pathlib import Path
 
-          archive='/tmp/universal-base-characters-standard.zip'
+          archive=Path('/tmp/universal-base-characters-standard.zip')
+          out=Path('public/assets/characters/quaternius-universal-base-male')
+          out.mkdir(parents=True, exist_ok=True)
           prefix='Universal Base Characters[Standard]/Base Characters/Godot - UE/'
-          model=prefix+'Superhero_Male_FullBody.gltf'
+          selected=[
+              'Superhero_Male_FullBody.gltf',
+              'Superhero_Male_FullBody.bin',
+              'T_Hair_1_Normal.png',
+              'T_Hair_1_BaseColor.png',
+              'T_Eye_Normal.png',
+              'T_Eye_Brown.png',
+              'T_Superhero_Male_Normal.png',
+              'T_Superhero_Male_Dark.png',
+              'T_Superhero_Male_Roughness.png',
+          ]
           with zipfile.ZipFile(archive) as zf:
-              gltf=json.loads(zf.read(model).decode('utf-8'))
-              print('asset:', gltf.get('asset'))
-              print('scene:', gltf.get('scene'), 'scenes:', gltf.get('scenes'))
-              print('extensionsUsed:', gltf.get('extensionsUsed'))
-              print('extensionsRequired:', gltf.get('extensionsRequired'))
-              print('animations:', [a.get('name') for a in gltf.get('animations',[])])
-              print('buffers:', gltf.get('buffers'))
-              print('images:', gltf.get('images'))
-              print('textures:', gltf.get('textures'))
-              print('materials:')
-              for i,m in enumerate(gltf.get('materials',[])):
-                  pbr=m.get('pbrMetallicRoughness',{})
-                  print(i, m.get('name'), 'baseColorTexture=', pbr.get('baseColorTexture'), 'normal=', m.get('normalTexture'), 'roughMetal=', pbr.get('metallicRoughnessTexture'), 'alphaMode=', m.get('alphaMode'))
-              print('skins:')
-              nodes=gltf.get('nodes',[])
-              for i,s in enumerate(gltf.get('skins',[])):
-                  joints=s.get('joints',[])
-                  print(i, s.get('name'), 'skeleton=', s.get('skeleton'), 'jointCount=', len(joints))
-                  print(' jointNames=', [nodes[j].get('name') for j in joints])
-              print('nodes:')
-              for i,n in enumerate(nodes):
-                  if any(k in n for k in ('mesh','skin','camera')) or n.get('name'):
-                      print(i, n.get('name'), 'mesh=', n.get('mesh'), 'skin=', n.get('skin'), 'children=', n.get('children'))
-              print('meshes/primitives:')
-              accessors=gltf.get('accessors',[])
-              for mi,m in enumerate(gltf.get('meshes',[])):
-                  print('mesh', mi, m.get('name'))
-                  for pi,p in enumerate(m.get('primitives',[])):
-                      pos=p.get('attributes',{}).get('POSITION')
-                      idx=p.get('indices')
-                      pos_count=accessors[pos].get('count') if pos is not None else None
-                      idx_count=accessors[idx].get('count') if idx is not None else None
-                      attrs=sorted(p.get('attributes',{}))
-                      print(' primitive', pi, 'material=', p.get('material'), 'vertices=', pos_count, 'indices=', idx_count, 'attrs=', attrs)
-              print('--- dependencies ---')
-              uris=[]
-              for section in ('buffers','images'):
-                  for item in gltf.get(section,[]):
-                      uri=item.get('uri')
-                      if uri: uris.append(uri)
-              for uri in uris:
-                  full=prefix+uri
-                  info=zf.getinfo(full)
-                  print(info.file_size, uri)
-              print('--- license ---')
-              print(zf.read('Universal Base Characters[Standard]/License_Standard.txt').decode('utf-8', errors='replace'))
+              for name in selected:
+                  data=zf.read(prefix+name)
+                  (out/name).write_bytes(data)
+              license_bytes=zf.read('Universal Base Characters[Standard]/License_Standard.txt')
+              (out/'License_Standard.txt').write_bytes(license_bytes)
+
+          gltf_path=out/'Superhero_Male_FullBody.gltf'
+          gltf=json.loads(gltf_path.read_text('utf-8'))
+          uri_fixes={
+              'T_Hair_1_Normal_png.png':'T_Hair_1_Normal.png',
+              'T_Eye_Normal_png.png':'T_Eye_Normal.png',
+          }
+          for image in gltf.get('images',[]):
+              uri=image.get('uri')
+              if uri in uri_fixes:
+                  image['uri']=uri_fixes[uri]
+          gltf_path.write_text(json.dumps(gltf, ensure_ascii=False, separators=(',',':')), encoding='utf-8')
+
+          source=(out/'ASSET_SOURCE.md')
+          source.write_text('''# Quaternius Universal Base Characters — male runtime asset\n\n- Source: Quaternius, **Universal Base Characters** (Standard pack)\n- Official page: https://quaternius.com/packs/universalbasecharacters.html\n- Official itch page: https://quaternius.itch.io/universal-base-characters\n- Downloaded official file: `Universal Base Characters[Standard].zip`\n- itch upload id: `15861669`\n- Original archive SHA-256: `fdbf1804c90dfc1ea03e992bff7da2dfd1a79318e13270a660180f9308455f40`\n- Runtime source model: `Base Characters/Godot - UE/Superhero_Male_FullBody.gltf`\n- License: CC0; verbatim pack license is retained as `License_Standard.txt`.\n\n## Local compatibility patch\n\nThe upstream glTF references two PNG URIs with `_png` duplicated in the file name, while the Standard archive contains the files without that suffix. The vendored glTF changes only those two image URIs:\n\n- `T_Hair_1_Normal_png.png` → `T_Hair_1_Normal.png`\n- `T_Eye_Normal_png.png` → `T_Eye_Normal.png`\n\nNo geometry, skeleton, UV, material, or texture data is otherwise modified.\n''', encoding='utf-8')
           PY
+
+      - name: Commit verified runtime asset to spike branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'facefall-asset-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add public/assets/characters/quaternius-universal-base-male
+          if git diff --cached --quiet; then
+            echo 'Asset already vendored; nothing to commit.'
+            exit 0
+          fi
+          git commit -m '0.9.0: vendor verified Quaternius male hero asset'
+          git push origin HEAD:visual/0.9.0-hero-glb-spike
