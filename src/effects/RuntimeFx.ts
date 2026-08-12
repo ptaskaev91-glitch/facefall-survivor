@@ -11,28 +11,61 @@ class SimpleParticle implements ParticleInstance {
   active = false;
   readonly velocity = new THREE.Vector3();
   private drag = 1.5;
+  private kind: ParticleRecipe['kind'] = 'debris';
+  private readonly direction = new THREE.Vector3();
 
   constructor() {
     this.object = new THREE.Mesh(
-      new THREE.SphereGeometry(0.04, 5, 4),
+      new THREE.SphereGeometry(0.04, 6, 5),
       new THREE.MeshBasicMaterial({ transparent: true, opacity: 1 })
     );
     this.object.visible = false;
   }
 
   configure(recipe: ParticleRecipe, context: EffectContext): void {
+    this.kind = recipe.kind;
     const material = this.object.material as THREE.MeshBasicMaterial;
     const color = recipe.kind === 'blood' ? 0x6f1010
-      : recipe.kind === 'spark' ? 0xffd17a
-        : recipe.kind === 'smoke' ? 0x777d78
-          : recipe.kind === 'casing' ? 0xb08b43
-            : 0x665d4d;
+      : recipe.kind === 'impact' ? 0xff3c28
+        : recipe.kind === 'tracer' ? 0xffd37a
+          : recipe.kind === 'spark' ? 0xffd17a
+            : recipe.kind === 'smoke' ? 0x777d78
+              : recipe.kind === 'casing' ? 0xb08b43
+                : 0x665d4d;
     material.color.setHex(color);
-    material.opacity = recipe.kind === 'smoke' ? 0.55 : 0.95;
-    this.object.scale.setScalar(Math.max(0.25, recipe.size / 0.04));
+    material.opacity = recipe.kind === 'smoke' ? 0.55 : 0.97;
     this.object.position.copy(context.origin);
+    this.object.quaternion.identity();
+
+    const baseScale = Math.max(0.25, recipe.size / 0.04);
+    if (recipe.kind === 'tracer') {
+      this.object.scale.set(baseScale * 0.32, baseScale * 0.32, baseScale * 3.8);
+    } else if (recipe.kind === 'impact') {
+      this.object.scale.setScalar(baseScale * 1.15);
+    } else {
+      this.object.scale.setScalar(baseScale);
+    }
 
     const direction = context.direction?.clone().normalize() ?? new THREE.Vector3(0, 1, 0);
+    if (recipe.kind === 'tracer') {
+      const spread = recipe.spread ?? 0;
+      direction.x += (Math.random() - 0.5) * spread;
+      direction.y += (Math.random() - 0.5) * spread * 0.45;
+      direction.z += (Math.random() - 0.5) * spread;
+      direction.normalize();
+      this.velocity.copy(direction).multiplyScalar(recipe.speed);
+      this.direction.copy(direction);
+      this.object.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
+      this.drag = 0.02;
+      return;
+    }
+
+    if (recipe.kind === 'impact') {
+      this.velocity.set(0, 0, 0);
+      this.drag = 20;
+      return;
+    }
+
     const jitter = new THREE.Vector3(
       (Math.random() - 0.5) * 1.4,
       Math.random() * 1.2,
@@ -44,14 +77,20 @@ class SimpleParticle implements ParticleInstance {
 
   reset(): void {
     this.velocity.set(0, 0, 0);
+    this.kind = 'debris';
+    this.object.quaternion.identity();
   }
 
   update(dt: number): void {
     this.object.position.addScaledVector(this.velocity, dt);
     this.velocity.multiplyScalar(Math.exp(-this.drag * dt));
-    if ((this.object.material as THREE.MeshBasicMaterial).color.r > 0.3) this.velocity.y -= 2.6 * dt;
+    if (this.kind !== 'tracer' && this.kind !== 'impact' && (this.object.material as THREE.MeshBasicMaterial).color.r > 0.3) {
+      this.velocity.y -= 2.6 * dt;
+    }
     const material = this.object.material as THREE.MeshBasicMaterial;
-    material.opacity = Math.max(0, 1 - this.age / this.lifetime);
+    const life = Math.max(0.001, this.lifetime);
+    const fade = Math.max(0, 1 - this.age / life);
+    material.opacity = this.kind === 'impact' ? Math.min(1, fade * 1.5) : fade;
   }
 }
 
