@@ -66,7 +66,7 @@ export class TouchInput {
     const press = (event: PointerEvent): void => {
       event.preventDefault();
       event.stopPropagation();
-      element.setPointerCapture?.(event.pointerId);
+      this.safeCapture(element, event.pointerId);
       this.input.setAction(action, true);
     };
 
@@ -94,12 +94,10 @@ export class TouchInput {
 
     const mode = aimController.getMode();
     if (mode === 'top') {
-      // Survivor-style TOP controls: first free touch becomes a joystick exactly there.
       if (this.joystickPointer === null) this.beginJoystick(event);
       return;
     }
 
-    // Third-person: left/central touch moves, right-side touch rotates yaw.
     const movementZone = event.clientX <= window.innerWidth * 0.58;
     if (this.joystickPointer === null && movementZone) {
       this.beginJoystick(event);
@@ -110,7 +108,7 @@ export class TouchInput {
       this.aimPointer = event.pointerId;
       this.aimLastX = event.clientX;
       this.aimLastY = event.clientY;
-      this.surface?.setPointerCapture?.(event.pointerId);
+      this.safeCapture(this.surface, event.pointerId);
     }
   };
 
@@ -130,7 +128,7 @@ export class TouchInput {
       bottom: 'auto'
     });
 
-    this.surface?.setPointerCapture?.(event.pointerId);
+    this.safeCapture(this.surface, event.pointerId);
     this.updateJoystick(event.clientX, event.clientY);
   }
 
@@ -174,5 +172,15 @@ export class TouchInput {
     this.elements.stick.style.transform = 'translate(0px, 0px)';
     this.elements.joystick.style.display = 'none';
     this.input.setMove(0, 0);
+  }
+
+  private safeCapture(element: HTMLElement | undefined, pointerId: number): void {
+    if (!element?.setPointerCapture) return;
+    try {
+      element.setPointerCapture(pointerId);
+    } catch {
+      // Some browsers/synthetic events can report a pointerdown without an active capture slot.
+      // Movement still works through window-level pointermove/up listeners.
+    }
   }
 }
