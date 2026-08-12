@@ -7,7 +7,8 @@ Hosting: **Vercel only**
 Primary URL: `https://facefall-survivor-pavels-projects-0b29bb12.vercel.app`
 
 Текущий production milestone: **0.8.2 MOBILE AUTO-AIM**.  
-Текущий рабочий checkpoint: **0.8.3 CAMERA + AUDIT**.
+Текущий рабочий checkpoint: **0.8.4 COMBAT + HUMANOID INFECTED** (`main`).
+Production deploy 0.8.4: **pending confirmation**.
 
 Этот файл отражает только фактически реализованное состояние. Prototype/fallback не считается final implementation.
 
@@ -92,9 +93,14 @@ Reuse policy:
 - [x] camera collision;
 - [x] pistol / shotgun / ballistic bow foundations;
 - [x] recoil / spread / stagger / knock impulse;
-- [x] primitive hit zones;
+- [x] movement-dependent accuracy loss;
+- [x] visible bullet/pellet tracer layer for pistol/shotgun;
+- [x] exact hit-point impact feedback on infected;
+- [x] primitive/per-mesh hit zones;
 - [x] player HP / enemy melee damage / death;
 - [x] Walker / Runner / Brute runtime archetypes;
+- [x] low-poly humanoid infected visuals replace capsule markers in 0.8.4;
+- [x] simple procedural infected gait;
 - [x] EnemyBrain state boundary;
 - [x] wander / investigate / chase / attack / stagger;
 - [x] SpatialHash + LocalAvoidance;
@@ -108,15 +114,52 @@ Reuse policy:
 ## Largest remaining gaps
 
 1. **Visual content is still prototype quality.** No production hero/infected/weapon GLBs and no authored environment GLB.
-2. **No animation pipeline in active production runtime.** Player/enemies remain mostly procedural/static shapes.
+2. **No animation pipeline in active production runtime.** Player/enemies remain procedural visuals; infected gait is temporary.
 3. **No final Recast navmesh.** Current obstacle-aware query is a temporary procedural-map solution.
 4. **Face fitting is functional but primitive.** Photo is mapped to a box-head face; crop/alignment/blending are absent.
-5. **`GameApp.ts` is too large (~32 KB source) and owns too much integration wiring.** Must be decomposed before adding much more gameplay.
+5. **`GameApp.ts` is a confirmed God Object (~32 KB source).** It owns lifecycle, rendering, world, input, combat event wiring, player update, enemy/wave integration, HUD/status, level manifest, camera coordination and FX orchestration. Decomposition is now a prerequisite for major GLB/animation integration.
 6. **HUD is developer-oriented.** Debug status is still prominent and final survivor-style UX is absent.
 7. **No focused unit test suite** for Weapon/Damage/AI/Wave pure simulation.
 8. **Performance is not measured systematically.** No Metrics overlay, draw-call/texture/GC profile or long-run stress baseline.
-9. **Documentation metadata is stale outside this file.** README still says 0.4; package version still says `0.5.0-alpha.2`; parts of `structure.md` still describe the older floating-reticle model.
-10. **Legacy compatibility remains** under `/legacy/` and should be removed only after the new build is clearly stable.
+9. **Repository hygiene is stale:** README says 0.4, package version says `0.5.0-alpha.2`, no project `LICENSE`, and several legacy files/config rewrites remain.
+10. **Legacy compatibility remains** under `/legacy/`; additionally `game.js`, `game-safe.js`, `game-safe2.js` are not part of the current deploy rollback path and are candidates for removal after a quick reference check.
+
+---
+
+# 4A. External repository audit reconciliation — 2026-08-12
+
+The external audit was checked against current `main`, not accepted blindly.
+
+## Confirmed and adopted
+
+- [x] `GameApp.ts` size/ownership problem confirmed (~31,998 bytes in current audited tree).
+- [x] no unit-test suite found; current automated coverage is browser smoke/E2E oriented.
+- [x] README is stale and describes 0.4 instead of current 0.8.x architecture.
+- [x] package version is stale (`0.5.0-alpha.2`).
+- [x] no project `LICENSE` exists in the repository.
+- [x] four old monolithic runtime files exist in repository root: `game.js`, `game-safe.js`, `game-safe2.js`, `game-v050.js`.
+- [x] current rollback deploy only intentionally copies `game-v050.js` together with legacy `index.html`/CSS; the other three old runtimes are not needed by `scripts/copy-legacy.mjs`.
+- [x] `vercel.json` still contains old CDN/Three examples rewrites that belong to the pre-bundled/legacy generation and should not remain in the final Vite production configuration.
+- [x] `ATTRIBUTION.md` currently says no production-quality external assets are registered.
+
+## Correction to external audit
+
+The claim that current production hero is `threejs.org/examples/models/gltf/Soldier.glb` is **not accurate for active engine-next**. The URL still exists as a stale `vercel.json` rewrite from the legacy/prototype pipeline, but current engine-next player is procedural/low-poly and does not load `/assets/models/hero.glb`.
+
+Action is still required, but it is classified as **stale deploy configuration / asset-attribution hygiene**, not as an active production hero availability dependency.
+
+## Priority decision
+
+Architecture hardening moves **before heavy visual asset integration**:
+
+1. repository hygiene pass;
+2. focused unit-test baseline;
+3. `GameApp` decomposition;
+4. then production GLB hero/animation/infected/level integration.
+
+Reason: adding AnimationMixer, CharacterModel, real weapons and authored world-loading directly into the current God Object would make the next refactor materially riskier.
+
+Linting is useful but **not a blocking P0**. Strict TypeScript + browser CI already provide meaningful correctness gates. Add ESLint only after tests/decomposition unless an immediate style/bug rule is specifically needed.
 
 ---
 
@@ -132,8 +175,10 @@ Reuse policy:
 - [x] reuse policy;
 - [x] roadmap;
 - [x] 2026-08-12 implementation audit;
-- [ ] refresh README/build number before 0.9 release;
-- [ ] refresh stale aiming/camera descriptions in `structure.md`.
+- [x] reconcile external codebase audit into roadmap;
+- [ ] refresh README/build number in hygiene pass;
+- [ ] refresh stale aiming/camera descriptions in `structure.md`;
+- [ ] record 0.8.4 checkpoint in `history.md` at next documentation sync.
 
 ---
 
@@ -153,7 +198,8 @@ Reuse policy:
 - [x] mobile touch smoke;
 - [x] production deploy artifact;
 - [x] deployment-root assertion;
-- [ ] focused unit tests.
+- [ ] focused unit tests;
+- [HOLD] ESLint/configured lint gate until architecture/test baseline is in place.
 
 ## Core
 
@@ -163,7 +209,7 @@ Reuse policy:
 - [x] GameApp lifecycle;
 - [x] resilient Bootstrap;
 - [x] cleanup/dispose foundation;
-- [ ] decompose GameApp before major new gameplay systems.
+- [ ] decompose GameApp before production GLB/animation integration.
 
 ## Physics / spatial
 
@@ -174,6 +220,94 @@ Reuse policy:
 - [x] LocalAvoidance;
 - [~] wall sliding;
 - [ ] explicit slope/step policy only if authored level needs it.
+
+---
+
+# 6A. 0.8.5 — Repository hygiene gate
+
+**NEW — small, high-confidence cleanup before architectural refactor**
+
+- [ ] update README to current 0.8.x TypeScript/Vite/mobile architecture;
+- [ ] update package version to current development generation;
+- [ ] decide project source license intentionally and add `LICENSE` (do not guess a license automatically);
+- [ ] remove `game.js`, `game-safe.js`, `game-safe2.js` after confirming no documentation/tooling references depend on them;
+- [ ] keep `game-v050.js` only while `/legacy/` rollback is intentionally supported;
+- [ ] remove stale `/vendor/three.js` and `/vendor/GLTFLoader.js` Vercel rewrites from final engine-next deploy config;
+- [ ] remove stale `/assets/models/hero.glb -> threejs.org Soldier.glb` rewrite, or explicitly document it as prototype-only until removed;
+- [ ] ensure every externally shipped model/media asset, including temporary prototype assets if still reachable in production, is represented in attribution/notices;
+- [ ] refresh `structure.md` and `history.md` for current 0.8.4 state.
+
+Exit criteria:
+
+- active production path has no unnecessary external model/CDN dependency;
+- root contains only intentionally retained runtime generations;
+- README/version/legal metadata no longer contradict the code.
+
+---
+
+# 6B. 0.8.6 — Unit-test baseline
+
+**NEW — before GameApp refactor**
+
+Use Vitest or an equally lightweight Vite-native runner.
+
+First targets:
+
+- [ ] `Health` heal/damage/death boundaries;
+- [ ] `DamageSystem` emits hit/kill exactly once and preserves hit metadata;
+- [ ] `WeaponSystem` ammo/cooldown/reload/switch state transitions;
+- [ ] pistol/shotgun weapon definitions and spread invariants;
+- [ ] `EnemyBrain` state decisions: wander/investigate/chase/attack/stagger;
+- [ ] `WaveDirector` progression/spawn budget;
+- [ ] `SpatialHash` insert/update/remove/query;
+- [ ] `LocalAvoidance` basic separation invariants;
+- [ ] `GameStateController` legal transitions.
+
+CI target:
+
+```text
+npm ci
+→ typecheck
+→ unit tests
+→ desktop Chromium smoke
+→ mobile touch smoke
+→ production build
+```
+
+Do not try to unit-test Three.js rendering pixels in this stage.
+
+---
+
+# 6C. 0.8.7 — GameApp decomposition gate
+
+**NEW P0 — complete before heavy production asset/animation integration**
+
+Target: `GameApp` becomes a thin composition root/orchestrator, not owner of gameplay implementation.
+
+Extract in small, behavior-preserving PRs:
+
+- [ ] `RunSession` — score/kills/reset/game-over/wave session state;
+- [ ] `PlayerRuntime` / `PlayerController` — movement, facing, muzzle transform, player health;
+- [ ] `CombatRuntime` — shot resolution, hitscan/pellet loop, damage/hit feedback wiring;
+- [ ] `EnemyRuntime` — enemy update/wave spawn/perception wiring;
+- [ ] `WorldRuntime` — level manifest, lights, procedural fallback, collision/world lifecycle;
+- [ ] `PresentationRuntime` — FX/tracers/projectiles/rain/storm presentation updates;
+- [ ] `HudPresenter` — HUD/status/debug text updates;
+- [ ] explicit lifecycle/dispose ownership for each subsystem;
+- [ ] reduce `GameApp` to composition + state transitions + fixed-update ordering.
+
+Rules:
+
+- preserve fixed timestep and EventBus contracts;
+- no visual redesign in same commits as extraction;
+- unit tests added in 0.8.6 must stay green through every extraction;
+- browser smoke remains mandatory;
+- do not introduce a DI framework/service locator.
+
+Exit target:
+
+- `GameApp` is substantially smaller and its fields primarily reference orchestrators, not low-level systems;
+- adding CharacterModel/AnimationMixer does not require editing unrelated combat/world/HUD code.
 
 ---
 
@@ -212,9 +346,10 @@ Reuse policy:
 - [x] engine-next is compiled production root `/`;
 - [x] Three.js bundled by Vite;
 - [x] previous legacy runtime retained under `/legacy/`;
-- [x] primary Vercel deployment completed;
+- [x] primary Vercel deployment completed for tested 0.8.x generation;
 - [x] real Android test completed on production URL;
-- [ ] remove legacy compatibility after visual/content build proves stable.
+- [?] deploy/confirm current 0.8.4 main checkpoint;
+- [ ] remove `/legacy/` compatibility after visual/content build proves stable.
 
 ---
 
@@ -240,11 +375,11 @@ This replaces all older floating-reticle descriptions.
 - [x] no vertical manual aiming;
 - [x] manual swipe rotates yaw only;
 - [x] auto-aim rotates yaw toward target in central sector;
+- [x] 0.8.4 strengthens fixed-center target steering;
 - [x] FIRE remains manual;
 - [x] camera collision retained;
-- [x] 0.8.2 camera raised/pulled back relative to early prototype;
-- [x] 0.8.3 raises camera slightly again: height `3.55 → 4.05`, distance `6.8 → 7.0`, lookAhead `3.8 → 4.1`;
-- [?] verify final 0.8.3 framing on real Android.
+- [x] camera height/distance framing raised after Android testing;
+- [?] verify 0.8.4 auto-aim + combat readability on real Android.
 
 Future mobile tuning:
 
@@ -257,9 +392,11 @@ Future mobile tuning:
 
 # 10. 0.6 — Visual Vertical Slice
 
-**NOW THE HIGHEST-IMPACT DEVELOPMENT GAP**
+**HIGHEST VISUAL IMPACT, BUT HEAVY INTEGRATION STARTS AFTER 0.8.5–0.8.7 HARDENING**
 
 Do not add lots of new mechanics before this stage becomes visually credible.
+
+Asset sourcing/concept work may proceed in parallel with architecture hardening. Runtime integration of production hero/animation/world should begin after the GameApp boundary is safer.
 
 ## Hero
 
@@ -301,14 +438,18 @@ Target:
 
 Current:
 
-- [x] functional procedural Walker/Runner/Brute archetypes.
+- [x] Walker/Runner/Brute gameplay archetypes;
+- [x] 0.8.4 low-poly humanoid infected with readable head/torso/limbs;
+- [x] Walker/Runner/Brute have distinct procedural silhouettes;
+- [x] simple procedural gait;
+- [x] per-mesh hit-zone metadata foundation.
 
 Target:
 
 - [ ] Walker GLB;
 - [ ] Runner GLB;
 - [ ] Brute GLB;
-- [ ] visually distinct silhouettes;
+- [ ] final visually distinct silhouettes;
 - [ ] locomotion/attack/stagger/death animations.
 
 ## Abandoned Outskirts
@@ -393,7 +534,7 @@ Do not add Recast WASM before authored map geometry exists unless required by a 
 
 # 13. 0.8 — Combat Feel / Audio / Mobile Aim
 
-**COMPLETE AS FUNCTIONAL COMBAT TEST RELEASE**
+**FUNCTIONAL COMBAT RELEASE; 0.8.4 ADDS READABILITY PASS**
 
 ## Combat
 
@@ -403,12 +544,17 @@ Do not add Recast WASM before authored map geometry exists unless required by a 
 - [x] camera recoil;
 - [x] pistol/shotgun differentiation;
 - [x] ballistic bow foundation;
-- [x] primitive head/torso/limb hit zones;
+- [x] head/torso/limb hit zones foundation;
 - [x] damage multipliers;
 - [x] stagger resistance;
 - [x] knock impulse;
 - [x] particles/decals/transient lights;
 - [x] reload gameplay event;
+- [x] 0.8.4 pistol small natural deviation;
+- [x] 0.8.4 shotgun independent pellet spread;
+- [x] 0.8.4 visible physical tracer layer for pistol/shotgun;
+- [x] 0.8.4 exact impact-point wound/flash feedback per successful hit;
+- [x] damage remains hitscan for pistol/shotgun responsiveness; tracer is presentation, not delayed simulation;
 - [ ] bow hold/draw/release state;
 - [ ] reload/switch interrupt polish;
 - [ ] animation reactions after real GLBs;
@@ -432,8 +578,9 @@ Do not add Recast WASM before authored map geometry exists unless required by a 
 - [x] 0.8 soft assist prototype completed historically;
 - [x] replaced in 0.8.2 with survivor-style TOP full auto-aim;
 - [x] replaced in 0.8.2 with fixed-center horizontal 3RD auto-aim;
+- [x] 0.8.4 increases 3RD horizontal auto-aim pull;
 - [x] no auto-fire;
-- [?] 0.8.3 camera framing final device confirmation.
+- [?] 0.8.4 real-device combat readability confirmation.
 
 ---
 
@@ -500,14 +647,13 @@ Pending:
 
 # 17. 0.9 — Performance / Architecture Hardening
 
-**NEXT ENGINE-QUALITY GATE AFTER VISUAL SLICE STARTS**
+**ARCHITECTURE PART MOVED EARLIER TO 0.8.5–0.8.7; 0.9 REMAINS PERFORMANCE/ASSET HARDENING**
 
-## Architecture
+Architecture carry-over:
 
-- [ ] split `GameApp` into smaller orchestration modules;
-- [ ] move player/session combat wiring out of GameApp;
-- [ ] isolate world/session creation and disposal;
-- [ ] add focused unit tests for Damage/Weapon/Wave/AI logic.
+- [ ] verify no new God Object forms after decomposition;
+- [ ] evaluate linting after refactor; add ESLint only for rules that provide real signal;
+- [ ] continue unit tests for newly extracted pure systems.
 
 ## Metrics
 
@@ -557,11 +703,13 @@ Real-device already validated:
 - [x] 3RD gameplay playable;
 - [x] mobile auto-aim tested;
 - [x] dynamic joystick tested;
-- [x] camera switching tested.
+- [x] camera switching tested;
+- [x] 0.8.3 higher 3RD camera framing accepted by user.
 
 Still required:
 
-- [?] 0.8.3 higher 3RD camera confirmation;
+- [ ] 0.8.4 tracer/pellet/hit readability on Android;
+- [ ] 0.8.4 humanoid infected readability/performance;
 - [ ] photo upload with several aspect ratios;
 - [ ] repeated game over/restart;
 - [ ] repeated camera switching long session;
@@ -610,9 +758,11 @@ Required:
 - [x] game over/restart;
 - [x] quality profile foundation;
 - [x] reproducible CI/browser smoke;
+- [ ] focused unit-test baseline;
 - [ ] Android 30+ FPS with real assets;
 - [ ] final HUD;
-- [ ] release QA/docs.
+- [ ] release QA/docs;
+- [ ] intentional project license decision + repository legal metadata.
 
 Not MVP:
 
@@ -624,21 +774,22 @@ Not MVP:
 
 ---
 
-# 21. Technical debt priority after audit
+# 21. Technical debt priority after internal + external audits
 
-## P0 — do before large feature expansion
+## P0 — before heavy visual/runtime integration
 
-1. [ ] finish 0.8.3 camera Android confirmation;
-2. [ ] keep gameplay stable while starting visual vertical slice;
-3. [ ] decompose `GameApp` before it grows substantially more;
-4. [ ] add first focused unit tests.
+1. [ ] finish 0.8.4 production deploy/Android confirmation;
+2. [ ] repository hygiene gate 0.8.5;
+3. [ ] unit-test baseline 0.8.6;
+4. [ ] decompose `GameApp` 0.8.7;
+5. [ ] keep gameplay behavior unchanged while hardening boundaries.
 
 ## P1 — visual/product quality
 
-1. [ ] authored level GLB;
-2. [ ] production hero + animation;
+1. [ ] production hero + animation;
+2. [ ] production weapon GLBs + sockets;
 3. [ ] infected GLBs + animation;
-4. [ ] weapon GLBs;
+4. [ ] authored level GLB;
 5. [ ] FaceSystem 2.0 fitting/crop;
 6. [ ] HUD cleanup.
 
@@ -648,31 +799,41 @@ Not MVP:
 2. [ ] performance metrics/profiling;
 3. [ ] KTX2/Meshopt/LOD pipeline;
 4. [ ] richer audio/environment polish;
-5. [ ] remove legacy runtime.
+5. [ ] remove remaining legacy runtime after rollback window ends.
 
-## Documentation debt
+## Repository hygiene debt
 
 - [ ] README build information is stale (`0.4`);
 - [ ] package version is stale (`0.5.0-alpha.2`);
-- [ ] `structure.md` has older floating-reticle/vertical-aim text and must be refreshed at next documentation checkpoint;
-- [ ] history must record 0.8.2/0.8.3 checkpoints.
+- [ ] no project `LICENSE`;
+- [ ] `game.js`, `game-safe.js`, `game-safe2.js` are legacy root files not used by current rollback copy script;
+- [ ] `game-v050.js` retained intentionally only for `/legacy/`;
+- [ ] stale Vercel CDN/Three example rewrites remain;
+- [ ] prototype asset reachability/attribution must be explicit;
+- [ ] `structure.md` needs current 0.8.x control/architecture refresh;
+- [ ] `history.md` must record 0.8.4 checkpoint.
 
 ---
 
 # 22. Official next development order
 
-After 0.8.3 camera confirmation:
+Current order after external audit reconciliation:
 
-1. **Visual Vertical Slice / Character:** introduce a real licensed humanoid GLB and AnimationMixer pipeline.
-2. Attach a real pistol and prove idle/walk/run/aim/fire animation transitions.
-3. Replace procedural infected visuals with first real Walker, then Runner/Brute.
-4. Build first authored `Abandoned Outskirts level.glb` with collision-ready layout.
-5. Add final offline Recast navmesh for that geometry.
-6. Upgrade FaceSystem to fit production head UV/crop.
-7. Redesign mobile HUD around the now-approved TOP/3RD controls.
-8. Decompose GameApp and add focused unit tests during this migration, before adding major new mechanics.
-9. Profile Android with real assets and enforce 30+ FPS budgets.
-10. Only then add progression/special infected/environment interactions.
+1. **0.8.4 release confirmation:** deploy/verify current `main` on Android.
+2. **0.8.5 Repo hygiene:** README/version, deliberate LICENSE decision, remove dead legacy files, remove stale Vercel rewrites/third-party prototype route.
+3. **0.8.6 Unit tests:** establish Vitest baseline around Health/Damage/Weapon/EnemyBrain/Wave/SpatialHash/GameState.
+4. **0.8.7 GameApp decomposition:** extract session/player/combat/enemy/world/presentation/HUD orchestration in behavior-preserving PRs.
+5. **Visual Vertical Slice / Character:** production licensed humanoid GLB + AnimationMixer.
+6. Attach production weapons and prove idle/walk/run/aim/fire/reload transitions.
+7. Replace temporary low-poly infected with production Walker/Runner/Brute GLBs and animations.
+8. Build authored `Abandoned Outskirts level.glb`.
+9. Add offline Recast navmesh for authored geometry.
+10. Upgrade FaceSystem for production head UV/crop/alignment.
+11. Redesign mobile HUD.
+12. Profile Android with real assets and enforce 30+ FPS budgets.
+13. Only then add progression/special infected/environment interactions.
+
+**Asset discovery/model preparation can happen in parallel with 0.8.5–0.8.7, but heavy runtime integration waits until the architecture boundary is safer.**
 
 **Do not return to broad feature expansion before the game visually stops looking like an engine prototype.**
 
