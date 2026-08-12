@@ -21,7 +21,7 @@ test.use({
   isMobile: true
 });
 
-test('capture mobile TOP, 3RD and uploaded-face checkpoints', async ({ page }) => {
+test('capture mobile TOP, 3RD, pistol-fire and uploaded-face checkpoints', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
 
@@ -37,6 +37,18 @@ test('capture mobile TOP, 3RD and uploaded-face checkpoints', async ({ page }) =
   await page.locator('#startGame').click();
   await expect(page.locator('#status')).toContainText('state=playing', { timeout: 20_000 });
   await page.waitForTimeout(1200);
+
+  const animationHooks = await page.evaluate(() => {
+    const runtimeWindow = window as Window & { __facefallApp?: any };
+    const app = runtimeWindow.__facefallApp;
+    if (!app) throw new Error('Facefall runtime is unavailable for animation inspection');
+    const fire = app.player.playWeaponFire('pistol');
+    const reload = app.player.playWeaponReload('pistol');
+    return { fire, reload };
+  });
+  expect(animationHooks).toEqual({ fire: true, reload: true });
+
+  await page.waitForTimeout(250);
   await page.screenshot({ path: `${artifactDir}/mobile-top.png`, fullPage: true });
 
   await page.locator('#camThird').click();
@@ -44,12 +56,14 @@ test('capture mobile TOP, 3RD and uploaded-face checkpoints', async ({ page }) =
   await page.waitForTimeout(800);
   await page.screenshot({ path: `${artifactDir}/mobile-third.png`, fullPage: true });
 
-  // CI-only inspection shot. The runtime is already exposed by Bootstrap for diagnostics;
-  // pausing prevents CameraDirector from replacing this temporary camera pose.
+  // Trigger the normal input path, then freeze the resulting pose for a deterministic
+  // close inspection. This validates the actual touch-FIRE → WeaponSystem → event route.
+  await page.locator('#touchFire').tap();
+  await page.waitForTimeout(90);
   await page.evaluate(() => {
     const runtimeWindow = window as Window & { __facefallApp?: any };
     const app = runtimeWindow.__facefallApp;
-    if (!app) throw new Error('Facefall runtime is unavailable for face inspection');
+    if (!app) throw new Error('Facefall runtime is unavailable for fire inspection');
     app.pause();
 
     const player = app.player;
@@ -68,7 +82,10 @@ test('capture mobile TOP, 3RD and uploaded-face checkpoints', async ({ page }) =
     camera.updateProjectionMatrix();
     world.render();
   });
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(80);
+  await page.screenshot({ path: `${artifactDir}/mobile-pistol-fire-front.png`, fullPage: true });
+
+  // Same front view also remains the uploaded-face inspection checkpoint.
   await page.screenshot({ path: `${artifactDir}/mobile-face-front.png`, fullPage: true });
 
   expect(errors, `Fatal browser errors: ${errors.join(' | ')}`).toEqual([]);
