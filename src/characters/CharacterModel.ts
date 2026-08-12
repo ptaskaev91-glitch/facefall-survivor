@@ -88,7 +88,19 @@ export class CharacterModel {
     const gltf = await this.loader.loadAsync(url);
     if (generation !== this.generation) throw new Error('Animation load superseded');
 
-    this.clips.splice(0, this.clips.length, ...gltf.animations);
+    // The library samples translation/scale as well as rotation for every joint.
+    // Keeping those channels would overwrite the base character's bone lengths and
+    // can distort compatible-but-not-bit-identical rigs. Rotation-only retargeting
+    // preserves this hero's proportions while still applying the authored motion.
+    const retargeted = gltf.animations.map((clip) => new THREE.AnimationClip(
+      clip.name,
+      clip.duration,
+      clip.tracks
+        .filter((track) => /\.quaternion$/i.test(track.name))
+        .map((track) => track.clone())
+    ).optimize());
+
+    this.clips.splice(0, this.clips.length, ...retargeted);
     this.bindLocomotionActions(this.clips);
     this.disposeObjectResources(gltf.scene);
     this.setLocomotion('idle', true);
