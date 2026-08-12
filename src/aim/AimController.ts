@@ -3,8 +3,8 @@ import type { CameraMode } from '../camera/CameraDirector';
 
 /**
  * Shared aim state.
- * TOP: free aim point represented by a faint laser from the player, no crosshair.
- * 3RD: crosshair is fixed in the exact screen center; swipe/mouse only rotates yaw.
+ * TOP: free/internal aim point represented by a very faint laser; mobile can fully auto-steer it.
+ * 3RD: crosshair is fixed in the exact screen center; swipe and auto-aim rotate yaw only.
  */
 export class AimController {
   private readonly ndc = new Vector2(0, 0);
@@ -33,7 +33,6 @@ export class AimController {
       this.touchSensitivity = Math.max(0.45, Math.min(2.2, options.sensitivity));
     }
     if (typeof options.deadzone === 'number' && Number.isFinite(options.deadzone)) {
-      // Kept for persisted settings compatibility. 3RD no longer uses a floating-reticle deadzone.
       this.thirdPersonDeadzone = Math.max(0.04, Math.min(0.28, options.deadzone));
     }
   }
@@ -75,7 +74,6 @@ export class AimController {
     const height = Math.max(1, window.innerHeight);
 
     if (this.mode === 'third') {
-      // Third-person is horizontal body/camera rotation only.
       this.thirdTurnDelta += (dx / width) * this.touchSensitivity * 1.8;
       this.thirdTurnDelta = Math.max(-0.36, Math.min(0.36, this.thirdTurnDelta));
       this.ndc.set(0, 0);
@@ -96,15 +94,19 @@ export class AimController {
     this.thirdTurnDelta = Math.max(-0.36, Math.min(0.36, this.thirdTurnDelta));
   }
 
-  /** Small screen-space correction used by soft mobile aim assist. */
+  /** Mobile aim-assist correction. TOP moves its internal aim point; 3RD converts X correction to yaw. */
   nudgeNdc(delta: Vector2): void {
-    if (this.mode === 'third') return;
+    if (this.mode === 'third') {
+      this.thirdTurnDelta += delta.x * 1.75;
+      this.thirdTurnDelta = Math.max(-0.24, Math.min(0.24, this.thirdTurnDelta));
+      return;
+    }
     this.ndc.add(delta);
     this.clamp();
     this.renderAimUi();
   }
 
-  /** TOP recoil can move the laser aim point. 3RD keeps the crosshair fixed. */
+  /** TOP recoil can move the internal aim point. 3RD keeps the crosshair fixed. */
   applyRecoil(yawDegrees: number, pitchDegrees: number): void {
     if (this.mode === 'third') return;
     this.ndc.x += yawDegrees * 0.0065;
@@ -142,7 +144,6 @@ export class AimController {
     this.renderAimUi();
   }
 
-  /** Consumed once per render update; delta already represents pointer travel. */
   consumeThirdPersonTurnDelta(): number {
     if (this.mode !== 'third') {
       this.thirdTurnDelta = 0;
@@ -153,7 +154,6 @@ export class AimController {
     return value;
   }
 
-  /** Compatibility for older callers. */
   getThirdPersonTurnDemand(): number {
     return this.mode === 'third' ? this.thirdTurnDelta : 0;
   }
@@ -173,17 +173,10 @@ export class AimController {
     laser.setAttribute('aria-hidden', 'true');
     laser.dataset.aimLaser = 'true';
     Object.assign(laser.style, {
-      position: 'absolute',
-      left: '0px',
-      top: '0px',
-      width: '0px',
-      height: '1px',
-      transformOrigin: '0 50%',
-      pointerEvents: 'none',
-      opacity: '0',
-      zIndex: '3',
-      background: 'linear-gradient(90deg, rgba(217,242,125,.07), rgba(217,242,125,.22))',
-      boxShadow: '0 0 4px rgba(217,242,125,.08)'
+      position: 'absolute', left: '0px', top: '0px', width: '0px', height: '1px',
+      transformOrigin: '0 50%', pointerEvents: 'none', opacity: '0', zIndex: '3',
+      background: 'linear-gradient(90deg, rgba(217,242,125,.04), rgba(217,242,125,.13))',
+      boxShadow: '0 0 3px rgba(217,242,125,.05)'
     });
     this.reticle.parentElement.appendChild(laser);
     this.laser = laser;
@@ -211,7 +204,7 @@ export class AimController {
     this.laser.style.top = `${startY}px`;
     this.laser.style.width = `${length}px`;
     this.laser.style.transform = `rotate(${angle}deg)`;
-    this.laser.style.opacity = '0.42';
+    this.laser.style.opacity = '0.18';
     this.renderAimUi();
   }
 
