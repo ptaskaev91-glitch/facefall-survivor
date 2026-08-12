@@ -16,10 +16,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsSL --compressed \
-            -A 'Mozilla/5.0 FacefallAssetAudit/1.0' \
+          UA='Mozilla/5.0 FacefallAssetAudit/1.0'
+          curl -fsSL --compressed -A "$UA" \
             'https://quaternius.itch.io/universal-base-characters/purchase' \
             -o /tmp/quaternius-purchase.html
+          curl -fsSL --compressed -A "$UA" \
+            'https://static.itch.io/checkout.min.js' \
+            -o /tmp/checkout.js
 
           python3 - <<'PY'
           from pathlib import Path
@@ -28,6 +31,7 @@ jobs:
           import re
 
           html = Path('/tmp/quaternius-purchase.html').read_text('utf-8', errors='replace')
+          js = Path('/tmp/checkout.js').read_text('utf-8', errors='replace')
           base = 'https://quaternius.itch.io/universal-base-characters/purchase'
 
           class Parser(HTMLParser):
@@ -42,25 +46,24 @@ jobs:
                       kind = data.get('type')
                       value = data.get('value') if kind in {'submit', 'button'} else None
                       print(f'control: tag={tag} name={name!r} type={kind!r} submit-value={value!r}')
-                  public_meta = {
-                      k: v for k, v in data.items()
-                      if any(token in k.lower() for token in ('upload', 'game-id', 'game_id', 'download'))
-                      and 'token' not in k.lower()
-                  }
-                  if public_meta:
-                      print(f'{tag}-metadata: {public_meta}')
 
           Parser().feed(html)
 
-          for needle in ('No thanks', 'Standard].zip', 'upload_id', 'uploadId', 'download_url', 'downloadUrl', 'skip_payment'):
-              match = re.search(re.escape(needle), html, re.I)
-              if not match:
-                  continue
-              start = max(0, match.start() - 320)
-              end = min(len(html), match.end() + 520)
-              snippet = re.sub(r'value=["\'][^"\']{20,}["\']', 'value="[redacted]"', html[start:end], flags=re.I)
-              print(f'--- context {needle} ---')
-              print(snippet.replace('\n', ' '))
+          for label, source, needles in (
+              ('html', html, ('No thanks', 'Standard].zip', 'skip_payment')),
+              ('checkout-js', js, ('direct_download_btn', 'skip_payment', 'download_url', '/download')),
+          ):
+              for needle in needles:
+                  match = re.search(re.escape(needle), source, re.I)
+                  if not match:
+                      continue
+                  start = max(0, match.start() - 550)
+                  end = min(len(source), match.end() + 900)
+                  snippet = source[start:end]
+                  snippet = re.sub(r'value=["\'][^"\']{20,}["\']', 'value="[redacted]"', snippet, flags=re.I)
+                  print(f'--- {label} context {needle} ---')
+                  print(snippet.replace('\n', ' '))
 
           print(f'html-bytes: {len(html.encode("utf-8"))}')
+          print(f'checkout-js-bytes: {len(js.encode("utf-8"))}')
           PY
