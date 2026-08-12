@@ -1,8 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
-
-export type LocomotionState = 'idle' | 'walk' | 'run';
+import { resolveLocomotionState, type LocomotionState } from './CharacterLocomotion';
 
 export interface CharacterLoadResult {
   clipNames: string[];
@@ -11,12 +10,6 @@ export interface CharacterLoadResult {
 }
 
 const TARGET_CHARACTER_HEIGHT = 1.82;
-
-export function resolveLocomotionState(speed: number): LocomotionState {
-  const safeSpeed = Number.isFinite(speed) ? Math.max(0, speed) : 0;
-  if (safeSpeed < 0.15) return 'idle';
-  return safeSpeed < 6 ? 'walk' : 'run';
-}
 
 /**
  * Production-character boundary behind PlayerRuntime.
