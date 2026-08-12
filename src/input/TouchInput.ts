@@ -5,6 +5,7 @@ export interface TouchInputElements {
   joystick: HTMLElement;
   stick: HTMLElement;
   fire: HTMLElement;
+  movementSurface?: HTMLElement;
   aimSurface?: HTMLElement;
   reload?: HTMLElement;
   switchWeapon?: HTMLElement;
@@ -25,11 +26,15 @@ export class TouchInput {
 
   constructor(private readonly input: InputManager, private readonly elements: TouchInputElements) {}
 
+  private get surface(): HTMLElement | undefined {
+    return this.elements.movementSurface ?? this.elements.aimSurface;
+  }
+
   attach(): void {
     if (this.attached) return;
     this.attached = true;
-    this.elements.joystick.addEventListener('pointerdown', this.onJoystickDown);
-    this.elements.aimSurface?.addEventListener('pointerdown', this.onAimDown);
+    this.elements.joystick.style.display = 'none';
+    this.surface?.addEventListener('pointerdown', this.onSurfaceDown);
     window.addEventListener('pointermove', this.onPointerMove, { passive: false });
     window.addEventListener('pointerup', this.onPointerUp);
     window.addEventListener('pointercancel', this.onPointerUp);
@@ -44,8 +49,7 @@ export class TouchInput {
   detach(): void {
     if (!this.attached) return;
     this.attached = false;
-    this.elements.joystick.removeEventListener('pointerdown', this.onJoystickDown);
-    this.elements.aimSurface?.removeEventListener('pointerdown', this.onAimDown);
+    this.surface?.removeEventListener('pointerdown', this.onSurfaceDown);
     window.removeEventListener('pointermove', this.onPointerMove);
     window.removeEventListener('pointerup', this.onPointerUp);
     window.removeEventListener('pointercancel', this.onPointerUp);
@@ -61,7 +65,8 @@ export class TouchInput {
 
     const press = (event: PointerEvent): void => {
       event.preventDefault();
-      element.setPointerCapture?.(event.pointerId);
+      event.stopPropagation();
+      this.safeCapture(element, event.pointerId);
       this.input.setAction(action, true);
     };
 
@@ -83,26 +88,49 @@ export class TouchInput {
     });
   }
 
-  private onJoystickDown = (event: PointerEvent): void => {
+  private onSurfaceDown = (event: PointerEvent): void => {
+    if (event.pointerType === 'mouse') return;
     event.preventDefault();
-    if (this.joystickPointer !== null) return;
-    this.joystickPointer = event.pointerId;
-    const rect = this.elements.joystick.getBoundingClientRect();
-    this.joystickCenterX = rect.left + rect.width / 2;
-    this.joystickCenterY = rect.top + rect.height / 2;
-    this.elements.joystick.setPointerCapture?.(event.pointerId);
-    this.updateJoystick(event.clientX, event.clientY);
+
+    const mode = aimController.getMode();
+    if (mode === 'top') {
+      if (this.joystickPointer === null) this.beginJoystick(event);
+      return;
+    }
+
+    const movementZone = event.clientX <= window.innerWidth * 0.58;
+    if (this.joystickPointer === null && movementZone) {
+      this.beginJoystick(event);
+      return;
+    }
+
+    if (this.aimPointer === null && event.pointerId !== this.joystickPointer) {
+      this.aimPointer = event.pointerId;
+      this.aimLastX = event.clientX;
+      this.aimLastY = event.clientY;
+      this.safeCapture(this.surface, event.pointerId);
+    }
   };
 
-  private onAimDown = (event: PointerEvent): void => {
-    if (this.aimPointer !== null || event.pointerId === this.joystickPointer) return;
-    event.preventDefault();
-    this.aimPointer = event.pointerId;
-    this.aimLastX = event.clientX;
-    this.aimLastY = event.clientY;
-    this.elements.aimSurface?.setPointerCapture?.(event.pointerId);
-    this.input.clearPointer();
-  };
+  private beginJoystick(event: PointerEvent): void {
+    this.joystickPointer = event.pointerId;
+    this.joystickCenterX = event.clientX;
+    this.joystickCenterY = event.clientY;
+
+    const rect = this.elements.joystick.getBoundingClientRect();
+    const width = rect.width || 112;
+    const height = rect.height || 112;
+    Object.assign(this.elements.joystick.style, {
+      display: 'block',
+      left: `${event.clientX - width / 2}px`,
+      top: `${event.clientY - height / 2}px`,
+      right: 'auto',
+      bottom: 'auto'
+    });
+
+    this.safeCapture(this.surface, event.pointerId);
+    this.updateJoystick(event.clientX, event.clientY);
+  }
 
   private onPointerMove = (event: PointerEvent): void => {
     if (event.pointerId === this.joystickPointer) {
@@ -117,10 +145,7 @@ export class TouchInput {
       const dy = event.clientY - this.aimLastY;
       this.aimLastX = event.clientX;
       this.aimLastY = event.clientY;
-      // In 3RD AimController ignores dy completely and converts dx into yaw rotation.
       aimController.addTouchDelta(dx, dy);
-      const ndc = aimController.getNdc();
-      this.input.setPointerNdc(ndc.x, ndc.y);
     }
   };
 
@@ -145,6 +170,17 @@ export class TouchInput {
   private resetJoystick(): void {
     this.joystickPointer = null;
     this.elements.stick.style.transform = 'translate(0px, 0px)';
+    this.elements.joystick.style.display = 'none';
     this.input.setMove(0, 0);
+  }
+
+  private safeCapture(element: HTMLElement | undefined, pointerId: number): void {
+    if (!element?.setPointerCapture) return;
+    try {
+      element.setPointerCapture(pointerId);
+    } catch {
+      // Some browsers/synthetic events can report a pointerdown without an active capture slot.
+      // Movement still works through window-level pointermove/up listeners.
+    }
   }
 }

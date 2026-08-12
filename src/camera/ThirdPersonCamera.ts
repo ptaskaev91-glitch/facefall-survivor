@@ -6,16 +6,18 @@ export interface ThirdPersonCameraSettings {
   height: number;
   side: number;
   lookHeight: number;
+  lookAhead: number;
   fov: number;
   smoothing: number;
 }
 
 const DEFAULTS: ThirdPersonCameraSettings = {
-  distance: 5.6,
-  height: 2.45,
-  side: 0.85,
-  lookHeight: 1.35,
-  fov: 68,
+  distance: 6.8,
+  height: 3.55,
+  side: 0.72,
+  lookHeight: 0.95,
+  lookAhead: 3.8,
+  fov: 70,
   smoothing: 10
 };
 
@@ -48,10 +50,15 @@ export class ThirdPersonCamera {
       .addScaledVector(this.right, this.settings.side);
     this.desired.y += this.settings.height;
 
-    this.lookTarget.set(target.x, target.y + this.settings.lookHeight, target.z);
+    // Look ahead of the player so the fixed center crosshair points into playable space,
+    // not into the character's upper back/head.
+    this.lookTarget.copy(target)
+      .addScaledVector(this.forward, this.settings.lookAhead);
+    this.lookTarget.y = target.y + this.settings.lookHeight;
 
     if (collision) {
-      this.collisionAnchor.copy(this.lookTarget);
+      this.collisionAnchor.copy(target);
+      this.collisionAnchor.y += 1.25;
       collision.resolve(this.collisionAnchor, this.desired, this.desired);
     }
 
