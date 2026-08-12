@@ -56,10 +56,26 @@ test('capture mobile TOP, 3RD, pistol-fire and uploaded-face checkpoints', async
   await page.waitForTimeout(800);
   await page.screenshot({ path: `${artifactDir}/mobile-third.png`, fullPage: true });
 
+  const magazineBefore = await page.evaluate(() => {
+    const runtimeWindow = window as Window & { __facefallApp?: any };
+    const app = runtimeWindow.__facefallApp;
+    if (!app) throw new Error('Facefall runtime is unavailable for ammo inspection');
+    return app.weaponSystem.status().magazine as number;
+  });
+
   // Trigger the normal input path, then freeze the resulting pose for a deterministic
-  // close inspection. This validates the actual touch-FIRE → WeaponSystem → event route.
+  // close inspection. This validates touch-FIRE → WeaponSystem → shot event → animation.
   await page.locator('#touchFire').tap();
   await page.waitForTimeout(90);
+
+  const magazineAfter = await page.evaluate(() => {
+    const runtimeWindow = window as Window & { __facefallApp?: any };
+    const app = runtimeWindow.__facefallApp;
+    if (!app) throw new Error('Facefall runtime is unavailable for ammo inspection');
+    return app.weaponSystem.status().magazine as number;
+  });
+  expect(magazineAfter).toBe(magazineBefore - 1);
+
   await page.evaluate(() => {
     const runtimeWindow = window as Window & { __facefallApp?: any };
     const app = runtimeWindow.__facefallApp;
