@@ -9,13 +9,11 @@ on:
       - 'scripts/**'
       - 'tests/**'
       - 'engine-lab.html'
-      - 'index.html'
-      - 'styles-safe.css'
-      - 'game-v050.js'
       - 'package.json'
       - 'package-lock.json'
       - 'playwright.config.ts'
       - 'tsconfig.json'
+      - 'tsconfig.tests.json'
       - 'vite.config.ts'
       - 'vercel.json'
       - '.github/workflows/engine-next-ci.yml'
@@ -26,13 +24,11 @@ on:
       - 'scripts/**'
       - 'tests/**'
       - 'engine-lab.html'
-      - 'index.html'
-      - 'styles-safe.css'
-      - 'game-v050.js'
       - 'package.json'
       - 'package-lock.json'
       - 'playwright.config.ts'
       - 'tsconfig.json'
+      - 'tsconfig.tests.json'
       - 'vite.config.ts'
       - 'vercel.json'
       - '.github/workflows/engine-next-ci.yml'
@@ -58,23 +54,34 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Unit tests
+        run: npm run test:unit
+
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Browser smoke
+      - name: Browser smoke and visual checkpoints
         run: npm run test:smoke
 
-      - name: Build combined Vercel bundle
+      - name: Upload visual smoke screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: facefall-visual-checkpoints
+          path: test-artifacts
+          if-no-files-found: ignore
+          retention-days: 3
+
+      - name: Build Vercel bundle
         run: npm run build:deploy
 
-      - name: Verify 0.8 is deployment root
+      - name: Verify engine-next is sole deployment root
         run: |
           grep -q "ENGINE NEXT 0.8" dist-next/index.html
-          test -f dist-next/legacy/index.html
-          test -f dist-next/legacy/game-v050.js
-          test -f dist-next/legacy/styles-safe.css
+          test -f dist-next/engine-lab.html
+          test ! -e dist-next/legacy
 
-      - name: Upload combined deploy artifact
+      - name: Upload deploy artifact
         uses: actions/upload-artifact@v4
         with:
           name: facefall-dist-next
