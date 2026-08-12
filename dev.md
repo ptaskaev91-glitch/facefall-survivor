@@ -4,17 +4,12 @@
 Repository: `ptaskaev91-glitch/facefall-survivor`  
 Source of truth: `main`  
 Hosting: **Vercel only**  
-Primary alias: `https://facefall-survivor-pavels-projects-0b29bb12.vercel.app`
+Primary URL: `https://facefall-survivor-pavels-projects-0b29bb12.vercel.app`
 
-Текущий milestone: **0.8 COMBAT+AI — primary test release candidate**.  
-После merge 0.8 основной Vercel `/` должен показывать engine-next. Предыдущая 0.5 ALPHA сохраняется под `/legacy/` для сравнения/отката.
+Текущий production milestone: **0.8.2 MOBILE AUTO-AIM**.  
+Текущий рабочий checkpoint: **0.8.3 CAMERA + AUDIT**.
 
-Связанные документы:
-
-- `structure.md` — текущая/целевая архитектура;
-- `history.md` — хронология решений и checkpoint;
-- `THIRD_PARTY_NOTICES.md` — прямые code-reuse notices;
-- `public/assets/ATTRIBUTION.md` — media licensing.
+Этот файл отражает только фактически реализованное состояние. Prototype/fallback не считается final implementation.
 
 ---
 
@@ -24,522 +19,600 @@ Facefall Survivor — mobile-first browser 3D action-survival против за�
 
 Обязательная формула:
 
-- TOP / Diablo-like камера;
+- TOP survivor/action-RPG камера;
 - third-person over-the-shoulder камера;
 - одна simulation для обеих камер;
 - pistol / shotgun / bow;
 - Walker / Runner / Brute;
 - waves + рост сложности;
 - фото пользователя становится лицом героя;
-- desktop + touch;
-- Android — обязательная реальная тестовая платформа;
-- dark atmospheric environment;
+- Android — главная реальная mobile test platform;
+- desktop support;
+- атмосферная authored 3D-локация;
 - Vercel production.
 
-Главный product hook:
+Главный hook:
 
 > **Твоё лицо — твой герой в survival shooter.**
 
 ---
 
-# 2. Technology decision after three audits
+# 2. Technology decision
 
-Референсы:
+Итог после аудитов `ivanoskov/shooter`, `Unvanquished`, `redeclipse/base`:
 
-1. `ivanoskov/shooter` → browser/Three.js foundation;
-2. `Unvanquished/Unvanquished` → gameplay/system architecture;
-3. `redeclipse/base` → combat feel / weapons / FX / environment.
-
-Итог:
-
-> **TypeScript + Vite + npm Three.js + GLB/manifest levels + Octree/Capsule + NavigationQuery/Recast target + SpatialHash/local avoidance + data-driven combat + event-driven presentation + pooled FX/audio + mobile-first budgets.**
+> **TypeScript + Vite + npm Three.js + glTF/GLB + manifest-driven level + Octree/Capsule + SpatialHash/local avoidance + NavigationQuery/Recast target + data-driven combat + event-driven presentation + pooled FX/audio + local-first FaceSystem + mobile-first controls + GitHub Actions + Vercel.**
 
 Reuse policy:
 
 - permissive isolated code можно адаптировать с attribution;
 - GPL game code напрямую не копируем;
-- native C++ идеи переписываются под TypeScript/browser;
-- media licenses проверяются отдельно;
-- если чужой блок сложнее адаптировать, чем написать чисто — пишем с нуля.
+- C++/native engine ideas переписываем под browser/TypeScript;
+- media licenses проверяем отдельно;
+- если адаптация сложнее чистой реализации — пишем с нуля.
 
-Уже адаптировано из MIT `ivanoskov/shooter`:
+Уже адаптированы с attribution из MIT `ivanoskov/shooter`:
 
 - Capsule/Octree collision response pattern;
 - GLTF loader/traverse preparation pattern.
 
-Остальные ключевые systems Facefall реализованы специально под проект.
+---
+
+# 3. Status legend
+
+- `[x]` — implemented and present in source;
+- `[?]` — implemented, needs more real-device validation;
+- `[~]` — partial/prototype/fallback;
+- `[ ]` — pending;
+- `[HOLD]` — intentionally later.
 
 ---
 
-# 3. Architecture rules
+# 4. Audit checkpoint — 2026-08-12
 
-1. `src/main.ts` остаётся thin bootstrap.
-2. Один fixed-timestep gameplay loop.
-3. Input adapters → один `InputManager`.
-4. Visible reticle = gameplay state = источник направления player shot.
-5. Simulation emits events; presentation handles sound/FX/UI.
-6. Static collision ≠ navigation ≠ crowd lookup.
-7. Static world → Octree; crowd → SpatialHash; final AI paths → navmesh.
-8. Weapons/enemies/FX data-driven.
-9. Dynamic visual systems имеют pool/capacity/TTL.
-10. TOP и 3RD используют одного Player/World.
-11. Level visual geometry, manifest semantics и navmesh разделены.
-12. Face processing local-first.
-13. Every gameplay PR → `npm ci + typecheck + Chromium smoke + production build`.
-14. Major checkpoint → update `dev.md`, `structure.md`, `history.md`.
-15. Android feedback приоритетнее desktop-only polish.
+## What is already real
 
----
+- [x] engine-next is production root on Vercel;
+- [x] TypeScript/Vite/npm Three.js runtime;
+- [x] package lock + `npm ci`;
+- [x] automated Chromium gameplay smoke;
+- [x] automated mobile touch smoke;
+- [x] fixed-timestep GameLoop;
+- [x] GameState lifecycle;
+- [x] menu / loading / playing / game over / restart;
+- [x] local photo choose/save/remove;
+- [x] low-poly human player visual;
+- [x] uploaded photo is material on actual head face, not floating plane;
+- [x] TOP survivor-style full auto-aim;
+- [x] TOP dynamic joystick appears under first gameplay touch;
+- [x] TOP hero automatically turns toward selected infected;
+- [x] 3RD fixed-center crosshair;
+- [x] 3RD horizontal-only manual yaw;
+- [x] 3RD horizontal auto-aim steering;
+- [x] camera collision;
+- [x] pistol / shotgun / ballistic bow foundations;
+- [x] recoil / spread / stagger / knock impulse;
+- [x] primitive hit zones;
+- [x] player HP / enemy melee damage / death;
+- [x] Walker / Runner / Brute runtime archetypes;
+- [x] EnemyBrain state boundary;
+- [x] wander / investigate / chase / attack / stagger;
+- [x] SpatialHash + LocalAvoidance;
+- [x] obstacle-aware temporary navigation query;
+- [x] waves / score / kills / pickups;
+- [x] fog / grass / rain / storm flash / lightning / thunder;
+- [x] pooled particles / decals / transient lights;
+- [x] procedural Web Audio foundation;
+- [x] real Android testing has reached playable 0.8.x builds.
 
-# 4. Status legend
+## Largest remaining gaps
 
-- `[x]` implemented;
-- `[~]` partial/foundation;
-- `[?]` implemented, needs device confirmation;
-- `[ ]` pending;
-- `[HOLD]` intentionally later.
+1. **Visual content is still prototype quality.** No production hero/infected/weapon GLBs and no authored environment GLB.
+2. **No animation pipeline in active production runtime.** Player/enemies remain mostly procedural/static shapes.
+3. **No final Recast navmesh.** Current obstacle-aware query is a temporary procedural-map solution.
+4. **Face fitting is functional but primitive.** Photo is mapped to a box-head face; crop/alignment/blending are absent.
+5. **`GameApp.ts` is too large (~32 KB source) and owns too much integration wiring.** Must be decomposed before adding much more gameplay.
+6. **HUD is developer-oriented.** Debug status is still prominent and final survivor-style UX is absent.
+7. **No focused unit test suite** for Weapon/Damage/AI/Wave pure simulation.
+8. **Performance is not measured systematically.** No Metrics overlay, draw-call/texture/GC profile or long-run stress baseline.
+9. **Documentation metadata is stale outside this file.** README still says 0.4; package version still says `0.5.0-alpha.2`; parts of `structure.md` still describe the older floating-reticle model.
+10. **Legacy compatibility remains** under `/legacy/` and should be removed only after the new build is clearly stable.
 
 ---
 
 # 5. D0 — Documentation / architecture
 
-**COMPLETE**
+**COMPLETE, ongoing maintenance required**
 
-- [x] three audits completed;
-- [x] target stack selected;
+- [x] three external architecture audits;
+- [x] target stack;
 - [x] `structure.md`;
 - [x] `history.md`;
-- [x] licensing strategy;
-- [x] full roadmap;
-- [x] reuse policy.
+- [x] licensing policy;
+- [x] reuse policy;
+- [x] roadmap;
+- [x] 2026-08-12 implementation audit;
+- [ ] refresh README/build number before 0.9 release;
+- [ ] refresh stale aiming/camera descriptions in `structure.md`.
 
 ---
 
 # 6. 0.5A — Engine Foundation
 
-**COMPLETE ENOUGH FOR PRODUCT DEVELOPMENT**
+**COMPLETE ENOUGH — do not expand foundation without gameplay need**
 
 ## Build / CI
 
-- [x] npm project;
+- [x] npm;
 - [x] Three.js package dependency;
-- [x] TypeScript strict;
+- [x] strict TypeScript;
 - [x] Vite;
-- [x] package lock;
-- [x] `npm ci` in CI;
+- [x] package-lock;
+- [x] `npm ci` CI;
 - [x] Playwright Chromium smoke;
-- [x] Vite production artifact;
-- [x] Vercel `dist-next` output;
-- [x] deployment-root assertion from 0.8;
-- [ ] focused unit tests for pure simulation systems.
+- [x] mobile touch smoke;
+- [x] production deploy artifact;
+- [x] deployment-root assertion;
+- [ ] focused unit tests.
 
 ## Core
 
-- [x] `GameLoop` fixed timestep;
-- [x] typed `EventBus`;
-- [x] `GameStateController`;
-- [x] `GameApp`;
+- [x] one fixed-timestep GameLoop;
+- [x] typed EventBus;
+- [x] GameStateController;
+- [x] GameApp lifecycle;
 - [x] resilient Bootstrap;
-- [x] menu/loading/playing/paused/gameover/error lifecycle;
 - [x] cleanup/dispose foundation;
-- [~] `GameApp` still needs decomposition.
-
-## Input / aiming / cameras
-
-- [x] keyboard/mouse;
-- [x] touch controls;
-- [x] camera-relative joystick movement;
-- [x] TOP movable reticle;
-- [x] 3RD floating reticle + soft-edge turning;
-- [x] visible reticle and WeaponSystem share one AimController state;
-- [x] sensitivity setting;
-- [x] 3RD deadzone setting;
-- [x] soft mobile Aim Assist setting;
-- [x] TopDownCamera;
-- [x] ThirdPersonCamera;
-- [x] CameraCollision;
-- [?] 0.8 aim/recoil/assist feel requires latest Android test.
+- [ ] decompose GameApp before major new gameplay systems.
 
 ## Physics / spatial
 
-- [x] static Octree CollisionWorld;
+- [x] Octree CollisionWorld;
 - [x] PlayerCapsule;
 - [x] raycast / segmentCast;
 - [x] SpatialHash;
 - [x] LocalAvoidance;
 - [~] wall sliding;
-- [ ] explicit slopes/steps policy;
-- [ ] richer dynamic colliders if gameplay needs them.
+- [ ] explicit slope/step policy only if authored level needs it.
 
 ---
 
-# 7. 0.5B — Legacy Functional Parity
+# 7. 0.5B — Functional Parity / Product Flow
 
-**FUNCTIONALLY REACHED FOR PRIMARY TESTING; final Android comparison still required.**
-
-## Product flow
+**REACHED AND SUPERSEDED BY 0.8.x**
 
 - [x] start menu;
-- [x] face choose/preview/remove;
+- [x] photo choose/preview/remove;
 - [x] local face persistence;
-- [x] camera selection before run;
-- [x] aim/audio settings;
+- [x] camera selection;
+- [x] settings persistence;
 - [x] start/loading/error feedback;
 - [x] game over;
-- [x] restart without page reload.
-
-## Gameplay
-
-- [x] pistol basic runtime;
-- [x] shotgun basic runtime;
-- [x] bow ballistic runtime;
+- [x] restart without reload;
+- [x] pistol;
+- [x] shotgun;
+- [x] bow projectile;
 - [x] reload;
-- [x] weapon switch;
-- [x] player HP/damage/death;
-- [x] Walker/Runner/Brute spawn/runtime;
+- [x] switch weapon;
+- [x] player health/damage;
+- [x] three enemy archetypes;
 - [x] WaveDirector;
-- [x] kills/score;
+- [x] score/kills;
 - [x] health/ammo pickups;
-- [x] manifest-driven spawn/loot/light semantics;
-
-## Atmosphere
-
-- [x] fog;
-- [x] lighting foundation;
-- [x] grass foundation;
-- [x] rain;
-- [x] rain/wind audio;
-- [x] lightning/thunder foundation;
-- [x] pooled combat FX;
-
-## Validation
-
-- [x] automated Chromium menu → run → 3RD smoke;
-- [x] no fatal pageerror in smoke;
-- [x] locked reproducible build;
-- [x] Android earlier engine-next versions booted and were playable;
-- [?] latest 0.8 primary deployment Android test required.
+- [x] manifest-driven spawn/loot/light metadata;
+- [x] atmosphere foundation;
+- [x] Android boot/play validation.
 
 ---
 
-# 8. Production migration for 0.8 testing
+# 8. Production migration
 
-User explicitly requested primary deployment of 0.8 for testing.
+**COMPLETE FOR TEST RELEASE**
 
-Release layout:
-
-- [x] Vite engine-next compiled by build pipeline;
-- [x] `dist-next/index.html` promoted to compiled engine-next;
-- [x] legacy source copied under `/legacy/`;
-- [x] CI asserts `ENGINE NEXT 0.8` is deployment root;
-- [ ] merge PR #14 into `main` after final green CI;
-- [ ] deploy `main` to primary Vercel;
-- [ ] verify primary Vercel root shows `ENGINE NEXT 0.8`;
-- [ ] real Android smoke-test;
-- [ ] remove legacy compatibility/proxy debt later, not before device validation.
+- [x] engine-next is compiled production root `/`;
+- [x] Three.js bundled by Vite;
+- [x] previous legacy runtime retained under `/legacy/`;
+- [x] primary Vercel deployment completed;
+- [x] real Android test completed on production URL;
+- [ ] remove legacy compatibility after visual/content build proves stable.
 
 ---
 
-# 9. 0.6 — Visual Vertical Slice
+# 9. Mobile controls — current canonical model
 
-**NOT COMPLETE. This remains the largest visual gap.**
+This replaces all older floating-reticle descriptions.
 
-After 0.8 gameplay/device feedback:
+## TOP
+
+- [x] no manual aiming gesture;
+- [x] invisible/internal aim point driven by auto-target selection;
+- [x] full survivor-style auto-aim on mobile;
+- [x] hero automatically turns toward selected target;
+- [x] very faint laser can remain only as direction feedback;
+- [x] movement joystick appears wherever first free gameplay touch starts;
+- [x] joystick disappears on release;
+- [x] FIRE remains manual;
+- [x] dedicated mobile smoke checks floating joystick lifecycle.
+
+## 3RD
+
+- [x] crosshair permanently fixed at exact screen center;
+- [x] no vertical manual aiming;
+- [x] manual swipe rotates yaw only;
+- [x] auto-aim rotates yaw toward target in central sector;
+- [x] FIRE remains manual;
+- [x] camera collision retained;
+- [x] 0.8.2 camera raised/pulled back relative to early prototype;
+- [x] 0.8.3 raises camera slightly again: height `3.55 → 4.05`, distance `6.8 → 7.0`, lookAhead `3.8 → 4.1`;
+- [?] verify final 0.8.3 framing on real Android.
+
+Future mobile tuning:
+
+- [ ] target stickiness / hysteresis to reduce rapid target switching;
+- [ ] priority weighting by distance + threat + screen position;
+- [ ] optional auto-fire mode only if later deliberately chosen as product mechanic;
+- [ ] contextual button layout/HUD redesign.
+
+---
+
+# 10. 0.6 — Visual Vertical Slice
+
+**NOW THE HIGHEST-IMPACT DEVELOPMENT GAP**
+
+Do not add lots of new mechanics before this stage becomes visually credible.
 
 ## Hero
 
+Current:
+
+- [x] functional low-poly procedural human;
+- [x] torso/legs/arms/head/weapon silhouette;
+- [x] photo mapped onto actual head front material.
+
+Target:
+
 - [ ] production-direction humanoid GLB;
-- [ ] clean skeleton;
+- [ ] skeleton;
 - [ ] outfit;
-- [ ] proper face-compatible head;
+- [ ] face-compatible UV/head;
 - [ ] weapon sockets;
 - [ ] LOD.
 
-## Hero animations
+## Hero animation
 
 - [ ] idle;
 - [ ] walk;
 - [ ] run;
-- [ ] pistol/shotgun/bow aim;
-- [ ] fire;
-- [ ] reload;
+- [ ] pistol aim/fire/reload;
+- [ ] shotgun aim/fire/reload;
+- [ ] bow draw/release;
 - [ ] hit;
 - [ ] death;
-- [ ] AnimationMixer state transitions/crossfades.
+- [ ] AnimationMixer state machine and crossfades.
 
 ## Weapons
 
-- [ ] real pistol GLB;
-- [ ] real shotgun GLB;
-- [ ] real bow/arrow GLB;
-- [ ] hand attachment.
+- [ ] pistol GLB;
+- [ ] shotgun GLB;
+- [ ] bow/arrow GLB;
+- [ ] correct hand attachment.
 
 ## Infected
+
+Current:
+
+- [x] functional procedural Walker/Runner/Brute archetypes.
+
+Target:
 
 - [ ] Walker GLB;
 - [ ] Runner GLB;
 - [ ] Brute GLB;
-- [ ] distinct silhouettes;
-- [ ] attack/stagger/death animations.
+- [ ] visually distinct silhouettes;
+- [ ] locomotion/attack/stagger/death animations.
 
 ## Abandoned Outskirts
 
-- [ ] actual `level.glb`;
-- [ ] road/dirt road;
-- [ ] buildings/garage;
-- [ ] fences/gates;
-- [ ] wrecked vehicle;
-- [ ] lamps/poles;
-- [ ] trees/bushes/grass;
-- [ ] props/debris;
-- [ ] mud/puddles/wet asphalt;
-- [ ] authored collision geometry.
+Current:
 
-Definition: screenshot must look like a real game, not engine lab.
+- [x] manifest exists;
+- [x] procedural test world exists;
+- [x] collision/navigation prototype works on current world.
+
+Target:
+
+- [ ] authored `level.glb`;
+- [ ] road + dirt road;
+- [ ] 2–3 buildings / garage;
+- [ ] fences / gates;
+- [ ] wrecked vehicle;
+- [ ] lamps / utility poles;
+- [ ] trees / bushes / grass clusters;
+- [ ] props / debris / crates;
+- [ ] mud / puddles / wet asphalt;
+- [ ] authored collision geometry;
+- [ ] gameplay spawn/choke/flank composition.
+
+**Exit:** a screenshot must look like an actual mobile survivor/shooter, not an engine lab.
 
 ---
 
-# 10. 0.7 — Navigation / Enemy AI
+# 11. 0.7 — Navigation / Enemy AI
 
-**PRACTICAL GAMEPLAY LAYER REACHED; final Recast navmesh waits for authored level.**
+**PRACTICAL PROTOTYPE COMPLETE; FINAL AUTHORED-MAP NAVIGATION PENDING**
 
-## Completed
+Completed:
 
 - [x] SpatialHash;
 - [x] LocalAvoidance;
-- [x] EnemyBrain separation;
-- [x] lightweight explicit State Tree;
-- [x] `NavigationQuery` seam;
+- [x] EnemyBrain;
+- [x] State Tree intent model;
+- [x] NavigationQuery abstraction;
 - [x] direct fallback;
-- [x] obstacle-aware `CollisionNavigationQuery` for current procedural map;
+- [x] CollisionNavigationQuery;
 - [x] wander;
 - [x] investigate;
 - [x] chase;
 - [x] attack/hold;
 - [x] stagger;
-- [x] last-known target/alert timers;
-- [x] `hearNoise()` API;
-- [~] sight perception by range;
-- [~] basic death state = kill/hide/remove from crowd.
+- [x] last-known target / alert timer;
+- [x] `hearNoise()` API.
 
-## Final authored-map navigation
+Partial:
 
-Architecture decision:
+- [~] sight = range + current LOS plumbing rather than mature perception;
+- [~] death = hide/remove rather than animation/corpse lifecycle;
+- [~] sound perception API exists but weapon-shot wiring is not verified as active.
 
-> **Offline Recast/Detour navmesh generation + lightweight runtime NavigationQuery adapter.**
+Final target after `level.glb`:
 
-Leading browser integration: `recast-navigation`/compatible Recast wrapper, subject to implementation spike when authored `level.glb` exists.
-
-Pending:
-
-- [ ] authored navmesh geometry;
-- [ ] bake/export navmesh;
-- [ ] Recast runtime adapter;
-- [ ] actual static-world line-of-sight callback;
-- [ ] wire weapon shots into `hearNoise()`;
-- [ ] AI update LOD/path-query throttling;
+- [ ] bake offline Recast/Detour navmesh;
+- [ ] runtime Recast NavigationQuery adapter;
+- [ ] final static-world LOS query;
+- [ ] verified shot/noise propagation;
+- [ ] AI update LOD / path-query throttling;
 - [ ] navigation debug overlay.
 
-Important: current `CollisionNavigationQuery` is intentionally temporary and does not pretend to be full navmesh pathfinding.
+Do not add Recast WASM before authored map geometry exists unless required by a deliberate spike.
 
 ---
 
-# 11. 0.75 — Wave / encounter loop
+# 12. 0.75 — Waves / encounters
 
-- [x] manifest spawn zones;
-- [x] composition rules;
+- [x] spawn zones;
 - [x] wave progression;
-- [x] max-active budget by quality;
+- [x] active-enemy budget;
+- [x] basic composition rules;
 - [x] inter-wave timing foundation;
 - [x] pickups;
 - [~] difficulty curve;
 - [ ] richer encounter events;
-- [ ] special infected after core content quality improves.
+- [ ] special infected after core visual quality improves.
 
 ---
 
-# 12. 0.8 — Combat Feel + Audio
+# 13. 0.8 — Combat Feel / Audio / Mobile Aim
 
-**RELEASE CANDIDATE IMPLEMENTED IN PR #14.**
+**COMPLETE AS FUNCTIONAL COMBAT TEST RELEASE**
 
-## Weapons
+## Combat
 
-- [x] data-driven recoil profiles;
-- [x] recoil moves visible reticle;
-- [x] camera recoil impulse;
+- [x] data-driven weapon definitions;
+- [x] recoil profiles;
 - [x] movement-dependent spread;
-- [x] pistol/shotgun feel differentiated by recoil/spread;
-- [x] bow remains ballistic;
-- [x] reload gameplay event;
-- [x] procedural reload sound;
-- [ ] bow hold/draw/release timing state;
-- [ ] reload/switch interrupt policy polish.
-
-## Hits / reactions
-
+- [x] camera recoil;
+- [x] pistol/shotgun differentiation;
+- [x] ballistic bow foundation;
 - [x] primitive head/torso/limb hit zones;
-- [x] zone multipliers;
-- [x] critical feedback;
-- [x] stagger duration based on hit severity;
-- [x] archetype stagger resistance;
+- [x] damage multipliers;
+- [x] stagger resistance;
 - [x] knock impulse;
-- [x] blood/impact particles/decals;
-- [ ] animation-based hit reactions after real GLBs;
-- [ ] death animation variants after real GLBs;
-- [ ] controlled hit-stop after device profiling.
+- [x] particles/decals/transient lights;
+- [x] reload gameplay event;
+- [ ] bow hold/draw/release state;
+- [ ] reload/switch interrupt polish;
+- [ ] animation reactions after real GLBs;
+- [ ] controlled hit-stop only after profiling.
 
-## Audio / ambience
+## Audio / atmosphere
 
-- [x] pistol/shotgun/bow procedural shot sounds;
+- [x] procedural weapon sounds;
 - [x] hit/kill cues;
 - [x] reload cues;
 - [x] footsteps;
-- [~] infected attack/vocal cues;
+- [~] infected vocal/attack layer;
 - [x] rain;
 - [x] wind;
 - [x] thunder;
-- [x] storm visual flash;
-- [ ] richer authored audio assets later if quality requires them.
+- [x] storm flash;
+- [ ] authored audio asset pass later if needed.
 
 ## Mobile aim
 
-- [x] persisted sensitivity;
-- [x] persisted deadzone;
-- [x] persisted Aim Assist strength;
-- [x] Aim Assist is soft correction only;
+- [x] 0.8 soft assist prototype completed historically;
+- [x] replaced in 0.8.2 with survivor-style TOP full auto-aim;
+- [x] replaced in 0.8.2 with fixed-center horizontal 3RD auto-aim;
 - [x] no auto-fire;
-- [x] recoil and assist operate on same reticle state as weapon direction;
-- [?] tune after primary Android test.
-
-### 0.8 exit criteria
-
-- [x] strict TypeScript;
-- [x] Chromium gameplay smoke;
-- [x] Vite deploy build;
-- [x] primary-root deployment assertion;
-- [ ] merge PR #14;
-- [ ] primary Vercel deploy;
-- [ ] Android feedback/hotfix if necessary.
+- [?] 0.8.3 camera framing final device confirmation.
 
 ---
 
-# 13. 0.82 — Environment Reactivity
+# 14. 0.82 — Environment Reactivity
 
-Next after 0.8 feedback / visual assets begin:
+Do after authored environment foundation:
 
-- [ ] connect WindField visibly to vegetation;
-- [ ] local wind impulse from shotgun/explosion;
-- [ ] improve environment decals/orientation;
-- [ ] wet-surface response polish;
-- [ ] destructible light prototype only if mobile budget allows;
-- [ ] explosive barrel only if it adds gameplay value.
+- [ ] visible vegetation WindField integration;
+- [ ] shotgun/explosion local wind impulse;
+- [ ] better decal orientation;
+- [ ] wet-surface response;
+- [ ] optional destructible light;
+- [ ] optional explosive barrel.
 
-No full physics sandbox.
-
----
-
-# 14. 0.85 — Face System 2.0
-
-- [ ] dedicated crop UI;
-- [ ] zoom/pan;
-- [ ] oval mask;
-- [ ] brightness/contrast normalization;
-- [x] local persistence foundation;
-- [x] replace/remove;
-- [ ] proper production-head integration;
-- [ ] fallback heads;
-- [HOLD] automatic face landmarks until base system is stable.
+No full rigid-body sandbox.
 
 ---
 
-# 15. 0.87 — HUD / UX
+# 15. 0.85 — Face System 2.0
 
-- [~] mobile HUD exists;
-- [x] crosshair/reticle;
-- [x] camera buttons;
-- [x] FIRE/reload/weapon/camera touch buttons;
-- [x] aim/audio settings;
-- [ ] final visual HUD design;
-- [ ] safe-area/device polish;
-- [ ] pause/settings access during run;
-- [ ] richer loading progress;
-- [ ] remove/reduce debug status for normal play.
+Current:
 
----
-
-# 16. 0.9 — Performance
-
-Targets:
-
-- Android: stable **30+ FPS** combat scenario;
-- desktop: **60 FPS** target.
+- [x] photo choose/remove;
+- [x] local persistence;
+- [x] photo no longer floats as a card;
+- [x] photo is mapped to actual low-poly head front.
 
 Pending:
 
-- [ ] debug Metrics overlay;
-- [ ] draw-call/material audit;
-- [ ] texture memory audit;
-- [ ] GLB optimization;
-- [ ] KTX2/Basis;
-- [ ] Meshopt evaluation;
-- [ ] character/environment LOD;
-- [ ] enemy update LOD;
-- [ ] restart leak audit;
-- [ ] long-session GC/frame spikes;
-- [ ] bundle/download budget after real assets land.
+- [ ] crop UI;
+- [ ] zoom/pan;
+- [ ] oval/face mask;
+- [ ] brightness/contrast normalization;
+- [ ] automatic aspect/crop fitting;
+- [ ] production-head UV integration;
+- [ ] fallback head variants;
+- [HOLD] local face landmarks until production head is stable.
 
 ---
 
-# 17. 0.92 — QA
+# 16. 0.87 — HUD / UX
 
-- [x] Chromium automated smoke;
-- [ ] latest Android 0.8 smoke;
-- [ ] TOP aim test;
-- [ ] 3RD aim test;
-- [ ] aim assist/recoil test;
-- [ ] photo upload/persistence;
-- [ ] camera switch repeatedly;
-- [ ] weapon switch/reload;
-- [ ] game over/restart repeatedly;
-- [ ] obstacles/crowd behaviour;
-- [ ] 15+ minute run;
+Current:
+
+- [x] HP/wave/kills/score;
+- [x] fixed-center 3RD crosshair;
+- [x] dynamic TOP joystick;
+- [x] FIRE / reload / weapon / camera buttons;
+- [x] menu/settings;
+- [~] functional mobile HUD.
+
+Pending:
+
+- [ ] survivor-style final visual hierarchy;
+- [ ] reduce top build badge in normal play;
+- [ ] remove/reduce large debug status line;
+- [ ] safe-area polish across Android devices;
+- [ ] pause/settings during run;
+- [ ] loading progress;
+- [ ] clearer ammo/weapon representation;
+- [ ] target-lock feedback only if it improves clarity without clutter.
+
+---
+
+# 17. 0.9 — Performance / Architecture Hardening
+
+**NEXT ENGINE-QUALITY GATE AFTER VISUAL SLICE STARTS**
+
+## Architecture
+
+- [ ] split `GameApp` into smaller orchestration modules;
+- [ ] move player/session combat wiring out of GameApp;
+- [ ] isolate world/session creation and disposal;
+- [ ] add focused unit tests for Damage/Weapon/Wave/AI logic.
+
+## Metrics
+
+- [ ] FPS/frame-time overlay under `?debug=1`;
+- [ ] draw calls;
+- [ ] triangles;
+- [ ] texture count/memory approximation;
+- [ ] active enemies;
+- [ ] FX pool occupancy;
+- [ ] SpatialHash/nav stats.
+
+## Mobile profiling
+
+- [ ] stable 30+ FPS target with real assets;
+- [ ] 15-minute session;
 - [ ] high-wave stress;
-- [ ] landscape/portrait checks;
-- [ ] slow/failed asset load.
+- [ ] restart leak test;
+- [ ] GC spike audit;
+- [ ] dynamic-light/shadow budget;
+- [ ] DPR quality tuning.
+
+## Asset optimization after real assets land
+
+- [ ] GLB cleanup;
+- [ ] KTX2/Basis evaluation;
+- [ ] Meshopt evaluation;
+- [ ] LOD;
+- [ ] remove unused animation tracks/materials;
+- [ ] lazy-load noncritical assets;
+- [ ] initial-download budget.
 
 ---
 
-# 18. 0.95 — Replay loop
+# 18. 0.92 — QA
+
+Automated:
+
+- [x] desktop Chromium menu/run/camera smoke;
+- [x] mobile touch/dynamic joystick smoke;
+- [x] no fatal pageerror gate;
+- [x] production bundle/root assertion.
+
+Real-device already validated:
+
+- [x] production build opens on Android;
+- [x] TOP gameplay playable;
+- [x] 3RD gameplay playable;
+- [x] mobile auto-aim tested;
+- [x] dynamic joystick tested;
+- [x] camera switching tested.
+
+Still required:
+
+- [?] 0.8.3 higher 3RD camera confirmation;
+- [ ] photo upload with several aspect ratios;
+- [ ] repeated game over/restart;
+- [ ] repeated camera switching long session;
+- [ ] weapon switch/reload stress;
+- [ ] high wave enemy stress;
+- [ ] 15+ minute session;
+- [ ] landscape orientation;
+- [ ] slow/failed asset loading;
+- [ ] lower-performance Android device if available.
+
+---
+
+# 19. 0.95 — Replay loop
+
+Only after visual/content quality and performance are convincing.
 
 - [x] score foundation;
 - [x] waves/run stats;
-- [ ] best score persistence;
-- [ ] lightweight upgrade choices;
+- [ ] best-score persistence;
+- [ ] lightweight between-wave upgrade choice;
 - [ ] simple local progression.
 
-Do not build complex inventory/RPG before core combat/content quality is validated.
+Do not build complex inventory/RPG yet.
 
 ---
 
-# 19. 1.0 MVP
+# 20. 1.0 MVP definition
 
 Required:
 
-- [ ] authored Abandoned Outskirts level;
-- [ ] production hero + infected + weapon assets;
-- [ ] final Face integration;
-- [x] two camera systems foundation;
-- [x] three weapon gameplay foundations;
+- [ ] authored Abandoned Outskirts GLB;
+- [ ] production hero asset;
+- [ ] production infected assets;
+- [ ] production weapon assets;
+- [ ] animation state machine;
+- [ ] Face System fitted to production head;
+- [x] two camera gameplay modes;
+- [x] survivor-style TOP mobile control;
+- [x] fixed-center 3RD mobile control;
+- [x] three weapon foundations;
 - [x] three infected archetype foundations;
 - [ ] final Recast navmesh;
 - [x] waves;
 - [x] combat feedback/audio foundation;
-- [x] mobile controls/settings foundation;
+- [x] mobile menu/settings;
 - [x] game over/restart;
-- [x] quality profiles foundation;
-- [x] locked CI/browser smoke;
-- [ ] Android performance target;
-- [ ] final release QA/docs.
+- [x] quality profile foundation;
+- [x] reproducible CI/browser smoke;
+- [ ] Android 30+ FPS with real assets;
+- [ ] final HUD;
+- [ ] release QA/docs.
 
 Not MVP:
 
@@ -551,62 +624,67 @@ Not MVP:
 
 ---
 
-# 20. Current technical debt after 0.8
+# 21. Technical debt priority after audit
 
-High priority:
+## P0 — do before large feature expansion
 
-- [ ] `GameApp` owns too much integration wiring;
-- [ ] actual authored `level.glb` absent;
-- [ ] production character/weapon/infected GLBs absent;
-- [ ] Recast navmesh not integrated because authored map does not exist yet;
-- [ ] actual LOS callback/noise wiring incomplete;
-- [ ] current FaceSystem is temporary face plane;
-- [ ] debug HUD still prominent;
-- [?] primary 0.8 Android test pending.
+1. [ ] finish 0.8.3 camera Android confirmation;
+2. [ ] keep gameplay stable while starting visual vertical slice;
+3. [ ] decompose `GameApp` before it grows substantially more;
+4. [ ] add first focused unit tests.
 
-Temporary compatibility debt:
+## P1 — visual/product quality
 
-- [ ] old runtime retained under `/legacy/`;
-- [ ] legacy CDN rewrite compatibility remains while `/legacy/` is kept;
-- [ ] remove compatibility only after engine-next proves stable on device.
+1. [ ] authored level GLB;
+2. [ ] production hero + animation;
+3. [ ] infected GLBs + animation;
+4. [ ] weapon GLBs;
+5. [ ] FaceSystem 2.0 fitting/crop;
+6. [ ] HUD cleanup.
 
-Closed debt:
+## P2 — final engine/content integration
 
-- [x] runtime Three.js CDN dependency removed from engine-next;
-- [x] package lock/npm ci;
-- [x] browser smoke;
-- [x] camera-relative mobile movement;
-- [x] visible reticle/shot synchronization;
-- [x] mobile aim settings;
-- [x] AudioSystem;
-- [x] LocalAvoidance;
-- [x] EnemyBrain state boundary;
-- [x] NavigationQuery seam;
-- [x] obstacle-aware current-map navigation;
-- [x] combat recoil/spread/stagger foundation;
-- [x] primary deployment layout prepared.
+1. [ ] Recast navmesh for authored map;
+2. [ ] performance metrics/profiling;
+3. [ ] KTX2/Meshopt/LOD pipeline;
+4. [ ] richer audio/environment polish;
+5. [ ] remove legacy runtime.
+
+## Documentation debt
+
+- [ ] README build information is stale (`0.4`);
+- [ ] package version is stale (`0.5.0-alpha.2`);
+- [ ] `structure.md` has older floating-reticle/vertical-aim text and must be refreshed at next documentation checkpoint;
+- [ ] history must record 0.8.2/0.8.3 checkpoints.
 
 ---
 
-# 21. Official next step after 0.8 deployment
+# 22. Official next development order
 
-1. User tests primary Vercel 0.8 on real Android.
-2. Fix only concrete mobile/control/combat regressions first.
-3. Then start **visual vertical slice**: authored level + real character/weapon/infected GLBs.
-4. Once authored level geometry exists, bake and integrate final Recast navmesh.
-5. Fit Face System 2.0 to production head.
-6. Performance/profile the real-content build.
-7. Remove `/legacy/` only after new production proves stable.
+After 0.8.3 camera confirmation:
+
+1. **Visual Vertical Slice / Character:** introduce a real licensed humanoid GLB and AnimationMixer pipeline.
+2. Attach a real pistol and prove idle/walk/run/aim/fire animation transitions.
+3. Replace procedural infected visuals with first real Walker, then Runner/Brute.
+4. Build first authored `Abandoned Outskirts level.glb` with collision-ready layout.
+5. Add final offline Recast navmesh for that geometry.
+6. Upgrade FaceSystem to fit production head UV/crop.
+7. Redesign mobile HUD around the now-approved TOP/3RD controls.
+8. Decompose GameApp and add focused unit tests during this migration, before adding major new mechanics.
+9. Profile Android with real assets and enforce 30+ FPS budgets.
+10. Only then add progression/special infected/environment interactions.
+
+**Do not return to broad feature expansion before the game visually stops looking like an engine prototype.**
 
 ---
 
-# 22. Documentation rule
+# 23. Documentation rule
 
 After every major development session:
 
-- mark actual completed items;
-- distinguish prototype/fallback from final implementation;
+- update actual completed statuses;
+- distinguish prototype from final implementation;
 - record CI/device status;
-- add checkpoint to `history.md`;
-- update `structure.md` when subsystem boundaries/files change;
-- never mark Vercel/device verification complete without actually checking it.
+- update `history.md` at major checkpoints;
+- update `structure.md` whenever architecture/control boundaries change;
+- never mark Vercel/device verification complete without actual evidence.
