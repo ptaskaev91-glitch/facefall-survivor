@@ -35,8 +35,6 @@ export class PlayerRuntime {
     this.root.add(marker);
     scene.add(this.root);
 
-    // FaceSystem remains the production-safe visual until a GLB head is verified
-    // to preserve the user's uploaded-face hook during the vertical-slice migration.
     this.faceSystem = new FaceSystem(this.root);
     this.characterModel = new CharacterModel(quality.shadows);
     this.root.add(this.characterModel.root);
@@ -45,16 +43,25 @@ export class PlayerRuntime {
   get position(): THREE.Vector3 { return this.root.position; }
   get hasProductionCharacter(): boolean { return this.characterModel.isLoaded; }
 
-  async setFaceDataUrl(dataUrl: string | null): Promise<void> { await this.faceSystem.setDataUrl(dataUrl); }
+  async setFaceDataUrl(dataUrl: string | null): Promise<void> {
+    await Promise.all([
+      this.faceSystem.setDataUrl(dataUrl),
+      this.characterModel.setFaceDataUrl(dataUrl)
+    ]);
+  }
 
-  /**
-   * Loads a rigged GLTF/GLB behind the player runtime boundary.
-   * The caller must opt into visual activation after face/head compatibility is verified.
-   */
-  async loadProductionCharacter(url: string, activate = false): Promise<CharacterLoadResult> {
+  /** Loads the production rig and optional compatible animation library behind this runtime boundary. */
+  async loadProductionCharacter(
+    url: string,
+    animationUrl?: string,
+    activate = false
+  ): Promise<CharacterLoadResult> {
     const result = await this.characterModel.load(url);
+    const clipNames = animationUrl
+      ? await this.characterModel.loadAnimations(animationUrl)
+      : result.clipNames;
     this.setProductionVisualActive(activate);
-    return result;
+    return { ...result, clipNames };
   }
 
   setProductionVisualActive(active: boolean): void {
