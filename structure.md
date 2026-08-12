@@ -1,9 +1,9 @@
 # Facefall Survivor — Structure
 
-Последняя актуализация: **2026-08-12**  
+Последняя актуализация: **2026-08-13**  
 Repository: `ptaskaev91-glitch/facefall-survivor`  
-Source of truth: `main` after merge of active hardening PR  
-Architecture checkpoint: **0.8.5–0.8.7 HARDENED**
+Source of truth: `visual/0.9.0-hero-glb-spike` until PR #20 merge, then `main`  
+Architecture checkpoint: **0.9.0 HERO VERTICAL SLICE**
 
 ---
 
@@ -39,6 +39,10 @@ facefall-survivor/
 ├── public/
 │   └── assets/
 │       ├── ATTRIBUTION.md
+│       ├── characters/
+│       │   └── quaternius-universal-base-male/
+│       ├── animations/
+│       │   └── quaternius-universal-animation-library/
 │       └── levels/
 │           └── abandoned-outskirts/
 │               └── level.manifest.json
@@ -79,6 +83,9 @@ facefall-survivor/
 │   │   └── ThirdPersonCamera.ts
 │   │
 │   ├── characters/
+│   │   ├── CharacterLocomotion.ts
+│   │   ├── CharacterModel.ts
+│   │   ├── WeaponSocketVisual.ts
 │   │   └── FaceSystem.ts
 │   │
 │   ├── combat/
@@ -217,7 +224,7 @@ Bootstrap
  ├── AudioSystem
  └── GameApp                 ← gameplay orchestration / ordering
       ├── WorldRuntime       ← scene/render/world/collision/environment
-      ├── PlayerRuntime      ← player transform/collider/face/visual
+      ├── PlayerRuntime      ← player transform/collider + CharacterModel/face/weapon visual boundary
       ├── GameHud            ← DOM HUD/status presentation
       ├── WeaponSystem
       ├── DamageSystem
@@ -264,11 +271,13 @@ Owns:
 - movement integration;
 - facing vector;
 - spawn/reset;
-- muzzle world transform;
-- `FaceSystem` lifecycle;
-- current prototype low-poly player visual lifecycle.
+- `CharacterModel` rig / `SkeletonUtils` / `AnimationMixer` lifecycle;
+- production hero scale/orientation normalization;
+- uploaded-face routing to fallback `FaceSystem` and production `Head` shell;
+- production pistol socket and muzzle world transform;
+- automatic procedural visual fallback when production assets fail.
 
-Future `CharacterModel`, humanoid GLB, `SkeletonUtils`, `AnimationMixer` and weapon sockets belong **behind PlayerRuntime**.
+Production hero/animation/weapon visual work now lives **behind PlayerRuntime**.
 
 `GameApp` should only ask the player runtime to move/reset/return transform information.
 

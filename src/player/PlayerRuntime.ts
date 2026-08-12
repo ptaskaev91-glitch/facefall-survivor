@@ -1,5 +1,7 @@
 import * as THREE from 'three';
+import { CharacterModel, type CharacterLoadResult } from '../characters/CharacterModel';
 import { FaceSystem } from '../characters/FaceSystem';
+import { WeaponSocketVisual } from '../characters/WeaponSocketVisual';
 import type { QualityProfile } from '../graphics/quality';
 import { CollisionWorld } from '../physics/CollisionWorld';
 import { PlayerCapsule } from '../physics/PlayerCapsule';
@@ -10,6 +12,9 @@ export interface PlayerMovementResult {
   movementSpreadMultiplier: number;
 }
 
+const PRODUCTION_HERO_URL = '/assets/characters/quaternius-universal-base-male/Superhero_Male_FullBody.gltf';
+const PRODUCTION_ANIMATIONS_URL = '/assets/animations/quaternius-universal-animation-library/UAL1_Standard.glb';
+
 /** Owns player transform, collider, visual and face lifecycle. */
 export class PlayerRuntime {
   readonly root = new THREE.Group();
@@ -17,9 +22,13 @@ export class PlayerRuntime {
   readonly facing = new THREE.Vector3(0, 0, -1);
 
   private readonly faceSystem: FaceSystem;
+  private readonly characterModel: CharacterModel;
+  private readonly weaponVisual: WeaponSocketVisual;
   private readonly desired = new THREE.Vector3();
   private readonly velocity = new THREE.Vector3();
   private readonly muzzleOffset = new THREE.Vector3(0, 1.15, 0);
+  private productionVisualActive = false;
+  private productionLoadAttempted = false;
 
   constructor(scene: THREE.Scene, quality: QualityProfile) {
     const marker = this.makeCapsuleMarker(0.36, 0.85, 0x8d9c8d, quality.shadows);
@@ -31,12 +40,59 @@ export class PlayerRuntime {
     marker.add(weaponMesh);
     this.root.add(marker);
     scene.add(this.root);
+
     this.faceSystem = new FaceSystem(this.root);
+    this.characterModel = new CharacterModel(quality.shadows);
+    this.weaponVisual = new WeaponSocketVisual(quality.shadows);
+    this.root.add(this.characterModel.root);
   }
 
   get position(): THREE.Vector3 { return this.root.position; }
+  get hasProductionCharacter(): boolean { return this.characterModel.isLoaded; }
 
-  async setFaceDataUrl(dataUrl: string | null): Promise<void> { await this.faceSystem.setDataUrl(dataUrl); }
+  async setFaceDataUrl(dataUrl: string | null): Promise<void> {
+    if (!this.productionLoadAttempted && !this.characterModel.isLoaded) {
+      this.productionLoadAttempted = true;
+      try {
+        await this.loadProductionCharacter(PRODUCTION_HERO_URL, PRODUCTION_ANIMATIONS_URL, false);
+      } catch (error) {
+        console.warn('Production hero unavailable; keeping legacy player visual.', error);
+      }
+    }
+
+    await Promise.all([
+      this.faceSystem.setDataUrl(dataUrl),
+      this.characterModel.setFaceDataUrl(dataUrl)
+    ]);
+    this.setProductionVisualActive(this.characterModel.isLoaded);
+  }
+
+  /** Loads the production rig and optional compatible animation library behind this runtime boundary. */
+  async loadProductionCharacter(
+    url: string,
+    animationUrl?: string,
+    activate = false
+  ): Promise<CharacterLoadResult> {
+    const result = await this.characterModel.load(url);
+    const clipNames = animationUrl
+      ? await this.characterModel.loadAnimations(animationUrl)
+      : result.clipNames;
+
+    // Sample the idle pose before deriving the hand position used by the production socket.
+    this.characterModel.update(0, 0);
+    if (!this.weaponVisual.attach(this.characterModel.root, 'hand_r')) {
+      console.warn('Production hero has no hand_r weapon socket; pistol visual disabled.');
+    }
+
+    this.setProductionVisualActive(activate);
+    return { ...result, clipNames };
+  }
+
+  setProductionVisualActive(active: boolean): void {
+    this.productionVisualActive = active && this.characterModel.isLoaded;
+    this.characterModel.setVisible(this.productionVisualActive);
+    this.faceSystem.setVisible(!this.productionVisualActive);
+  }
 
   move(moveX: number, moveY: number, sprint: boolean, dt: number, collisionWorld: CollisionWorld): PlayerMovementResult {
     this.desired.set(moveX, 0, moveY);
@@ -49,6 +105,8 @@ export class PlayerRuntime {
     this.controller.integrate(dt, collisionWorld);
     this.root.position.set(this.controller.position.x, this.controller.position.y - 0.35, this.controller.position.z);
     this.root.rotation.y = Math.atan2(-this.facing.x, -this.facing.z);
+    this.characterModel.update(dt, targetSpeed);
+    this.weaponVisual.update();
     return { targetSpeed, movementSpreadMultiplier };
   }
 
@@ -65,10 +123,13 @@ export class PlayerRuntime {
   }
 
   muzzle(out: THREE.Vector3): THREE.Vector3 {
+    if (this.productionVisualActive && this.weaponVisual.getMuzzleWorldPosition(out)) return out;
     return out.copy(this.root.position).add(this.muzzleOffset).addScaledVector(this.facing, 0.5);
   }
 
   dispose(): void {
+    this.weaponVisual.dispose();
+    this.characterModel.dispose();
     this.faceSystem.dispose();
     this.root.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
