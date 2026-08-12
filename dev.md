@@ -1,13 +1,13 @@
 # Facefall Survivor — Development Plan
 
-Последняя актуализация: **2026-08-12**  
+Последняя актуализация: **2026-08-13**  
 Repository: `ptaskaev91-glitch/facefall-survivor`  
-Source of truth: `main` after merge of the active hardening PR  
+Source of truth: `visual/0.9.0-hero-glb-spike` until PR #20 merge, then `main`  
 Hosting: **Vercel only**  
 Primary URL: `https://facefall-survivor-pavels-projects-0b29bb12.vercel.app`
 
-Текущий стабильный gameplay checkpoint до этого блока: **0.8.4 COMBAT + HUMANOID INFECTED**.  
-Текущий активный checkpoint: **0.8.5–0.8.7 HARDENING — repo hygiene + tests + GameApp decomposition**.
+Текущий стабильный architecture checkpoint: **0.8.5–0.8.7 HARDENING**.  
+Текущий активный visual checkpoint: **0.9.0 HERO VERTICAL SLICE — rigged GLTF + animation + uploaded face + pistol socket**.
 
 Этот файл отражает только фактическую реализацию. Prototype/fallback не считается final implementation.
 
@@ -187,7 +187,7 @@ npm ci
 
 Future tests after new systems appear:
 
-- [ ] Character animation state transitions;
+- [x] Character locomotion state transitions (pure idle/walk/run resolver);
 - [ ] Recast adapter query contract;
 - [ ] progression/upgrade logic;
 - [ ] long-run session invariants where practical.
@@ -265,6 +265,7 @@ Playwright now automatically captures mobile-sized checkpoints:
 
 - [x] `mobile-top.png` after gameplay start;
 - [x] `mobile-third.png` after camera switch;
+- [x] `mobile-face-front.png` with a synthetic uploaded face for head-bone inspection;
 - [x] screenshots uploaded as `facefall-visual-checkpoints` artifact;
 - [x] assistant can download and inspect screenshots before merge.
 
@@ -288,35 +289,35 @@ Do not add broad mechanics before the screenshot stops looking like an engine pr
 
 ## 8.1 Hero production pipeline
 
-- [ ] choose/license production-direction humanoid GLB;
-- [ ] inspect skeleton/bones/scale/materials;
-- [ ] clone skinned meshes correctly (`SkeletonUtils` where needed);
-- [ ] CharacterModel wrapper lives behind PlayerRuntime;
-- [ ] head/face-compatible UV or dedicated face surface;
-- [ ] weapon hand sockets;
-- [ ] LOD/asset budget.
+- [x] choose/license production-direction humanoid GLB — Quaternius Universal Base Characters, CC0;
+- [x] inspect skeleton/bones/scale/materials — 65-bone humanoid with `Head` / `hand_r`;
+- [x] clone skinned meshes correctly with `SkeletonUtils`;
+- [x] `CharacterModel` wrapper lives behind `PlayerRuntime`;
+- [x] curved uploaded-face surface attached to the real `Head` bone;
+- [x] production weapon socket foundation on animated `hand_r`;
+- [ ] LOD/initial-download asset budget optimization.
 
 ## 8.2 Hero animation
 
-- [ ] AnimationMixer;
-- [ ] idle;
-- [ ] walk;
-- [ ] run;
+- [x] AnimationMixer;
+- [x] idle;
+- [x] walk;
+- [x] run;
 - [ ] pistol aim/fire/reload;
 - [ ] shotgun aim/fire/reload;
 - [ ] bow draw/release;
 - [ ] hit;
 - [ ] death;
-- [ ] state machine/crossfades;
-- [ ] animation state unit tests where state logic is pure.
+- [x] locomotion state resolver + crossfades;
+- [x] animation state unit tests where state logic is pure.
 
 ## 8.3 Weapons art
 
-- [ ] pistol GLB;
+- [~] production-direction pistol visual at realistic ~21 cm scale; final GLB remains optional if materially better;
 - [ ] shotgun GLB;
 - [ ] bow + arrow GLB;
-- [ ] correct hand/socket attachment;
-- [ ] muzzle anchor from model rather than approximate player offset.
+- [x] animated right-hand position socket foundation;
+- [x] muzzle anchor from active production weapon rather than approximate player offset.
 
 ## 8.4 Production infected
 
@@ -388,7 +389,9 @@ Current:
 
 - [x] local photo selection;
 - [x] local persistence;
-- [x] photo mapped to actual low-poly head front, not floating card.
+- [x] photo mapped to actual low-poly head front, not floating card;
+- [x] production path maps the uploaded photo to a curved shell attached to the real `Head` bone;
+- [x] visual smoke validates file input → production head.
 
 Target after production head exists:
 
@@ -537,13 +540,12 @@ Not MVP:
 
 # 17. Official next development order
 
-After hardening PR is green and merged:
+After the 0.9.0 hero vertical slice merge:
 
-1. **Production hero GLB spike** behind `PlayerRuntime`.
-2. Add CharacterModel + AnimationMixer and prove idle/walk/run.
-3. Add real pistol socket and aim/fire animation.
-4. Expand to shotgun and bow.
-5. Replace Walker with first production infected asset, then Runner/Brute.
+1. **Pistol fire/reload animation integration** from the vendored CC0 library.
+2. Finalize production pistol art only if a GLB materially improves the current readable socket visual.
+3. Expand production weapon visuals/sockets to shotgun and bow.
+4. Replace Walker with the first production infected asset, then Runner/Brute.
 6. Build first authored `Abandoned Outskirts level.glb` through `WorldRuntime`.
 7. Bake/integrate final Recast navmesh.
 8. Upgrade Face System for the production head.

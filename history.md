@@ -1,6 +1,6 @@
 # Facefall Survivor — History
 
-Последняя актуализация: **2026-08-12**  
+Последняя актуализация: **2026-08-13**  
 Repository: `ptaskaev91-glitch/facefall-survivor`  
 Source of truth: `main`
 
@@ -442,7 +442,27 @@ Broad new gameplay mechanics remain lower priority until the game visually stops
 
 ---
 
-# 20. How to continue this file
+# 20. 0.9.0 — production hero vertical slice
+
+PR #20 on `visual/0.9.0-hero-glb-spike` moved Facefall from the procedural player body to a real rigged hero pipeline behind `PlayerRuntime`.
+
+- Quaternius Universal Base Characters Standard and Universal Animation Library Standard were obtained from official free-download paths and verified as CC0; original licenses/provenance are retained.
+- ambiguous derivative character files found elsewhere were rejected.
+- `CharacterModel` now owns `GLTFLoader`, `SkeletonUtils`, `AnimationMixer`, scaling, grounding and cleanup.
+- locomotion uses idle/walk/run crossfades with rotation-only retargeting so animation translation/scale tracks cannot distort the base rig.
+- the uploaded photo becomes a feathered curved shell attached to the real `Head` bone.
+- visual facing was corrected by 180° to match Facefall gameplay aim.
+- production pistol position follows animated `hand_r`; its muzzle is the actual origin used by `WeaponSystem.fire`.
+- the first 43 cm pistol prototype was caught by visual CI and resized to a realistic ~21 cm silhouette.
+- procedural player rendering remains an automatic fallback if production GLTF loading fails.
+
+Visual CI now captures TOP, 3RD and `mobile-face-front.png` with a synthetic uploaded face. These checkpoints caught rig-proportion, scale and facing defects that status-only CI did not.
+
+Next: pistol fire/reload animation integration, then shotgun/bow production visuals and production infected.
+
+---
+
+# 21. How to continue this file
 
 At every major checkpoint record:
 
