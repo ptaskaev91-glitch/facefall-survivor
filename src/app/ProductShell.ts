@@ -158,7 +158,9 @@ export class ProductShell {
       sensitivity: this.settings.aimSensitivity,
       deadzone: this.settings.aimDeadzone
     });
-    this.app.configureAimAssist(this.settings.aimAssist);
+    // Mobile control scheme always keeps auto-aim active. The saved value tunes strength,
+    // but even an old stored 0 cannot disable the survivor-style targeting entirely.
+    this.app.configureAimAssist(Math.max(0.01, this.settings.aimAssist));
     this.audio.setVolume(this.settings.masterVolume);
   }
 
