@@ -12,7 +12,7 @@ jobs:
   inspect-public-download:
     runs-on: ubuntu-latest
     steps:
-      - name: Download and inventory official Quaternius Standard pack
+      - name: Inspect official Quaternius male hero glTF
         shell: bash
         run: |
           set -euo pipefail
@@ -20,104 +20,96 @@ jobs:
           PURCHASE='https://quaternius.itch.io/universal-base-characters/purchase'
           DOWNLOAD_URL_ENDPOINT='https://quaternius.itch.io/universal-base-characters/download_url'
           FILE_ENDPOINT='https://quaternius.itch.io/universal-base-characters/file/15861669?source=game_download'
+          ARCHIVE='/tmp/universal-base-characters-standard.zip'
 
           curl -fsSL --compressed -A "$UA" -c /tmp/cookies.txt "$PURCHASE" -o /tmp/purchase.html
-
           CSRF="$(python3 - <<'PY'
           from pathlib import Path
-          import html as html_lib
-          import re
+          import html as html_lib, re
           text = Path('/tmp/purchase.html').read_text('utf-8', errors='replace')
-          match = re.search(r'<meta[^>]+name=["\']csrf_token["\'][^>]+value=["\']([^"\']+)', text, re.I)
-          if not match:
-              match = re.search(r'<meta[^>]+value=["\']([^"\']+)["\'][^>]+name=["\']csrf_token["\']', text, re.I)
-          if not match:
-              raise SystemExit('csrf meta not found')
+          match = re.search(r'<meta[^>]+name=["\']csrf_token["\'][^>]+value=["\']([^"\']+)', text, re.I) or re.search(r'<meta[^>]+value=["\']([^"\']+)["\'][^>]+name=["\']csrf_token["\']', text, re.I)
+          if not match: raise SystemExit('csrf meta not found')
           print(html_lib.unescape(match.group(1)))
           PY
           )"
-
-          curl -fsS --compressed -A "$UA" \
-            -b /tmp/cookies.txt -c /tmp/cookies.txt \
-            -e "$PURCHASE" -H 'X-Requested-With: XMLHttpRequest' \
-            --data-urlencode "csrf_token=$CSRF" \
-            --data-urlencode 'reward_id=' \
-            "$DOWNLOAD_URL_ENDPOINT" -o /tmp/download-url.json
-
+          curl -fsS --compressed -A "$UA" -b /tmp/cookies.txt -c /tmp/cookies.txt -e "$PURCHASE" -H 'X-Requested-With: XMLHttpRequest' --data-urlencode "csrf_token=$CSRF" --data-urlencode 'reward_id=' "$DOWNLOAD_URL_ENDPOINT" -o /tmp/download-url.json
           DOWNLOAD_PAGE="$(python3 - <<'PY'
           import json
           from pathlib import Path
-          data = json.loads(Path('/tmp/download-url.json').read_text('utf-8'))
-          url = data.get('url')
-          if not url:
-              raise SystemExit(f'no download URL in response: {sorted(data)}')
-          print(url)
+          data=json.loads(Path('/tmp/download-url.json').read_text()); print(data['url'])
           PY
           )"
           curl -fsSL --compressed -A "$UA" -b /tmp/cookies.txt -c /tmp/cookies.txt "$DOWNLOAD_PAGE" -o /tmp/download.html
-
           CSRF_DOWNLOAD="$(python3 - <<'PY'
           from pathlib import Path
-          import html as html_lib
-          import re
+          import html as html_lib, re
           text = Path('/tmp/download.html').read_text('utf-8', errors='replace')
-          match = re.search(r'<meta[^>]+name=["\']csrf_token["\'][^>]+value=["\']([^"\']+)', text, re.I)
-          if not match:
-              match = re.search(r'<meta[^>]+value=["\']([^"\']+)["\'][^>]+name=["\']csrf_token["\']', text, re.I)
-          if not match:
-              raise SystemExit('download-page csrf meta not found')
+          match = re.search(r'<meta[^>]+name=["\']csrf_token["\'][^>]+value=["\']([^"\']+)', text, re.I) or re.search(r'<meta[^>]+value=["\']([^"\']+)["\'][^>]+name=["\']csrf_token["\']', text, re.I)
+          if not match: raise SystemExit('download csrf meta not found')
           print(html_lib.unescape(match.group(1)))
           PY
           )"
-
-          curl -fsS --compressed -A "$UA" \
-            -b /tmp/cookies.txt -c /tmp/cookies.txt \
-            -e "$DOWNLOAD_PAGE" -H 'X-Requested-With: XMLHttpRequest' \
-            --data-urlencode "csrf_token=$CSRF_DOWNLOAD" \
-            "$FILE_ENDPOINT" -o /tmp/file-url.json
-
+          curl -fsS --compressed -A "$UA" -b /tmp/cookies.txt -c /tmp/cookies.txt -e "$DOWNLOAD_PAGE" -H 'X-Requested-With: XMLHttpRequest' --data-urlencode "csrf_token=$CSRF_DOWNLOAD" "$FILE_ENDPOINT" -o /tmp/file-url.json
           FILE_URL="$(python3 - <<'PY'
           import json
           from pathlib import Path
-          data = json.loads(Path('/tmp/file-url.json').read_text('utf-8'))
-          if data.get('errors'):
-              raise SystemExit('file endpoint errors: ' + '; '.join(map(str, data['errors'])))
-          url = data.get('url')
-          if not url:
-              raise SystemExit(f'no file URL in response: {sorted(data)}')
-          print(url)
+          data=json.loads(Path('/tmp/file-url.json').read_text()); print(data['url'])
           PY
           )"
-
-          curl -fL --retry 3 --retry-delay 2 -A "$UA" "$FILE_URL" -o /tmp/universal-base-characters-standard.zip
-          file /tmp/universal-base-characters-standard.zip
-          du -h /tmp/universal-base-characters-standard.zip
-          sha256sum /tmp/universal-base-characters-standard.zip
+          curl -fL --retry 3 --retry-delay 2 -A "$UA" "$FILE_URL" -o "$ARCHIVE"
 
           python3 - <<'PY'
-          from pathlib import Path
-          import zipfile
-          import re
+          import json, zipfile
+          from pathlib import PurePosixPath
 
-          archive = Path('/tmp/universal-base-characters-standard.zip')
+          archive='/tmp/universal-base-characters-standard.zip'
+          prefix='Universal Base Characters[Standard]/Base Characters/Godot - UE/'
+          model=prefix+'Superhero_Male_FullBody.gltf'
           with zipfile.ZipFile(archive) as zf:
-              infos = [i for i in zf.infolist() if not i.is_dir()]
-              print('zip-files:', len(infos))
-              print('zip-uncompressed-mib:', round(sum(i.file_size for i in infos) / 1024 / 1024, 2))
-
-              exts = {}
-              for info in infos:
-                  ext = Path(info.filename).suffix.lower() or '[none]'
-                  exts[ext] = exts.get(ext, 0) + 1
-              print('extensions:', sorted(exts.items(), key=lambda kv: (-kv[1], kv[0])))
-
-              interesting = [i for i in infos if Path(i.filename).suffix.lower() in {'.gltf', '.glb', '.bin', '.fbx', '.obj', '.png', '.jpg', '.jpeg', '.txt', '.md'}]
-              print('interesting-files:', len(interesting))
-              for info in interesting[:400]:
-                  print(f'{info.file_size:>10}  {info.filename}')
-
-              print('--- likely male/base character candidates ---')
-              candidates = [i for i in interesting if re.search(r'(male|man|base|regular|character)', i.filename, re.I)]
-              for info in candidates[:250]:
-                  print(f'{info.file_size:>10}  {info.filename}')
+              gltf=json.loads(zf.read(model).decode('utf-8'))
+              print('asset:', gltf.get('asset'))
+              print('scene:', gltf.get('scene'), 'scenes:', gltf.get('scenes'))
+              print('extensionsUsed:', gltf.get('extensionsUsed'))
+              print('extensionsRequired:', gltf.get('extensionsRequired'))
+              print('animations:', [a.get('name') for a in gltf.get('animations',[])])
+              print('buffers:', gltf.get('buffers'))
+              print('images:', gltf.get('images'))
+              print('textures:', gltf.get('textures'))
+              print('materials:')
+              for i,m in enumerate(gltf.get('materials',[])):
+                  pbr=m.get('pbrMetallicRoughness',{})
+                  print(i, m.get('name'), 'baseColorTexture=', pbr.get('baseColorTexture'), 'normal=', m.get('normalTexture'), 'roughMetal=', pbr.get('metallicRoughnessTexture'), 'alphaMode=', m.get('alphaMode'))
+              print('skins:')
+              nodes=gltf.get('nodes',[])
+              for i,s in enumerate(gltf.get('skins',[])):
+                  joints=s.get('joints',[])
+                  print(i, s.get('name'), 'skeleton=', s.get('skeleton'), 'jointCount=', len(joints))
+                  print(' jointNames=', [nodes[j].get('name') for j in joints])
+              print('nodes:')
+              for i,n in enumerate(nodes):
+                  if any(k in n for k in ('mesh','skin','camera')) or n.get('name'):
+                      print(i, n.get('name'), 'mesh=', n.get('mesh'), 'skin=', n.get('skin'), 'children=', n.get('children'))
+              print('meshes/primitives:')
+              accessors=gltf.get('accessors',[])
+              for mi,m in enumerate(gltf.get('meshes',[])):
+                  print('mesh', mi, m.get('name'))
+                  for pi,p in enumerate(m.get('primitives',[])):
+                      pos=p.get('attributes',{}).get('POSITION')
+                      idx=p.get('indices')
+                      pos_count=accessors[pos].get('count') if pos is not None else None
+                      idx_count=accessors[idx].get('count') if idx is not None else None
+                      attrs=sorted(p.get('attributes',{}))
+                      print(' primitive', pi, 'material=', p.get('material'), 'vertices=', pos_count, 'indices=', idx_count, 'attrs=', attrs)
+              print('--- dependencies ---')
+              uris=[]
+              for section in ('buffers','images'):
+                  for item in gltf.get(section,[]):
+                      uri=item.get('uri')
+                      if uri: uris.append(uri)
+              for uri in uris:
+                  full=prefix+uri
+                  info=zf.getinfo(full)
+                  print(info.file_size, uri)
+              print('--- license ---')
+              print(zf.read('Universal Base Characters[Standard]/License_Standard.txt').decode('utf-8', errors='replace'))
           PY
