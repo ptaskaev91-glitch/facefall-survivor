@@ -78,8 +78,7 @@ export class PlayerRuntime {
       ? await this.characterModel.loadAnimations(animationUrl)
       : result.clipNames;
 
-    // Sample the idle pose before deriving the socket's local alignment. The visual then
-    // remains a true hand-bone child and follows subsequent animation rotations.
+    // Sample the idle pose before deriving the hand position used by the production socket.
     this.characterModel.update(0, 0);
     if (!this.weaponVisual.attach(this.characterModel.root, 'hand_r')) {
       console.warn('Production hero has no hand_r weapon socket; pistol visual disabled.');
@@ -107,6 +106,7 @@ export class PlayerRuntime {
     this.root.position.set(this.controller.position.x, this.controller.position.y - 0.35, this.controller.position.z);
     this.root.rotation.y = Math.atan2(-this.facing.x, -this.facing.z);
     this.characterModel.update(dt, targetSpeed);
+    this.weaponVisual.update();
     return { targetSpeed, movementSpreadMultiplier };
   }
 
