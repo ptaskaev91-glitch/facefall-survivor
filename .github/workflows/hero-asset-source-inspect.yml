@@ -26,39 +26,21 @@ jobs:
 
           python3 - <<'PY'
           from pathlib import Path
-          from html.parser import HTMLParser
-          from urllib.parse import urljoin
           import re
 
           html = Path('/tmp/quaternius-purchase.html').read_text('utf-8', errors='replace')
           js = Path('/tmp/checkout.js').read_text('utf-8', errors='replace')
-          base = 'https://quaternius.itch.io/universal-base-characters/purchase'
-
-          class Parser(HTMLParser):
-              def handle_starttag(self, tag, attrs):
-                  data = dict(attrs)
-                  if tag in {'a', 'form', 'script'}:
-                      target = data.get('href') or data.get('action') or data.get('src')
-                      if target:
-                          print(f'{tag}-target: {urljoin(base, target)}')
-                  if tag in {'input', 'button'}:
-                      name = data.get('name')
-                      kind = data.get('type')
-                      value = data.get('value') if kind in {'submit', 'button'} else None
-                      print(f'control: tag={tag} name={name!r} type={kind!r} submit-value={value!r}')
-
-          Parser().feed(html)
 
           for label, source, needles in (
-              ('html', html, ('No thanks', 'Standard].zip', 'skip_payment')),
-              ('checkout-js', js, ('direct_download_btn', 'skip_payment', 'download_url', '/download')),
+              ('html', html, ('No thanks', 'Standard].zip')),
+              ('checkout-js', js, ('prototype.direct_download=function', 'direct_download=function', 'download_url=function')),
           ):
               for needle in needles:
                   match = re.search(re.escape(needle), source, re.I)
                   if not match:
                       continue
-                  start = max(0, match.start() - 550)
-                  end = min(len(source), match.end() + 900)
+                  start = max(0, match.start() - 900)
+                  end = min(len(source), match.end() + 1800)
                   snippet = source[start:end]
                   snippet = re.sub(r'value=["\'][^"\']{20,}["\']', 'value="[redacted]"', snippet, flags=re.I)
                   print(f'--- {label} context {needle} ---')
