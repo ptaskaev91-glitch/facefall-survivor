@@ -60,7 +60,7 @@ test('capture mobile TOP, 3RD, pistol fire/reload and uploaded-face checkpoints'
     const runtimeWindow = window as Window & { __facefallApp?: any };
     const app = runtimeWindow.__facefallApp;
     if (!app) throw new Error('Facefall runtime is unavailable for ammo inspection');
-    return app.weaponSystem.status().magazine as number;
+    return app.weaponSystem.runtime().magazine as number;
   });
 
   // Real mobile input route: touch FIRE must consume ammo and emit the shot event used by animation.
@@ -71,21 +71,30 @@ test('capture mobile TOP, 3RD, pistol fire/reload and uploaded-face checkpoints'
     const runtimeWindow = window as Window & { __facefallApp?: any };
     const app = runtimeWindow.__facefallApp;
     if (!app) throw new Error('Facefall runtime is unavailable for ammo inspection');
-    return app.weaponSystem.status().magazine as number;
+    return app.weaponSystem.runtime().magazine as number;
   });
   expect(magazineAfter).toBe(magazineBefore - 1);
   await page.screenshot({ path: `${artifactDir}/mobile-pistol-fire-third.png`, fullPage: true });
 
-  // Real mobile reload route: one spent round makes reload legal; R must enter reloading state.
-  await page.locator('#touchReload').tap();
-  await page.waitForTimeout(110);
-  const reloading = await page.evaluate(() => {
+  // Let the short fire cooldown finish before asking WeaponSystem to enter reload.
+  await page.waitForTimeout(450);
+  const stateBeforeReload = await page.evaluate(() => {
     const runtimeWindow = window as Window & { __facefallApp?: any };
     const app = runtimeWindow.__facefallApp;
     if (!app) throw new Error('Facefall runtime is unavailable for reload inspection');
-    return app.weaponSystem.status().reloading as boolean;
+    return app.weaponSystem.runtime().state as string;
   });
-  expect(reloading).toBe(true);
+  expect(stateBeforeReload).toBe('idle');
+
+  await page.locator('#touchReload').tap();
+  await page.waitForTimeout(110);
+  const reloadState = await page.evaluate(() => {
+    const runtimeWindow = window as Window & { __facefallApp?: any };
+    const app = runtimeWindow.__facefallApp;
+    if (!app) throw new Error('Facefall runtime is unavailable for reload inspection');
+    return app.weaponSystem.runtime().state as string;
+  });
+  expect(reloadState).toBe('reloading');
 
   // Freeze reload pose and inspect the hero/front face deterministically.
   await page.evaluate(() => {
