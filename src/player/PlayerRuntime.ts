@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CharacterModel, type CharacterLoadResult } from '../characters/CharacterModel';
 import { FaceSystem } from '../characters/FaceSystem';
 import { WeaponSocketVisual } from '../characters/WeaponSocketVisual';
+import type { WeaponId } from '../combat/types';
 import type { QualityProfile } from '../graphics/quality';
 import { CollisionWorld } from '../physics/CollisionWorld';
 import { PlayerCapsule } from '../physics/PlayerCapsule';
@@ -29,6 +30,7 @@ export class PlayerRuntime {
   private readonly muzzleOffset = new THREE.Vector3(0, 1.15, 0);
   private productionVisualActive = false;
   private productionLoadAttempted = false;
+  private activeWeapon: WeaponId = 'pistol';
 
   constructor(scene: THREE.Scene, quality: QualityProfile) {
     const marker = this.makeCapsuleMarker(0.36, 0.85, 0x8d9c8d, quality.shadows);
@@ -92,6 +94,22 @@ export class PlayerRuntime {
     this.productionVisualActive = active && this.characterModel.isLoaded;
     this.characterModel.setVisible(this.productionVisualActive);
     this.faceSystem.setVisible(!this.productionVisualActive);
+    this.weaponVisual.setVisible(this.productionVisualActive && this.activeWeapon === 'pistol');
+  }
+
+  setActiveWeapon(weaponId: WeaponId): void {
+    this.activeWeapon = weaponId;
+    this.weaponVisual.setVisible(this.productionVisualActive && weaponId === 'pistol');
+  }
+
+  playWeaponFire(weaponId: WeaponId): boolean {
+    if (!this.productionVisualActive || weaponId !== 'pistol') return false;
+    return this.characterModel.playPistolFire();
+  }
+
+  playWeaponReload(weaponId: WeaponId): boolean {
+    if (!this.productionVisualActive || weaponId !== 'pistol') return false;
+    return this.characterModel.playPistolReload();
   }
 
   move(moveX: number, moveY: number, sprint: boolean, dt: number, collisionWorld: CollisionWorld): PlayerMovementResult {
@@ -123,7 +141,7 @@ export class PlayerRuntime {
   }
 
   muzzle(out: THREE.Vector3): THREE.Vector3 {
-    if (this.productionVisualActive && this.weaponVisual.getMuzzleWorldPosition(out)) return out;
+    if (this.productionVisualActive && this.activeWeapon === 'pistol' && this.weaponVisual.getMuzzleWorldPosition(out)) return out;
     return out.copy(this.root.position).add(this.muzzleOffset).addScaledVector(this.facing, 0.5);
   }
 
