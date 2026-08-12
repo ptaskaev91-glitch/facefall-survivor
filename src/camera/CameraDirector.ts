@@ -40,11 +40,10 @@ export class CameraDirector {
 
   update(target: Vector3, facing: Vector3, dt: number): void {
     if (this.mode === 'third') {
-      // A floating reticle makes small adjustments without moving the whole view.
-      // Near the horizontal soft edge, the character/camera rotates continuously.
-      const turn = aimController.getThirdPersonTurnDemand();
-      if (Math.abs(turn) > 0.001) {
-        facing.applyAxisAngle(this.up, -turn * dt * 2.25).normalize();
+      // 3RD uses a fixed-center crosshair. Pointer travel rotates body + camera only on yaw.
+      const turnDelta = aimController.consumeThirdPersonTurnDelta();
+      if (Math.abs(turnDelta) > 0.0001) {
+        facing.applyAxisAngle(this.up, -turnDelta).normalize();
       }
       this.thirdPerson.update(this.camera, target, facing, dt, this.collision);
     } else {
