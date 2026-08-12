@@ -10,6 +10,8 @@ export interface CharacterLoadResult {
 }
 
 const TARGET_CHARACTER_HEIGHT = 1.82;
+const SKELETON_TO_FULL_HEIGHT = 1.12;
+const TARGET_ANKLE_HEIGHT = 0.075;
 const FACE_TEXTURE_WIDTH = 512;
 const FACE_TEXTURE_HEIGHT = 640;
 
@@ -53,15 +55,16 @@ export class CharacterModel {
     const instance = cloneSkeleton(gltf.scene);
     instance.name = 'hero-model';
     this.prepareRenderable(instance);
-
-    const bounds = new THREE.Box3().setFromObject(instance);
-    const sourceHeight = Math.max(0.001, bounds.max.y - bounds.min.y);
-    const uniformScale = TARGET_CHARACTER_HEIGHT / sourceHeight;
-    instance.scale.multiplyScalar(uniformScale);
     instance.updateMatrixWorld(true);
 
-    const scaledBounds = new THREE.Box3().setFromObject(instance);
-    instance.position.y -= scaledBounds.min.y;
+    // SkinnedMesh geometry bounds can describe the undeformed source mesh rather than the
+    // visible bind pose, which made some rigs several times too large in-game. Prefer an
+    // anatomical rig measurement and only fall back to geometry bounds for unknown rigs.
+    const sourceHeight = this.estimateFullHeightFromRig(instance) ?? this.estimateFallbackHeight(instance);
+    const uniformScale = TARGET_CHARACTER_HEIGHT / Math.max(0.001, sourceHeight);
+    instance.scale.multiplyScalar(uniformScale);
+    instance.updateMatrixWorld(true);
+    this.groundFromFeet(instance);
 
     this.model = instance;
     this.root.add(instance);
@@ -162,6 +165,60 @@ export class CharacterModel {
     if (previous && previous !== next) previous.fadeOut(fade);
     next.reset().setEffectiveTimeScale(1).setEffectiveWeight(1).fadeIn(fade).play();
     this.activeState = state;
+  }
+
+  private estimateFullHeightFromRig(root: THREE.Object3D): number | null {
+    const head = this.findBone(root, 'Head');
+    const feet = [this.findBone(root, 'foot_l'), this.findBone(root, 'foot_r')].filter(
+      (bone): bone is THREE.Bone => bone !== null
+    );
+    if (!head || feet.length === 0) return null;
+
+    root.updateMatrixWorld(true);
+    const headWorld = new THREE.Vector3();
+    head.getWorldPosition(headWorld);
+    const footWorld = new THREE.Vector3();
+    for (const foot of feet) {
+      const position = new THREE.Vector3();
+      foot.getWorldPosition(position);
+      footWorld.add(position);
+    }
+    footWorld.multiplyScalar(1 / feet.length);
+
+    const skeletonHeight = Math.abs(headWorld.y - footWorld.y);
+    if (!Number.isFinite(skeletonHeight) || skeletonHeight < 0.5 || skeletonHeight > 3.0) return null;
+    return skeletonHeight * SKELETON_TO_FULL_HEIGHT;
+  }
+
+  private estimateFallbackHeight(root: THREE.Object3D): number {
+    const bounds = new THREE.Box3().setFromObject(root);
+    const height = bounds.max.y - bounds.min.y;
+    return Number.isFinite(height) && height > 0.001 ? height : TARGET_CHARACTER_HEIGHT;
+  }
+
+  private groundFromFeet(root: THREE.Object3D): void {
+    root.updateMatrixWorld(true);
+    const feet = [this.findBone(root, 'foot_l'), this.findBone(root, 'foot_r')].filter(
+      (bone): bone is THREE.Bone => bone !== null
+    );
+
+    if (feet.length > 0) {
+      let minFootY = Number.POSITIVE_INFINITY;
+      for (const foot of feet) {
+        const position = new THREE.Vector3();
+        foot.getWorldPosition(position);
+        minFootY = Math.min(minFootY, position.y);
+      }
+      if (Number.isFinite(minFootY)) {
+        root.position.y += TARGET_ANKLE_HEIGHT - minFootY;
+        root.updateMatrixWorld(true);
+        return;
+      }
+    }
+
+    const bounds = new THREE.Box3().setFromObject(root);
+    if (Number.isFinite(bounds.min.y)) root.position.y -= bounds.min.y;
+    root.updateMatrixWorld(true);
   }
 
   private async rebuildFaceShell(dataUrl: string, generation: number): Promise<void> {
