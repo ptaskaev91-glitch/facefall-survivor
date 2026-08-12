@@ -1,0 +1,105 @@
+name: Patch 0.9.1 Pistol Animation
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/patch-091-pistol-animation.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: visual/0.9.1-pistol-animation
+          fetch-depth: 0
+      - name: Integrate combat animation overrides
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              p=Path(path); text=p.read_text('utf-8')
+              if old not in text:
+                  raise SystemExit(f'missing block in {path}: {old[:100]!r}')
+              p.write_text(text.replace(old,new,1),'utf-8')
+
+          # CharacterModel: one-shot combat override layer above locomotion.
+          replace('src/characters/CharacterModel.ts',
+            "  private readonly clips: THREE.AnimationClip[] = [];\n  private model: THREE.Object3D | null = null;",
+            "  private readonly clips: THREE.AnimationClip[] = [];\n  private model: THREE.Object3D | null = null;\n  private overrideAction: THREE.AnimationAction | null = null;\n  private overrideTime = 0;\n  private desiredLocomotion: LocomotionState = 'idle';")
+
+          replace('src/characters/CharacterModel.ts',
+            "  update(dt: number, speed: number): void {\n    if (!this.loaded || !this.mixer) return;\n    this.setLocomotion(resolveLocomotionState(speed));\n    this.mixer.update(Math.max(0, dt));\n  }\n\n  dispose(): void {",
+            "  update(dt: number, speed: number): void {\n    if (!this.loaded || !this.mixer) return;\n    const safeDt = Math.max(0, dt);\n    this.desiredLocomotion = resolveLocomotionState(speed);\n\n    if (this.overrideAction) {\n      this.overrideTime = Math.max(0, this.overrideTime - safeDt);\n      this.mixer.update(safeDt);\n      if (this.overrideTime <= 0) this.finishOverride();\n      return;\n    }\n\n    this.setLocomotion(this.desiredLocomotion);\n    this.mixer.update(safeDt);\n  }\n\n  playPistolFire(): boolean {\n    const clip = this.findClip(\n      ['Pistol_Fire', 'Pistol_Shoot', 'Pistol_Shot'],\n      [/pistol.*(fire|shoot|shot)/i, /(fire|shoot|shot).*pistol/i]\n    );\n    if (!clip) return false;\n    return this.playOverride(clip, Math.min(0.42, Math.max(0.12, clip.duration)), 0.035);\n  }\n\n  playPistolReload(): boolean {\n    const clip = this.findClip(\n      ['Pistol_Reload', 'Reload_Pistol'],\n      [/pistol.*reload/i, /reload.*pistol/i]\n    );\n    if (!clip) return false;\n    return this.playOverride(clip, Math.max(0.25, clip.duration), 0.08);\n  }\n\n  dispose(): void {")
+
+          replace('src/characters/CharacterModel.ts',
+            "    this.mixer?.stopAllAction();\n    this.actions.clear();\n    this.activeState = null;\n    if (!this.mixer) return;",
+            "    this.mixer?.stopAllAction();\n    this.actions.clear();\n    this.overrideAction = null;\n    this.overrideTime = 0;\n    this.activeState = null;\n    if (!this.mixer) return;")
+
+          replace('src/characters/CharacterModel.ts',
+            "  private setLocomotion(state: LocomotionState, immediate = false): void {",
+            "  private findClip(exactNames: string[], patterns: RegExp[]): THREE.AnimationClip | undefined {\n    for (const name of exactNames) {\n      const exact = this.clips.find((clip) => clip.name.toLowerCase() === name.toLowerCase());\n      if (exact) return exact;\n    }\n    return this.clips.find((clip) => patterns.some((pattern) => pattern.test(clip.name)));\n  }\n\n  private playOverride(clip: THREE.AnimationClip, duration: number, fade: number): boolean {\n    if (!this.mixer) return false;\n\n    const action = this.mixer.clipAction(clip);\n    if (this.overrideAction && this.overrideAction !== action) this.overrideAction.fadeOut(fade);\n    const locomotion = this.activeState ? this.actions.get(this.activeState) : undefined;\n    locomotion?.fadeOut(fade);\n\n    action\n      .reset()\n      .setLoop(THREE.LoopOnce, 1)\n      .setEffectiveTimeScale(1)\n      .setEffectiveWeight(1);\n    action.clampWhenFinished = false;\n    action.fadeIn(fade).play();\n    this.overrideAction = action;\n    this.overrideTime = duration;\n    return true;\n  }\n\n  private finishOverride(): void {\n    if (!this.overrideAction) return;\n    this.overrideAction.fadeOut(0.08);\n    this.overrideAction = null;\n    this.overrideTime = 0;\n    this.activeState = null;\n    this.setLocomotion(this.desiredLocomotion);\n  }\n\n  private setLocomotion(state: LocomotionState, immediate = false): void {")
+
+          replace('src/characters/CharacterModel.ts',
+            "    this.mixer = null;\n    this.actions.clear();\n    this.clips.splice(0);\n    this.activeState = null;",
+            "    this.mixer = null;\n    this.actions.clear();\n    this.clips.splice(0);\n    this.overrideAction = null;\n    this.overrideTime = 0;\n    this.desiredLocomotion = 'idle';\n    this.activeState = null;")
+
+          # Weapon socket visibility is tied to the actually selected weapon.
+          replace('src/characters/WeaponSocketVisual.ts',
+            "  getMuzzleWorldPosition(out: THREE.Vector3): boolean {",
+            "  setVisible(visible: boolean): void {\n    if (this.socket) this.socket.visible = visible;\n  }\n\n  getMuzzleWorldPosition(out: THREE.Vector3): boolean {")
+
+          # PlayerRuntime routes combat events to CharacterModel and guards pistol muzzle use.
+          replace('src/player/PlayerRuntime.ts',
+            "import type { QualityProfile } from '../graphics/quality';",
+            "import type { WeaponId } from '../combat/types';\nimport type { QualityProfile } from '../graphics/quality';")
+          replace('src/player/PlayerRuntime.ts',
+            "  private productionVisualActive = false;\n  private productionLoadAttempted = false;",
+            "  private productionVisualActive = false;\n  private productionLoadAttempted = false;\n  private activeWeapon: WeaponId = 'pistol';")
+          replace('src/player/PlayerRuntime.ts',
+            "  setProductionVisualActive(active: boolean): void {\n    this.productionVisualActive = active && this.characterModel.isLoaded;\n    this.characterModel.setVisible(this.productionVisualActive);\n    this.faceSystem.setVisible(!this.productionVisualActive);\n  }",
+            "  setProductionVisualActive(active: boolean): void {\n    this.productionVisualActive = active && this.characterModel.isLoaded;\n    this.characterModel.setVisible(this.productionVisualActive);\n    this.faceSystem.setVisible(!this.productionVisualActive);\n    this.weaponVisual.setVisible(this.productionVisualActive && this.activeWeapon === 'pistol');\n  }\n\n  setActiveWeapon(weaponId: WeaponId): void {\n    this.activeWeapon = weaponId;\n    this.weaponVisual.setVisible(this.productionVisualActive && weaponId === 'pistol');\n  }\n\n  playWeaponFire(weaponId: WeaponId): boolean {\n    if (!this.productionVisualActive || weaponId !== 'pistol') return false;\n    return this.characterModel.playPistolFire();\n  }\n\n  playWeaponReload(weaponId: WeaponId): boolean {\n    if (!this.productionVisualActive || weaponId !== 'pistol') return false;\n    return this.characterModel.playPistolReload();\n  }")
+          replace('src/player/PlayerRuntime.ts',
+            "  muzzle(out: THREE.Vector3): THREE.Vector3 {\n    if (this.productionVisualActive && this.weaponVisual.getMuzzleWorldPosition(out)) return out;",
+            "  muzzle(out: THREE.Vector3): THREE.Vector3 {\n    if (this.productionVisualActive && this.activeWeapon === 'pistol' && this.weaponVisual.getMuzzleWorldPosition(out)) return out;")
+
+          # GameApp binds actual WeaponSystem events to animation and keeps visual selection honest.
+          replace('src/app/GameApp.ts',
+            "      const definition = WEAPONS[shot.weaponId];\n      if (shot.sourceId === 'player') this.applyWeaponRecoil(definition);",
+            "      const definition = WEAPONS[shot.weaponId];\n      if (shot.sourceId === 'player') {\n        this.player.playWeaponFire(shot.weaponId);\n        this.applyWeaponRecoil(definition);\n      }")
+          replace('src/app/GameApp.ts',
+            "    this.unsubscribeEvents.push(this.events.on('hit', (hit) => {",
+            "    this.unsubscribeEvents.push(this.events.on('weaponReload', ({ weaponId }) => {\n      this.player.playWeaponReload(weaponId);\n    }));\n\n    this.unsubscribeEvents.push(this.events.on('hit', (hit) => {")
+          replace('src/app/GameApp.ts',
+            "    if (this.input.consumePressed('switchWeapon')) this.weaponSystem.cycle();",
+            "    if (this.input.consumePressed('switchWeapon')) this.player.setActiveWeapon(this.weaponSystem.cycle());")
+          replace('src/app/GameApp.ts',
+            "    this.weaponSystem.reset();\n    this.projectileSystem.reset();",
+            "    this.weaponSystem.reset();\n    this.player.setActiveWeapon(this.weaponSystem.selected);\n    this.projectileSystem.reset();")
+
+          # Visible build label and menu copy were stale since 0.8.1.
+          replace('engine-lab.html',
+            'FACEFALL // ENGINE NEXT 0.8.1 AIM+CHARACTER',
+            'FACEFALL // 0.9.1 PISTOL ANIM')
+          replace('engine-lab.html',
+            'FACEFALL SURVIVOR · ENGINE NEXT 0.8.1',
+            'FACEFALL SURVIVOR · ENGINE NEXT 0.9.1')
+          replace('engine-lab.html',
+            'TOP: свайп двигает направление блеклого лазерного луча. 3RD: крестик всегда в центре, свайп поворачивает героя и камеру только влево/вправо. FIRE стреляет по активному направлению.',
+            'TOP: герой автоматически доворачивается к цели, движение — динамический джойстик. 3RD: крестик в центре, свайп поворачивает камеру по горизонтали. FIRE стреляет по активному направлению.')
+          PY
+      - name: Commit implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'facefall-dev-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add src/characters/CharacterModel.ts src/characters/WeaponSocketVisual.ts src/player/PlayerRuntime.ts src/app/GameApp.ts engine-lab.html
+          git commit -m '0.9.1: bind pistol fire and reload animation events'
+          git push origin HEAD:visual/0.9.1-pistol-animation
