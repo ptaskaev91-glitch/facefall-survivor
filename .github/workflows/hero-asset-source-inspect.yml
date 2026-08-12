@@ -12,7 +12,7 @@ jobs:
   inspect-animation-library:
     runs-on: ubuntu-latest
     steps:
-      - name: Resolve official animation-library downloads and inventory Standard pack
+      - name: Download and inventory official Universal Animation Library
         shell: bash
         run: |
           set -euo pipefail
@@ -20,6 +20,7 @@ jobs:
           SLUG='universal-animation-library'
           BASE="https://quaternius.itch.io/$SLUG"
           PURCHASE="$BASE/purchase"
+          UPLOAD='17958403'
           curl -fsSL --compressed -A "$UA" -c /tmp/cookies.txt "$PURCHASE" -o /tmp/purchase.html
           CSRF="$(python3 - <<'PY'
           from pathlib import Path
@@ -38,19 +39,34 @@ jobs:
           PY
           )"
           curl -fsSL --compressed -A "$UA" -b /tmp/cookies.txt -c /tmp/cookies.txt "$PAGE" -o /tmp/download.html
-          python3 - <<'PY'
+          CSRF2="$(python3 - <<'PY'
           from pathlib import Path
-          from html.parser import HTMLParser
-          import re
+          import html as h,re
           s=Path('/tmp/download.html').read_text('utf-8',errors='replace')
-          class P(HTMLParser):
-              def handle_starttag(self,tag,attrs):
-                  if tag not in {'a','button'}: return
-                  d=dict(attrs); u=d.get('data-upload_id') or d.get('data-upload-id')
-                  if not u: return
-                  start=self.get_starttag_text() or ''
-                  print('UPLOAD',u,re.sub(r'\s+',' ',start)[:800])
-          P().feed(s)
-          print('standard-visible', 'Standard' in s)
-          print('bytes',len(s.encode()))
+          m=re.search(r'<meta[^>]+name=["\']csrf_token["\'][^>]+value=["\']([^"\']+)',s,re.I) or re.search(r'<meta[^>]+value=["\']([^"\']+)["\'][^>]+name=["\']csrf_token["\']',s,re.I)
+          if not m: raise SystemExit('csrf missing')
+          print(h.unescape(m.group(1)))
+          PY
+          )"
+          curl -fsS --compressed -A "$UA" -b /tmp/cookies.txt -e "$PAGE" -H 'X-Requested-With: XMLHttpRequest' --data-urlencode "csrf_token=$CSRF2" "$BASE/file/$UPLOAD?source=game_download" -o /tmp/file.json
+          FILE="$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          print(json.loads(Path('/tmp/file.json').read_text())['url'])
+          PY
+          )"
+          curl -fL --retry 3 -A "$UA" "$FILE" -o /tmp/ual.zip
+          file /tmp/ual.zip
+          du -h /tmp/ual.zip
+          sha256sum /tmp/ual.zip
+          python3 - <<'PY'
+          import zipfile,re
+          from pathlib import Path
+          with zipfile.ZipFile('/tmp/ual.zip') as z:
+              files=[i for i in z.infolist() if not i.is_dir()]
+              print('files',len(files),'uncompressedMiB',round(sum(i.file_size for i in files)/1048576,2))
+              for i in files:
+                  n=i.filename
+                  if re.search(r'(idle|walk|run|sprint|jog|license|readme)',n,re.I) or Path(n).suffix.lower() in {'.gltf','.glb'}:
+                      print(i.file_size,n)
           PY
