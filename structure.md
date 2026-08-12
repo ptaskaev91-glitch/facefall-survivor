@@ -2,8 +2,8 @@
 
 Последняя актуализация: **2026-08-12**  
 Repository: `ptaskaev91-glitch/facefall-survivor`  
-Source of truth: `main`  
-Текущий milestone: **0.8 COMBAT+AI — primary test release candidate**
+Source of truth: `main` after merge of active hardening PR  
+Architecture checkpoint: **0.8.5–0.8.7 HARDENED**
 
 ---
 
@@ -11,24 +11,24 @@ Source of truth: `main`
 
 `structure.md` — источник истины по текущей и целевой архитектуре Facefall Survivor.
 
-После крупных checkpoint файл должен отвечать:
+Он фиксирует:
 
-1. что реально существует сейчас;
-2. какие части временные;
-3. как системы взаимодействуют;
-4. к какой структуре идём дальше.
-
----
-
-# 2. Итоговая технологическая формула
-
-> **TypeScript + Vite + npm Three.js + glTF/GLB + manifest-driven levels + Octree/Capsule physics + SpatialHash/local avoidance + NavigationQuery/Recast target + data-driven combat + event-driven presentation + bounded FX/audio + local-first FaceSystem + mobile-first controls/performance + locked CI/browser smoke + Vercel.**
-
-GitHub `main` — canonical source. Vercel — единственный hosting target.
+1. фактические файлы и ownership систем;
+2. временные prototype boundaries;
+3. взаимодействие simulation / world / presentation;
+4. целевую структуру для GLB/animation/authored-level этапа.
 
 ---
 
-# 3. Текущая source structure
+# 2. Technology formula
+
+> **TypeScript strict + Vite + npm Three.js + glTF/GLB + manifest-driven levels + Octree/Capsule + SpatialHash/local avoidance + NavigationQuery/Recast target + data-driven combat + event-driven presentation + pooled FX/audio + local-first FaceSystem + mobile-first controls + unit/browser/visual CI + Vercel.**
+
+GitHub `main` — canonical source. Vercel — единственный production hosting target.
+
+---
+
+# 3. Current source tree
 
 ```text
 facefall-survivor/
@@ -44,29 +44,43 @@ facefall-survivor/
 │               └── level.manifest.json
 │
 ├── scripts/
-│   └── copy-legacy.mjs
+│   └── promote-engine-next.mjs
 │
 ├── tests/
-│   └── smoke/
-│       └── engine-next.spec.ts
+│   ├── smoke/
+│   │   ├── engine-next.spec.ts
+│   │   ├── mobile-controls.spec.ts
+│   │   └── visual-regression.spec.ts
+│   └── unit/
+│       ├── health-damage.test.ts
+│       ├── weapon-system.test.ts
+│       ├── enemy-brain.test.ts
+│       ├── wave-director.test.ts
+│       └── spatial-state-avoidance.test.ts
 │
 ├── src/
 │   ├── main.ts
+│   │
 │   ├── app/
 │   │   ├── Bootstrap.ts
 │   │   ├── GameApp.ts
+│   │   ├── GameHud.ts
 │   │   ├── GameState.ts
 │   │   └── ProductShell.ts
+│   │
 │   ├── aim/
 │   │   ├── AimController.ts
 │   │   └── AimAssist.ts
+│   │
 │   ├── camera/
 │   │   ├── CameraCollision.ts
 │   │   ├── CameraDirector.ts
 │   │   ├── TopDownCamera.ts
 │   │   └── ThirdPersonCamera.ts
+│   │
 │   ├── characters/
 │   │   └── FaceSystem.ts
+│   │
 │   ├── combat/
 │   │   ├── types.ts
 │   │   ├── weapons.ts
@@ -76,9 +90,11 @@ facefall-survivor/
 │   │   ├── ProjectileSystem.ts
 │   │   ├── ProjectileVisuals.ts
 │   │   └── CombatFeedback.ts
+│   │
 │   ├── core/
 │   │   ├── EventBus.ts
 │   │   └── GameLoop.ts
+│   │
 │   ├── effects/
 │   │   ├── recipes.ts
 │   │   ├── EffectSystem.ts
@@ -87,52 +103,65 @@ facefall-survivor/
 │   │   ├── DecalPool.ts
 │   │   ├── LightPool.ts
 │   │   └── WindField.ts
+│   │
 │   ├── enemies/
 │   │   ├── archetypes.ts
 │   │   ├── EnemyBrain.ts
 │   │   └── EnemySystem.ts
+│   │
 │   ├── graphics/
 │   │   └── quality.ts
+│   │
 │   ├── input/
 │   │   ├── InputManager.ts
 │   │   ├── KeyboardMouseInput.ts
 │   │   ├── TouchInput.ts
 │   │   └── MovementFrame.ts
+│   │
 │   ├── navigation/
 │   │   ├── NavigationQuery.ts
 │   │   ├── CollisionNavigationQuery.ts
 │   │   └── LocalAvoidance.ts
+│   │
 │   ├── persistence/
 │   │   ├── FaceStore.ts
 │   │   └── SettingsStore.ts
+│   │
 │   ├── physics/
 │   │   ├── CollisionWorld.ts
 │   │   ├── PlayerCapsule.ts
 │   │   └── SpatialHash.ts
+│   │
 │   ├── pickups/
 │   │   └── PickupSystem.ts
+│   │
+│   ├── player/
+│   │   └── PlayerRuntime.ts
+│   │
 │   ├── presentation/
 │   │   └── audio/
 │   │       └── AudioSystem.ts
+│   │
 │   ├── rendering/
 │   │   ├── RainField.ts
 │   │   └── StormSystem.ts
+│   │
 │   ├── waves/
 │   │   └── WaveDirector.ts
+│   │
 │   └── world/
 │       ├── AssetManager.ts
 │       ├── LevelLoader.ts
 │       ├── LevelManifest.ts
-│       └── GrassField.ts
+│       ├── GrassField.ts
+│       └── WorldRuntime.ts
 │
-├── index.html                  # legacy source checkpoint, no longer deployment root in 0.8 test release
-├── game-v050.js
-├── styles-safe.css
-├── engine-lab.html             # Vite engine-next source entry
+├── engine-lab.html
 ├── package.json
 ├── package-lock.json
 ├── playwright.config.ts
 ├── tsconfig.json
+├── tsconfig.tests.json
 ├── vite.config.ts
 ├── vercel.json
 ├── THIRD_PARTY_NOTICES.md
@@ -142,472 +171,427 @@ facefall-survivor/
 └── history.md
 ```
 
+Retired from active source in the hardening checkpoint:
+
+- `game.js`;
+- `game-safe.js`;
+- `game-safe2.js`;
+- `game-v050.js`;
+- `styles-safe.css`;
+- old source `index.html`;
+- `scripts/copy-legacy.mjs`;
+- `/legacy/` deployment bundle;
+- old Three/GLTFLoader CDN rewrites;
+- old Three examples Soldier rewrite.
+
+Rollback remains available through Git history and previous immutable Vercel deployments rather than dead code shipped with every build.
+
 ---
 
-# 4. Deployment structure from 0.8
+# 4. Deployment structure
 
-`npm run build:deploy` produces:
+`npm run build:deploy`:
 
 ```text
+Vite build from engine-lab.html
+        ↓
 dist-next/
-├── index.html                  # compiled engine-next 0.8; PRIMARY /
-├── engine-lab.html             # same engine-next build for debug/direct access
-├── assets/                     # Vite bundled Three.js/game chunks
-├── legacy/
-│   ├── index.html              # previous 0.5 ALPHA checkpoint
-│   ├── game-v050.js
-│   └── styles-safe.css
-└── assets/levels/...           # copied public assets
+├── engine-lab.html
+├── index.html          # same compiled document promoted to primary /
+├── assets/
+│   ├── game chunks
+│   ├── bundled Three.js chunk
+│   └── public assets / level manifest
+└── ...
 ```
 
-From 0.8 test release:
-
-- `/` → engine-next;
-- `/engine-lab.html` → engine-next debug/test entry;
-- `/legacy/` → preserved old runtime for comparison/rollback testing.
-
-Three.js for engine-next is bundled by Vite. Legacy proxy rewrites may temporarily remain only to keep `/legacy/` functional and must be removed after final migration cleanup.
+`vercel.json` now only declares build command and output directory. The active engine-next production path does not require runtime Three.js CDN imports or an externally hosted prototype hero.
 
 ---
 
-# 5. Runtime lifecycle
+# 5. Top-level runtime ownership after 0.8.7
 
 ```text
-BOOT
- ↓
-MENU
- ├─ face select/preview/remove
- ├─ TOP / 3RD selection
- ├─ aim sensitivity
- ├─ deadzone
- ├─ aim assist
- └─ audio volume
- ↓
-LOADING
- ↓
-PLAYING ↔ PAUSED
- ↓
-GAMEOVER
- ↓
-RESTART → PLAYING
-
-ERROR → MENU
-```
-
-`ProductShell` owns browser form/file/localStorage UI. `GameApp` receives normalized options.
-
----
-
-# 6. Fixed runtime flow
-
-```text
-src/main.ts
- ↓
 Bootstrap
- ├─ GameApp
- ├─ ProductShell
- └─ AudioSystem
+ ├── ProductShell
+ ├── AudioSystem
+ └── GameApp                 ← gameplay orchestration / ordering
+      ├── WorldRuntime       ← scene/render/world/collision/environment
+      ├── PlayerRuntime      ← player transform/collider/face/visual
+      ├── GameHud            ← DOM HUD/status presentation
+      ├── WeaponSystem
+      ├── DamageSystem
+      ├── ProjectileSystem
+      ├── EnemySystem
+      ├── WaveDirector
+      ├── PickupSystem
+      ├── EffectSystem
+      └── Input / Aim
+```
 
-GameLoop fixed 60 Hz simulation
+This replaces the old design where `GameApp` directly constructed and owned almost every low-level subsystem.
+
+---
+
+# 6. `WorldRuntime`
+
+Owns:
+
+- `THREE.Scene`;
+- `WebGLRenderer`;
+- perspective camera;
+- CameraDirector + CameraCollision;
+- `CollisionWorld`;
+- procedural fallback static geometry;
+- `GrassField`;
+- `RainField`;
+- `StormSystem`;
+- `AssetManager` / `LevelLoader`;
+- manifest load/fallback;
+- manifest-created lights;
+- render/resize/environment disposal.
+
+Future production `level.glb` and authored environment integration belongs **here**, not in `GameApp`.
+
+---
+
+# 7. `PlayerRuntime`
+
+Owns:
+
+- player root transform;
+- `PlayerCapsule`;
+- movement integration;
+- facing vector;
+- spawn/reset;
+- muzzle world transform;
+- `FaceSystem` lifecycle;
+- current prototype low-poly player visual lifecycle.
+
+Future `CharacterModel`, humanoid GLB, `SkeletonUtils`, `AnimationMixer` and weapon sockets belong **behind PlayerRuntime**.
+
+`GameApp` should only ask the player runtime to move/reset/return transform information.
+
+---
+
+# 8. `GameHud`
+
+DOM-only presenter.
+
+Receives a `HudSnapshot`; does not mutate simulation.
+
+Owns:
+
+- HP / wave / kills / score text;
+- debug status line;
+- last gameplay event text;
+- game-over summary/show-hide.
+
+Future HUD visual redesign belongs here / presentation UI modules rather than in combat code.
+
+---
+
+# 9. GameApp responsibility after first decomposition pass
+
+`GameApp` is still intentionally the composition/orchestration boundary for:
+
+- lifecycle transitions;
+- fixed-update order;
+- combat event wiring;
+- Weapon/Damage/Projectile systems;
+- Enemy/Wave/Pickup coordination;
+- aim coordination;
+- score/kills session state.
+
+Potential future extraction if complexity grows:
+
+```text
+GameApp
+ ├── CombatRuntime
+ ├── RunSession
+ ├── EnemyRuntime
+ └── PresentationRuntime
+```
+
+Do this incrementally and only when it reduces real coupling. Do not add a DI framework/service locator.
+
+---
+
+# 10. Fixed simulation/render flow
+
+```text
+GameLoop fixed step (60 Hz)
  ↓
 Input snapshot
  ↓
-Aim / player movement
+Aim update
  ↓
-Weapons / projectiles
+PlayerRuntime.move
+ ↓
+Weapon / projectile simulation
  ↓
 Enemy brain / navigation / avoidance
  ↓
 Damage / waves / pickups
  ↓
-Gameplay events
+EventBus
  ↓
-FX / audio / storm / HUD
+FX / storm simulation
+
+per-frame render
  ↓
-Camera
+WorldRuntime camera update
  ↓
-Render
+Camera recoil
+ ↓
+Projectile visuals
+ ↓
+Grass/rain frame update
+ ↓
+WorldRuntime.render
 ```
 
-Rule: there is only one gameplay/physics loop.
+Invariant: one gameplay/physics loop only.
 
 ---
 
-# 7. Input / movement / aiming
+# 11. Mobile controls — canonical model
+
+## TOP
 
 ```text
-KeyboardMouseInput ─┐
-                    ├→ InputManager
-TouchInput ─────────┘
-        ↓
-MovementFrame        AimController
-camera-relative      visible reticle state
-movement             ↓
-                     AimAssist (mobile soft correction)
-                     ↓
-                     world-space aim direction
-                     ↓
-                     WeaponSystem
+Touch anywhere on free gameplay surface
+ ↓
+dynamic movement joystick under finger
+ ↓
+InputManager / MovementFrame
+
+Enemy targets
+ ↓
+AimAssist / internal AimController
+ ↓
+auto-target direction
+ ↓
+hero facing
+ ↓
+WeaponSystem fire direction
 ```
 
-Critical invariant:
+No manual mobile aim gesture in TOP. FIRE remains manual.
 
-> **Visible reticle and actual shot direction use the same AimController state.**
+## 3RD
 
-0.8 adds:
+```text
+crosshair fixed at screen center
+manual touch drag → yaw only
+mobile auto-aim → horizontal correction
+no manual vertical aim
+```
 
-- persisted sensitivity;
-- persisted 3RD deadzone;
-- persisted soft Aim Assist;
-- recoil nudges the same reticle state, so visual recoil and weapon direction cannot diverge.
-
-Aim Assist never fires automatically and never hard-snaps to an enemy.
+Camera is raised over the shoulder and uses collision resolution.
 
 ---
 
-# 8. Camera architecture
+# 12. Combat boundary
 
 ```text
-CameraDirector
-├── TopDownCamera
-└── ThirdPersonCamera
-      └── CameraCollision → CollisionWorld
-```
-
-Both modes use one Player/Simulation.
-
-TOP:
-
-- free screen reticle;
-- hero facing follows resolved world aim;
-- camera-relative movement.
-
-3RD:
-
-- floating reticle;
-- soft-edge turn demand;
-- shoulder camera;
-- wall push-in;
-- vertical aiming.
-
----
-
-# 9. Physics / navigation / crowd
-
-Physics:
-
-```text
-Static level → CollisionWorld / Octree
-Player       → Capsule
-Projectiles  → segment/ray queries
-Camera       → collision ray query
-```
-
-Crowd:
-
-```text
-Enemy positions → SpatialHash → LocalAvoidance
-```
-
-Navigation in 0.8 test build:
-
-```text
-EnemyBrain
- ↓ desired target
-NavigationQuery
- ↓
-CollisionNavigationQuery
- ├─ direct path when clear
- └─ short left/right obstacle detour when blocked
- ↓
-LocalAvoidance
- ↓
-Enemy movement
-```
-
-Final authored-map target remains:
-
-```text
-Offline Recast/Detour navmesh
- ↓
-runtime Recast NavigationQuery adapter
- ↓
-LocalAvoidance + SpatialHash
-```
-
-`CollisionNavigationQuery` is a practical browser-safe fallback for the current procedural test level, not the final pathfinding solution.
-
----
-
-# 10. Enemy architecture 0.8
-
-Archetypes:
-
-- Walker;
-- Runner;
-- Brute.
-
-Current lightweight State Tree:
-
-```text
-STAGGER
-  ↑ hit
-WANDER
-  ↓ hears/retains alert
-INVESTIGATE
-  ↓ sees player
-CHASE
-  ↓ range
-ATTACK / HOLD
-  ↓ target lost
-INVESTIGATE
-  ↓ alert expires
-WANDER
-```
-
-Current perception:
-
-- distance-based sight range;
-- optional line-of-sight hook exists;
-- last-known player position;
-- alert timer;
-- `hearNoise()` API exists.
-
-Still pending:
-
-- wiring actual Octree LOS callback;
-- wiring weapon noise into `hearNoise()`;
-- AI update LOD;
-- final navmesh.
-
-Stagger is archetype-dependent: Brute resists it more strongly.
-
----
-
-# 11. Combat architecture 0.8
-
-```text
-AimController/Input.fire
+Input/FIRE
  ↓
 WeaponSystem
  ↓
 ShotEvent
- ├─ pistol → hitscan
- ├─ shotgun → multi-hitscan
- └─ bow → ballistic ProjectileSystem
-                   ↓
-             DamageSystem
-              ↓       ↓
-             Hit     Kill
-              ↓
-     Enemy stagger / FX / audio
+ ├── pistol/shotgun hitscan simulation
+ │    ├── movement-dependent spread
+ │    ├── world occlusion check
+ │    ├── body hit zone
+ │    └── DamageSystem
+ │
+ └── bow ProjectileSystem
+      └── segment collision → DamageSystem
+
+DamageSystem
+ ├── HitEvent
+ └── KillEvent
+      ↓
+Enemy stagger / score / game-over
+      ↓
+EffectSystem / AudioSystem / HUD
 ```
 
-Data-driven `WeaponDefinition` controls:
+Pistol/shotgun tracer meshes are presentation; damage is immediate hitscan. This is deliberate for mobile responsiveness.
 
-- ammo;
-- damage;
-- pellets;
-- base spread;
-- fire interval;
-- reload time;
-- projectile physics;
-- impulse;
-- hit-zone multipliers;
-- recoil profile;
-- FX recipe IDs.
-
-0.8 adds:
-
-- movement-dependent spread;
-- visible/camera recoil;
-- recoil by weapon profile;
-- reload event/audio;
-- head/torso/limb damage multipliers;
-- stagger/knock response.
-
-Bow remains a physical ballistic projectile rather than hitscan.
+`WeaponSystem` no longer imports the global `AimController`; player aim may be provided by orchestration, otherwise weapon firing uses supplied facing/direction. This keeps the gameplay module independently testable.
 
 ---
 
-# 12. Presentation / atmosphere
-
-Simulation emits events. Presentation listens.
+# 13. Enemy / navigation boundary
 
 ```text
-Shot / Reload / Hit / Kill / EnemyAttack / Footstep / Thunder
- ↓
-Presentation
- ├─ EffectSystem
- │   ├─ particles
- │   ├─ decals
- │   ├─ lights
- │   └─ camera impulse
- ├─ AudioSystem
- │   ├─ weapon transients
- │   ├─ reload
- │   ├─ impacts
- │   ├─ infected attack cues
- │   ├─ footsteps
- │   ├─ rain/wind
- │   └─ thunder
- ├─ RainField
- └─ StormSystem
+EnemyBrain
+ ↓ intent
+NavigationQuery
+ ↓ desired path/waypoint
+LocalAvoidance
+ ↓ crowd-separated velocity
+EnemySystem
+ ↓ transform + attack callback
 ```
 
-All repeating visual systems are bounded/pool-based. Storm reuses one transient light.
+Current NavigationQuery implementation is collision-aware procedural fallback.
 
----
-
-# 13. World / levels
-
-Current level is still procedural test geometry plus a real `LevelManifest`.
-
-Target `Abandoned Outskirts`:
+Target after authored level exists:
 
 ```text
-public/assets/levels/abandoned-outskirts/
-├── level.glb
-├── level.manifest.json
-├── navmesh data
-└── preview.webp
+level.glb
+ + offline Recast navmesh
+        ↓
+RecastNavigationQuery
+        ↓
+LocalAvoidance / SpatialHash
 ```
 
-Responsibilities:
-
-- `level.glb` → visual/collision geometry;
-- manifest → player/enemy spawns, lights, loot, audio/wind/event markers;
-- navmesh → AI traversal.
-
-Manifest already drives player spawn, waves, lights and pickups.
+Collision and navmesh remain separate systems.
 
 ---
 
-# 14. Face architecture
+# 14. Testing architecture
+
+CI now contains three layers before production artifact generation:
+
+## Unit
+
+Node built-in test runner over compiled TypeScript:
+
+- Health / DamageSystem;
+- WeaponSystem;
+- EnemyBrain;
+- WaveDirector;
+- SpatialHash;
+- LocalAvoidance;
+- GameStateController.
+
+## Browser behavior
+
+Playwright Chromium:
+
+- menu boot;
+- run start;
+- camera switching;
+- mobile dynamic joystick;
+- no fatal page errors.
+
+## Visual checkpoints
+
+Playwright mobile viewport produces:
+
+- `mobile-top.png`;
+- `mobile-third.png`.
+
+CI uploads `facefall-visual-checkpoints`; these images are intended for actual human/assistant inspection after risky refactors or visual work.
+
+---
+
+# 15. Current prototype vs target content
+
+## Prototype today
+
+- procedural player body + photo head material;
+- procedural low-poly humanoid infected;
+- procedural fallback environment;
+- procedural gait;
+- approximate muzzle transform;
+- procedural audio.
+
+## Target vertical slice
 
 ```text
-ProductShell
- ↓ image file
-FaceStore(localStorage)
- ↓
-GameApp.start(faceDataUrl)
- ↓
-FaceSystem
+PlayerRuntime
+ └── CharacterModel
+      ├── hero.glb
+      ├── AnimationMixer
+      ├── weapon sockets
+      └── production FaceSystem integration
+
+EnemySystem
+ └── pooled infected character instances
+      ├── walker.glb
+      ├── runner.glb
+      └── brute.glb
+
+WorldRuntime
+ └── Abandoned Outskirts
+      ├── level.glb
+      ├── level.manifest.json
+      └── navmesh data
 ```
-
-Current 0.8 implementation is parity-level and uses a temporary face plane on the prototype hero.
-
-Target Face System 2.0:
-
-- crop/zoom/pan;
-- mask;
-- normalization;
-- real production-head integration;
-- local-first privacy.
 
 ---
 
-# 15. CI / release
+# 16. Asset rules
 
-Every gameplay PR must pass:
+Every externally shipped model/texture/audio/animation requires provenance and license registration in `public/assets/ATTRIBUTION.md` or `THIRD_PARTY_NOTICES.md` where appropriate.
+
+No production media should depend on an uncontrolled external URL at runtime.
+
+Preferred production pipeline:
 
 ```text
-npm ci
+source / Blender
  ↓
-strict TypeScript
+GLB export
  ↓
-Playwright Chromium smoke
+cleanup / naming / animation review
  ↓
-Vite production build
+glTF optimization
  ↓
-deployment-root assertion
+Meshopt / KTX2 when profiling justifies
  ↓
-artifact upload
+asset budget check
+ ↓
+public/assets
 ```
 
-0.8 deployment-root assertion verifies:
-
-- `dist-next/index.html` contains ENGINE NEXT 0.8;
-- `/legacy/` checkpoint files exist.
-
 ---
 
-# 16. Reuse / licensing
+# 17. Target architecture additions
 
-Direct permissive adaptations already tracked in `THIRD_PARTY_NOTICES.md`:
-
-- Capsule/Octree collision-response approach from `ivanoskov/shooter`;
-- GLTF loading/traverse preparation from `ivanoskov/shooter`.
-
-Rules:
-
-- permissive isolated code may be adapted with attribution;
-- GPL Unvanquished game code is not copied;
-- native C++ reference systems are reimplemented for browser/TypeScript;
-- external media has independent license review;
-- final assets must be listed in `public/assets/ATTRIBUTION.md`.
-
----
-
-# 17. Target structure after visual/content migration
+As the visual slice lands, expected additions include:
 
 ```text
 src/
-├── app/
-├── core/
-├── config/
-├── input/
-├── aim/
-├── camera/
-├── physics/
-├── navigation/
-├── simulation/
-│   ├── player/
-│   ├── combat/
-│   ├── enemies/
-│   ├── waves/
-│   └── pickups/
 ├── characters/
+│   ├── CharacterModel.ts
+│   ├── CharacterAnimator.ts
+│   └── FaceSystem.ts
 ├── world/
-├── rendering/
-├── presentation/
-│   ├── combat/
-│   ├── effects/
-│   ├── audio/
-│   └── ui/
-├── persistence/
-└── debug/
+│   ├── WorldRuntime.ts
+│   ├── AssetManager.ts
+│   ├── LevelLoader.ts
+│   └── MaterialLibrary.ts
+├── navigation/
+│   ├── NavigationQuery.ts
+│   └── RecastNavigationQuery.ts
+├── debug/
+│   └── Metrics.ts
+└── app/
+    ├── GameApp.ts
+    ├── GameHud.ts
+    └── optional RunSession/CombatRuntime when justified
 ```
 
-`GameApp` remains too large and should be decomposed after production-critical systems stop changing rapidly.
-
 ---
 
-# 18. Temporary pieces
+# 18. Structural rules
 
-Still temporary after 0.8:
-
-- procedural hero;
-- procedural infected meshes;
-- procedural test world;
-- temporary face plane;
-- collision-detour navigation fallback;
-- debug status HUD;
-- legacy runtime retained under `/legacy/`;
-- legacy CDN rewrite compatibility.
-
-These are not blockers for 0.8 gameplay testing, but they are not final 1.0 architecture/content.
-
----
-
-# 19. Next structural transition
-
-After 0.8 device feedback:
-
-1. fix mobile controls/aim/combat regressions found on real Android;
-2. create authored `Abandoned Outskirts` GLB;
-3. bake/load Recast navmesh and implement Recast `NavigationQuery` adapter;
-4. replace procedural characters/weapons;
-5. move toward Face System 2.0;
-6. decompose `GameApp`;
-7. remove `/legacy/` and proxy debt only after new production runtime proves stable.
+1. `main.ts` remains bootstrap-only.
+2. `GameApp` remains orchestration, not a new monolith.
+3. Rendering/world creation belongs to `WorldRuntime`.
+4. Character GLB/animation belongs behind `PlayerRuntime` / character modules.
+5. HUD does not own gameplay rules.
+6. Simulation never directly creates DOM UI.
+7. Physics collision and navigation are separate.
+8. Weapons/enemy archetypes stay data-driven.
+9. Effects stay pooled/bounded.
+10. No external asset is shipped without license/provenance record.
+11. Significant ownership/file changes update `structure.md`.
+12. Risky visual/refactor PRs should produce inspectable CI screenshots.

@@ -17,8 +17,8 @@ function markBuildUi(): void {
   const badge = document.querySelector<HTMLElement>('.lab-badge');
   const kicker = document.querySelector<HTMLElement>('.menu-kicker');
   const notes = [...document.querySelectorAll<HTMLElement>('.menu-note')];
-  if (badge) badge.textContent = 'FACEFALL // ENGINE NEXT 0.8.2 MOBILE AUTO-AIM';
-  if (kicker) kicker.textContent = 'FACEFALL SURVIVOR · ENGINE NEXT 0.8.2';
+  if (badge) badge.textContent = 'FACEFALL // ENGINE NEXT 0.8.5 HARDENED';
+  if (kicker) kicker.textContent = 'FACEFALL SURVIVOR · ENGINE NEXT 0.8.5';
   if (notes[0]) {
     notes[0].textContent = 'TOP: коснись любой свободной точки — джойстик появится под пальцем, герой сам выбирает цель и поворачивается к ней. 3RD: крестик всегда в центре, auto-aim доворачивает по горизонтали; свайп справа — ручной yaw. FIRE остаётся ручным.';
   }

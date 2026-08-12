@@ -1,14 +1,15 @@
 {
   "name": "facefall-survivor",
-  "version": "0.5.0-alpha.2",
+  "version": "0.8.5-alpha.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev:next": "vite --config vite.config.ts",
     "build:next": "vite build --config vite.config.ts",
-    "build:deploy": "npm run build:next && node scripts/copy-legacy.mjs",
+    "build:deploy": "npm run build:next && node scripts/promote-engine-next.mjs",
     "preview:next": "vite preview --config vite.config.ts",
     "typecheck": "tsc --noEmit",
+    "test:unit": "rm -rf .test-dist && tsc -p tsconfig.tests.json && printf '{\"type\":\"commonjs\"}\n' > .test-dist/package.json && node --test .test-dist/tests/unit/*.test.js",
     "test:smoke": "playwright test tests/smoke"
   },
   "dependencies": {
