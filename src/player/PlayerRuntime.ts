@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CharacterModel, type CharacterLoadResult } from '../characters/CharacterModel';
 import { FaceSystem } from '../characters/FaceSystem';
+import { WeaponSocketVisual } from '../characters/WeaponSocketVisual';
 import type { QualityProfile } from '../graphics/quality';
 import { CollisionWorld } from '../physics/CollisionWorld';
 import { PlayerCapsule } from '../physics/PlayerCapsule';
@@ -22,6 +23,7 @@ export class PlayerRuntime {
 
   private readonly faceSystem: FaceSystem;
   private readonly characterModel: CharacterModel;
+  private readonly weaponVisual: WeaponSocketVisual;
   private readonly desired = new THREE.Vector3();
   private readonly velocity = new THREE.Vector3();
   private readonly muzzleOffset = new THREE.Vector3(0, 1.15, 0);
@@ -41,6 +43,7 @@ export class PlayerRuntime {
 
     this.faceSystem = new FaceSystem(this.root);
     this.characterModel = new CharacterModel(quality.shadows);
+    this.weaponVisual = new WeaponSocketVisual(quality.shadows);
     this.root.add(this.characterModel.root);
   }
 
@@ -74,6 +77,14 @@ export class PlayerRuntime {
     const clipNames = animationUrl
       ? await this.characterModel.loadAnimations(animationUrl)
       : result.clipNames;
+
+    // Sample the idle pose before deriving the socket's local alignment. The visual then
+    // remains a true hand-bone child and follows subsequent animation rotations.
+    this.characterModel.update(0, 0);
+    if (!this.weaponVisual.attach(this.characterModel.root, 'hand_r')) {
+      console.warn('Production hero has no hand_r weapon socket; pistol visual disabled.');
+    }
+
     this.setProductionVisualActive(activate);
     return { ...result, clipNames };
   }
@@ -112,10 +123,12 @@ export class PlayerRuntime {
   }
 
   muzzle(out: THREE.Vector3): THREE.Vector3 {
+    if (this.productionVisualActive && this.weaponVisual.getMuzzleWorldPosition(out)) return out;
     return out.copy(this.root.position).add(this.muzzleOffset).addScaledVector(this.facing, 0.5);
   }
 
   dispose(): void {
+    this.weaponVisual.dispose();
     this.characterModel.dispose();
     this.faceSystem.dispose();
     this.root.traverse((object) => {
