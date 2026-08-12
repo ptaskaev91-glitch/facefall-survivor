@@ -69,6 +69,12 @@ export class KeyboardMouseInput {
   };
 
   private onMouseMove = (event: MouseEvent): void => {
+    if (aimController.getMode() === 'third') {
+      aimController.addMouseLookDelta(event.movementX);
+      this.input.setPointerNdc(0, 0);
+      return;
+    }
+
     const x = event.clientX / Math.max(1, this.target.innerWidth) * 2 - 1;
     const y = -(event.clientY / Math.max(1, this.target.innerHeight) * 2 - 1);
     aimController.setPointerNdc(x, y);
