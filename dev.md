@@ -2,12 +2,12 @@
 
 Последняя актуализация: **2026-08-13**  
 Repository: `ptaskaev91-glitch/facefall-survivor`  
-Source of truth: `visual/0.9.0-hero-glb-spike` until PR #20 merge, then `main`  
+Source of truth: `visual/0.9.1-pistol-animation` until PR #21 merge, then `main`  
 Hosting: **Vercel only**  
 Primary URL: `https://facefall-survivor-pavels-projects-0b29bb12.vercel.app`
 
 Текущий стабильный architecture checkpoint: **0.8.5–0.8.7 HARDENING**.  
-Текущий активный visual checkpoint: **0.9.0 HERO VERTICAL SLICE — rigged GLTF + animation + uploaded face + pistol socket**.
+Текущий активный visual checkpoint: **0.9.1 PISTOL COMBAT ANIMATION — real FIRE/R events + one-shot overrides + mobile visual gate**.
 
 Этот файл отражает только фактическую реализацию. Prototype/fallback не считается final implementation.
 
@@ -144,7 +144,7 @@ Damage for pistol/shotgun intentionally remains hitscan for responsiveness; phys
 - [x] production deploy now promotes one bundled engine-next build to `/`;
 - [x] rollback relies on Git history / previous Vercel deployments instead of carrying dead runtime generations in source;
 - [ ] choose Facefall repository source license intentionally and add `LICENSE` only after explicit product decision;
-- [ ] package-lock root metadata version can be refreshed at the next dependency-lock regeneration; dependency graph itself remains locked and `npm ci` passes.
+- [x] package-lock root metadata version is kept aligned with package.json at checkpoints; dependency graph remains locked and `npm ci` passes.
 
 External audit correction retained: the old Soldier URL was stale configuration, **not active production hero dependency**.
 
@@ -266,6 +266,8 @@ Playwright now automatically captures mobile-sized checkpoints:
 - [x] `mobile-top.png` after gameplay start;
 - [x] `mobile-third.png` after camera switch;
 - [x] `mobile-face-front.png` with a synthetic uploaded face for head-bone inspection;
+- [x] `mobile-pistol-fire-third.png` after real held touch FIRE;
+- [x] `mobile-pistol-reload-front.png` during real touch reload state;
 - [x] screenshots uploaded as `facefall-visual-checkpoints` artifact;
 - [x] assistant can download and inspect screenshots before merge.
 
@@ -303,7 +305,7 @@ Do not add broad mechanics before the screenshot stops looking like an engine pr
 - [x] idle;
 - [x] walk;
 - [x] run;
-- [ ] pistol aim/fire/reload;
+- [~] pistol aim foundation + [x] fire/reload one-shot animation overrides bound to actual combat events;
 - [ ] shotgun aim/fire/reload;
 - [ ] bow draw/release;
 - [ ] hit;
@@ -540,12 +542,12 @@ Not MVP:
 
 # 17. Official next development order
 
-After the 0.9.0 hero vertical slice merge:
+After the 0.9.1 pistol-animation merge:
 
-1. **Pistol fire/reload animation integration** from the vendored CC0 library.
-2. Finalize production pistol art only if a GLB materially improves the current readable socket visual.
-3. Expand production weapon visuals/sockets to shotgun and bow.
-4. Replace Walker with the first production infected asset, then Runner/Brute.
+1. **Shotgun production visual/socket + fire/reload animation**.
+2. Bow production visual/socket + draw/release animation.
+3. Replace Walker with the first production infected asset, then Runner/Brute.
+4. Return to Face System crop/fitting polish after the core weapon silhouettes are production-ready.
 6. Build first authored `Abandoned Outskirts level.glb` through `WorldRuntime`.
 7. Bake/integrate final Recast navmesh.
 8. Upgrade Face System for the production head.

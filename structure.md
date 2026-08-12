@@ -2,8 +2,8 @@
 
 Последняя актуализация: **2026-08-13**  
 Repository: `ptaskaev91-glitch/facefall-survivor`  
-Source of truth: `visual/0.9.0-hero-glb-spike` until PR #20 merge, then `main`  
-Architecture checkpoint: **0.9.0 HERO VERTICAL SLICE**
+Source of truth: `visual/0.9.1-pistol-animation` until PR #21 merge, then `main`  
+Architecture checkpoint: **0.9.1 PISTOL COMBAT ANIMATION**
 
 ---
 
@@ -56,6 +56,7 @@ facefall-survivor/
 │   │   ├── mobile-controls.spec.ts
 │   │   └── visual-regression.spec.ts
 │   └── unit/
+│       ├── animation-library.test.ts
 │       ├── health-damage.test.ts
 │       ├── weapon-system.test.ts
 │       ├── enemy-brain.test.ts
@@ -275,6 +276,8 @@ Owns:
 - production hero scale/orientation normalization;
 - uploaded-face routing to fallback `FaceSystem` and production `Head` shell;
 - production pistol socket and muzzle world transform;
+- combat-event → hero one-shot animation bridge for pistol fire/reload;
+- active-weapon visibility/muzzle guard so pistol visuals cannot leak into shotgun/bow gameplay;
 - automatic procedural visual fallback when production assets fail.
 
 Production hero/animation/weapon visual work now lives **behind PlayerRuntime**.
