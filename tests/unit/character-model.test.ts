@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { resolveLocomotionState } from '../../src/characters/CharacterModel';
+import { resolveLocomotionState } from '../../src/characters/CharacterLocomotion';
 
 test('CharacterModel locomotion state resolves idle at rest and tiny drift', () => {
   assert.equal(resolveLocomotionState(0), 'idle');
