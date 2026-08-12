@@ -97,7 +97,6 @@ export class FaceSystem {
     this.materials.add(this.photoMaterial);
     this.headMaterials[5] = this.photoMaterial;
     this.head.material = this.headMaterials;
-    this.head.material.needsUpdate = true;
   }
 
   dispose(): void {
@@ -210,7 +209,7 @@ export class FaceSystem {
       this.photoMaterial.dispose();
       this.photoMaterial = null;
     }
-    this.headMaterials && (this.headMaterials[5] = this.fallbackFaceMaterial);
+    if (this.headMaterials) this.headMaterials[5] = this.fallbackFaceMaterial;
   }
 
   private loadTexture(dataUrl: string): Promise<THREE.Texture> {
