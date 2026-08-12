@@ -1,5 +1,4 @@
 import { Vector3 } from 'three';
-import { aimController } from '../aim/AimController';
 import { EventBus } from '../core/EventBus';
 import { WEAPONS, type WeaponDefinition } from './weapons';
 import type { FacefallEvents, WeaponId } from './types';
@@ -14,12 +13,17 @@ export interface WeaponRuntime {
   stateTime: number;
 }
 
+export type PlayerAimResolver = (out: Vector3) => Vector3;
+
 export class WeaponSystem {
   readonly runtimes = new Map<WeaponId, WeaponRuntime>();
   selected: WeaponId = 'pistol';
   private readonly resolvedDirection = new Vector3();
 
-  constructor(private readonly events: EventBus<FacefallEvents>) {
+  constructor(
+    private readonly events: EventBus<FacefallEvents>,
+    private readonly resolvePlayerAim?: PlayerAimResolver
+  ) {
     this.reset();
   }
 
@@ -42,15 +46,12 @@ export class WeaponSystem {
       if (runtime.state === 'idle') continue;
       runtime.stateTime = Math.max(0, runtime.stateTime - dt);
       if (runtime.stateTime > 0) continue;
-
       if (runtime.state === 'reloading') this.completeReload(runtime);
       runtime.state = 'idle';
     }
   }
 
-  definition(id: WeaponId = this.selected): WeaponDefinition {
-    return WEAPONS[id];
-  }
+  definition(id: WeaponId = this.selected): WeaponDefinition { return WEAPONS[id]; }
 
   runtime(id: WeaponId = this.selected): WeaponRuntime {
     const runtime = this.runtimes.get(id);
@@ -88,10 +89,9 @@ export class WeaponSystem {
     runtime.state = 'cooldown';
     runtime.stateTime = definition.fireInterval;
 
-    const direction = sourceId === 'player'
-      ? aimController.getWorldDirection(this.resolvedDirection)
+    const direction = sourceId === 'player' && this.resolvePlayerAim
+      ? this.resolvePlayerAim(this.resolvedDirection)
       : this.resolvedDirection.copy(fallbackDirection);
-
     if (direction.lengthSq() <= 1e-6) direction.copy(fallbackDirection);
 
     this.events.emit('shot', {
