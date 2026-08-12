@@ -21,7 +21,7 @@ test.use({
   isMobile: true
 });
 
-test('capture mobile TOP and 3RD checkpoints with uploaded face', async ({ page }) => {
+test('capture mobile TOP, 3RD and uploaded-face checkpoints', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
 
@@ -43,6 +43,33 @@ test('capture mobile TOP and 3RD checkpoints with uploaded face', async ({ page 
   await expect(page.locator('#status')).toContainText('camera=third');
   await page.waitForTimeout(800);
   await page.screenshot({ path: `${artifactDir}/mobile-third.png`, fullPage: true });
+
+  // CI-only inspection shot. The runtime is already exposed by Bootstrap for diagnostics;
+  // pausing prevents CameraDirector from replacing this temporary camera pose.
+  await page.evaluate(() => {
+    const runtimeWindow = window as Window & { __facefallApp?: any };
+    const app = runtimeWindow.__facefallApp;
+    if (!app) throw new Error('Facefall runtime is unavailable for face inspection');
+    app.pause();
+
+    const player = app.player;
+    const world = app.world;
+    const position = player.position;
+    const facing = player.facing;
+    const camera = world.camera;
+
+    camera.position.set(
+      position.x + facing.x * 2.25,
+      position.y + 1.55,
+      position.z + facing.z * 2.25
+    );
+    camera.fov = 38;
+    camera.lookAt(position.x, position.y + 1.38, position.z);
+    camera.updateProjectionMatrix();
+    world.render();
+  });
+  await page.waitForTimeout(100);
+  await page.screenshot({ path: `${artifactDir}/mobile-face-front.png`, fullPage: true });
 
   expect(errors, `Fatal browser errors: ${errors.join(' | ')}`).toEqual([]);
 });
