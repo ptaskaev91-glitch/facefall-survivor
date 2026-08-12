@@ -1,12 +1,15 @@
 import * as THREE from 'three';
 
 /**
- * Lightweight production weapon visual bound to the animated character hand.
- * Gameplay weapon state remains owned by PlayerRuntime/WeaponController.
+ * Lightweight production weapon visual driven by the animated right-hand socket.
+ * Position follows the bone; weapon forward remains aligned with gameplay facing.
  */
 export class WeaponSocketVisual {
+  private characterRoot: THREE.Object3D | null = null;
+  private hand: THREE.Bone | null = null;
   private socket: THREE.Group | null = null;
   private muzzle: THREE.Object3D | null = null;
+  private readonly handWorldPosition = new THREE.Vector3();
   private readonly geometries: THREE.BufferGeometry[] = [];
   private readonly materials: THREE.Material[] = [];
 
@@ -19,27 +22,8 @@ export class WeaponSocketVisual {
     const hand = characterRoot.getObjectByName(boneName);
     if (!(hand instanceof THREE.Bone)) return false;
 
-    const handWorldQuaternion = new THREE.Quaternion();
-    const characterWorldQuaternion = new THREE.Quaternion();
-    const handWorldScale = new THREE.Vector3();
-    hand.getWorldQuaternion(handWorldQuaternion);
-    characterRoot.getWorldQuaternion(characterWorldQuaternion);
-    hand.getWorldScale(handWorldScale);
-
     const socket = new THREE.Group();
     socket.name = 'weapon-socket-pistol';
-
-    // Align the pistol's +Z with the character visual's forward axis in the sampled
-    // idle pose, while preserving subsequent animated hand rotations.
-    socket.quaternion.copy(handWorldQuaternion).invert().multiply(characterWorldQuaternion);
-
-    // Bone descendants inherit the character's normalization scale. Cancel it so the
-    // procedural pistol dimensions below remain stable world-space metres.
-    socket.scale.set(
-      1 / Math.max(0.0001, Math.abs(handWorldScale.x)),
-      1 / Math.max(0.0001, Math.abs(handWorldScale.y)),
-      1 / Math.max(0.0001, Math.abs(handWorldScale.z))
-    );
 
     const darkMetal = this.material({ color: 0x171b19, roughness: 0.3, metalness: 0.78 });
     const gripMaterial = this.material({ color: 0x252a27, roughness: 0.72, metalness: 0.18 });
@@ -76,10 +60,23 @@ export class WeaponSocketVisual {
     muzzle.position.set(0, 0.04, 0.485);
     socket.add(muzzle);
 
-    hand.add(socket);
+    // The wrapper has no normalization scale, so the pistol dimensions stay in metres.
+    // Keeping the socket here also prevents wrist roll from turning the barrel sideways.
+    characterRoot.add(socket);
+    this.characterRoot = characterRoot;
+    this.hand = hand;
     this.socket = socket;
     this.muzzle = muzzle;
+    this.update();
     return true;
+  }
+
+  update(): void {
+    if (!this.characterRoot || !this.hand || !this.socket) return;
+    this.characterRoot.updateWorldMatrix(true, true);
+    this.hand.getWorldPosition(this.handWorldPosition);
+    this.socket.position.copy(this.characterRoot.worldToLocal(this.handWorldPosition));
+    this.socket.quaternion.identity();
   }
 
   getMuzzleWorldPosition(out: THREE.Vector3): boolean {
@@ -98,6 +95,8 @@ export class WeaponSocketVisual {
 
   private detach(): void {
     this.socket?.removeFromParent();
+    this.characterRoot = null;
+    this.hand = null;
     this.socket = null;
     this.muzzle = null;
   }
