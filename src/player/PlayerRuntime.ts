@@ -11,6 +11,9 @@ export interface PlayerMovementResult {
   movementSpreadMultiplier: number;
 }
 
+const PRODUCTION_HERO_URL = '/assets/characters/quaternius-universal-base-male/Superhero_Male_FullBody.gltf';
+const PRODUCTION_ANIMATIONS_URL = '/assets/animations/quaternius-universal-animation-library/UAL1_Standard.glb';
+
 /** Owns player transform, collider, visual and face lifecycle. */
 export class PlayerRuntime {
   readonly root = new THREE.Group();
@@ -23,6 +26,7 @@ export class PlayerRuntime {
   private readonly velocity = new THREE.Vector3();
   private readonly muzzleOffset = new THREE.Vector3(0, 1.15, 0);
   private productionVisualActive = false;
+  private productionLoadAttempted = false;
 
   constructor(scene: THREE.Scene, quality: QualityProfile) {
     const marker = this.makeCapsuleMarker(0.36, 0.85, 0x8d9c8d, quality.shadows);
@@ -44,10 +48,20 @@ export class PlayerRuntime {
   get hasProductionCharacter(): boolean { return this.characterModel.isLoaded; }
 
   async setFaceDataUrl(dataUrl: string | null): Promise<void> {
+    if (!this.productionLoadAttempted && !this.characterModel.isLoaded) {
+      this.productionLoadAttempted = true;
+      try {
+        await this.loadProductionCharacter(PRODUCTION_HERO_URL, PRODUCTION_ANIMATIONS_URL, false);
+      } catch (error) {
+        console.warn('Production hero unavailable; keeping legacy player visual.', error);
+      }
+    }
+
     await Promise.all([
       this.faceSystem.setDataUrl(dataUrl),
       this.characterModel.setFaceDataUrl(dataUrl)
     ]);
+    this.setProductionVisualActive(this.characterModel.isLoaded);
   }
 
   /** Loads the production rig and optional compatible animation library behind this runtime boundary. */
