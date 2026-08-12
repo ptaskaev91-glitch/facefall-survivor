@@ -12,11 +12,11 @@ export interface ThirdPersonCameraSettings {
 }
 
 const DEFAULTS: ThirdPersonCameraSettings = {
-  distance: 6.8,
-  height: 3.55,
+  distance: 7.0,
+  height: 4.05,
   side: 0.72,
-  lookHeight: 0.95,
-  lookAhead: 3.8,
+  lookHeight: 1.0,
+  lookAhead: 4.1,
   fov: 70,
   smoothing: 10
 };
