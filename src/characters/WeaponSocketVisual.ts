@@ -29,35 +29,44 @@ export class WeaponSocketVisual {
     const gripMaterial = this.material({ color: 0x252a27, roughness: 0.72, metalness: 0.18 });
     const sightMaterial = this.material({ color: 0x0b0d0c, roughness: 0.45, metalness: 0.5 });
 
-    const slide = this.box(0.115, 0.105, 0.43, darkMetal);
-    slide.position.set(0, 0.035, 0.235);
+    // Compact service-pistol proportions: roughly 21 cm overall length.
+    const slide = this.box(0.042, 0.036, 0.205, darkMetal);
+    slide.position.set(0, 0.018, 0.105);
 
-    const frame = this.box(0.105, 0.085, 0.27, darkMetal);
-    frame.position.set(0, -0.045, 0.115);
+    const frame = this.box(0.038, 0.032, 0.125, darkMetal);
+    frame.position.set(0, -0.008, 0.052);
 
     const barrel = new THREE.Mesh(
-      this.geometry(new THREE.CylinderGeometry(0.025, 0.025, 0.28, 10)),
+      this.geometry(new THREE.CylinderGeometry(0.009, 0.009, 0.135, 10)),
       darkMetal
     );
     barrel.rotation.x = Math.PI / 2;
-    barrel.position.set(0, 0.04, 0.29);
+    barrel.position.set(0, 0.017, 0.135);
     barrel.castShadow = this.shadows;
 
-    const grip = this.box(0.105, 0.245, 0.115, gripMaterial);
-    grip.position.set(0, -0.145, -0.005);
+    const grip = this.box(0.039, 0.115, 0.052, gripMaterial);
+    grip.position.set(0, -0.071, -0.005);
     grip.rotation.x = -0.18;
 
-    const frontSight = this.box(0.022, 0.027, 0.035, sightMaterial);
-    frontSight.position.set(0, 0.102, 0.415);
+    const triggerGuard = new THREE.Mesh(
+      this.geometry(new THREE.TorusGeometry(0.026, 0.006, 6, 12, Math.PI)),
+      darkMetal
+    );
+    triggerGuard.rotation.x = Math.PI / 2;
+    triggerGuard.position.set(0, -0.044, 0.045);
+    triggerGuard.castShadow = this.shadows;
 
-    const rearSight = this.box(0.07, 0.022, 0.026, sightMaterial);
-    rearSight.position.set(0, 0.098, 0.055);
+    const frontSight = this.box(0.009, 0.012, 0.013, sightMaterial);
+    frontSight.position.set(0, 0.041, 0.194);
 
-    socket.add(slide, frame, barrel, grip, frontSight, rearSight);
+    const rearSight = this.box(0.028, 0.010, 0.011, sightMaterial);
+    rearSight.position.set(0, 0.040, 0.020);
+
+    socket.add(slide, frame, barrel, grip, triggerGuard, frontSight, rearSight);
 
     const muzzle = new THREE.Object3D();
     muzzle.name = 'weapon-muzzle';
-    muzzle.position.set(0, 0.04, 0.485);
+    muzzle.position.set(0, 0.017, 0.218);
     socket.add(muzzle);
 
     // The wrapper has no normalization scale, so the pistol dimensions stay in metres.
