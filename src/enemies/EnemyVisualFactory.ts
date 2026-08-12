@@ -117,7 +117,6 @@ export function createEnemyVisual(type: EnemyId, shadows: boolean): THREE.Group 
   addMesh(root, footGeometry.clone(), pants, [-0.18 * scale, 0.05, -0.08], 'limb', shadows, 'foot-left');
   addMesh(root, footGeometry.clone(), pants, [0.18 * scale, 0.05, -0.08], 'limb', shadows, 'foot-right');
 
-  // Brute gets an asymmetric shoulder mass; runner gets a torn bright sleeve.
   if (type === 'brute') {
     addMesh(root, new THREE.DodecahedronGeometry(0.26, 0), shirt, [-0.54, 1.46, 0], 'torso', shadows, 'brute-shoulder');
   } else if (type === 'runner') {
@@ -137,7 +136,6 @@ export function animateEnemyVisual(root: THREE.Group, speed: number, dt: number)
   root.userData.gaitPhase = phase;
   const stride = Math.min(0.55, speed * 0.11);
   const swing = Math.sin(phase) * stride;
-  const bob = Math.abs(Math.sin(phase * 0.5)) * Math.min(0.045, speed * 0.008);
 
   const leftArm = root.getObjectByName('arm-left');
   const rightArm = root.getObjectByName('arm-right');
@@ -147,5 +145,4 @@ export function animateEnemyVisual(root: THREE.Group, speed: number, dt: number)
   if (rightArm) rightArm.rotation.x = -0.72 - swing;
   if (leftLeg) leftLeg.rotation.x = -swing * 0.7;
   if (rightLeg) rightLeg.rotation.x = swing * 0.7;
-  root.position.y = bob;
 }
