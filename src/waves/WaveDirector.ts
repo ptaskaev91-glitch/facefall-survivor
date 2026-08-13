@@ -16,9 +16,14 @@ export class WaveDirector {
   private spawnCooldown = 0;
   private markerCursor = 0;
   private running = false;
+  private partySize = 1;
 
   configure(markers: LevelMarker[]): void {
     this.spawnMarkers = markers.filter((marker) => marker.kind === 'enemy-spawn');
+  }
+
+  setPartySize(size: number): void {
+    this.partySize = Math.max(1, Math.min(3, Math.floor(size)));
   }
 
   reset(): void {
@@ -28,6 +33,7 @@ export class WaveDirector {
     this.spawnCooldown = 0;
     this.markerCursor = 0;
     this.running = true;
+    this.partySize = 1;
   }
 
   stop(): void {
@@ -48,7 +54,8 @@ export class WaveDirector {
 
     this.spawnCooldown -= dt;
     if (this.spawnCooldown > 0) return [];
-    this.spawnCooldown = Math.max(0.18, 0.62 - this.wave * 0.025);
+    const partyPressure = (this.partySize - 1) * 0.035;
+    this.spawnCooldown = Math.max(0.14, 0.62 - this.wave * 0.025 - partyPressure);
 
     const type = this.queue.shift();
     if (!type) return [];
@@ -71,21 +78,22 @@ export class WaveDirector {
     this.wave += 1;
     this.queue = this.buildComposition(this.wave);
     this.spawnCooldown = 0;
-    this.intermission = Math.max(1.5, 4.0 - this.wave * 0.08);
+    this.intermission = Math.max(1.25, 4.0 - this.wave * 0.09);
   }
 
   private buildComposition(wave: number): EnemyId[] {
     const result: EnemyId[] = [];
-    const walkers = 3 + Math.ceil(wave * 1.45);
-    const runners = Math.max(0, Math.floor((wave - 1) * 0.7));
-    const brutes = wave >= 3 ? Math.floor(wave / 3) : 0;
+    const allyBonus = this.partySize - 1;
+    const walkers = 3 + Math.ceil(wave * 1.55) + allyBonus * 3;
+    const runners = Math.max(0, Math.floor((wave - 1) * 0.78)) + allyBonus;
+    const brutes = wave >= 3 ? Math.floor(wave / 3) + Math.floor(allyBonus * wave / 4) : 0;
 
     for (let i = 0; i < walkers; i++) result.push('walker');
     for (let i = 0; i < runners; i++) result.push('runner');
     for (let i = 0; i < brutes; i++) result.push('brute');
 
     for (let i = result.length - 1; i > 0; i--) {
-      const j = (i * 17 + wave * 11) % (i + 1);
+      const j = (i * 17 + wave * 11 + this.partySize * 5) % (i + 1);
       [result[i], result[j]] = [result[j], result[i]];
     }
     return result;
