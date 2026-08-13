@@ -1,0 +1,42 @@
+name: Patch 012 Smoke Compat
+on:
+  push:
+    branches:
+      - 'feature/0.12.0-super-makar-family'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update legacy weapon and face smoke tests
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tests/smoke/visual-regression.spec.ts'); s=p.read_text()
+          s=s.replace("#faceInput", "#makarFaceInput").replace("#facePreview", "#makarFacePreview")
+          needle="  const weapon = page.locator('#touchWeapon');\n  await weapon.dispatchEvent('pointerdown', pointerDown(61));"
+          repl="  await page.evaluate(() => (window as any).__facefallApp.weaponSystem.unlock('shotgun'));\n  const weapon = page.locator('#touchWeapon');\n  await weapon.dispatchEvent('pointerdown', pointerDown(61));"
+          if needle not in s: raise SystemExit('shotgun smoke anchor missing')
+          s=s.replace(needle,repl)
+          p.write_text(s)
+
+          p=Path('tests/smoke/bow-visual.spec.ts'); s=p.read_text()
+          needle="  const weapon = page.locator('#touchWeapon');\n  for (const pointerId of [71, 72]) {"
+          repl="  await page.evaluate(() => { const app=(window as any).__facefallApp; app.weaponSystem.unlock('shotgun'); app.weaponSystem.unlock('bow'); });\n  const weapon = page.locator('#touchWeapon');\n  for (const pointerId of [71, 72]) {"
+          if needle not in s: raise SystemExit('bow smoke anchor missing')
+          s=s.replace(needle,repl); p.write_text(s)
+
+          p=Path('tests/smoke/production-weapons.spec.ts'); s=p.read_text()
+          needle="  expect(weaponRequests).toHaveLength(0);\n\n  // First WEAP selects shotgun"
+          repl="  expect(weaponRequests).toHaveLength(0);\n  await page.evaluate(() => { const app=(window as any).__facefallApp; app.weaponSystem.unlock('shotgun'); app.weaponSystem.unlock('bow'); });\n\n  // First WEAP selects shotgun"
+          if needle not in s: raise SystemExit('production weapons anchor missing')
+          s=s.replace(needle,repl); p.write_text(s)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/patch-012-smoke-compat.yml
+          git add tests/smoke/visual-regression.spec.ts tests/smoke/bow-visual.spec.ts tests/smoke/production-weapons.spec.ts
+          git commit -m 'test: adapt legacy smoke gates to Super Makar shop'
+          git push origin HEAD:feature/0.12.0-super-makar-family
