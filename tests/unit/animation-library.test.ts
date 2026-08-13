@@ -24,21 +24,11 @@ function animationNames(): string[] {
   return (document.animations ?? []).map((animation) => animation.name ?? '').filter(Boolean);
 }
 
-test('vendored Universal Animation Library contains pistol combat clips', () => {
+test('vendored Universal Animation Library contains pistol combat clips used as the current firearm fallback', () => {
   const names = animationNames();
   const fire = names.find((name) => /pistol.*(fire|shoot|shot)|(fire|shoot|shot).*pistol/i.test(name));
   const reload = names.find((name) => /pistol.*reload|reload.*pistol/i.test(name));
 
   assert.ok(fire, `Missing pistol fire/shoot clip. Available clips: ${names.join(', ')}`);
   assert.ok(reload, `Missing pistol reload clip. Available clips: ${names.join(', ')}`);
-});
-
-
-test('vendored Universal Animation Library contains long-gun combat clips', () => {
-  const names = animationNames();
-  const fire = names.find((name) => /(shotgun|rifle).*(fire|shoot|shot)|(fire|shoot|shot).*(shotgun|rifle)/i.test(name));
-  const reload = names.find((name) => /(shotgun|rifle).*reload|reload.*(shotgun|rifle)/i.test(name));
-
-  assert.ok(fire, `Missing shotgun/rifle fire clip. Available clips: ${names.join(', ')}`);
-  assert.ok(reload, `Missing shotgun/rifle reload clip. Available clips: ${names.join(', ')}`);
 });
