@@ -80,7 +80,7 @@ export class PlayerRuntime {
       ? await this.characterModel.loadAnimations(animationUrl)
       : result.clipNames;
 
-    // Sample the idle pose before deriving the hand position used by the production socket.
+    // Sample the idle pose before deriving hand positions used by production sockets.
     this.characterModel.update(0, 0);
     if (!this.weaponVisual.attach(this.characterModel.root, 'hand_r')) {
       console.warn('Production hero has no hand_r weapon socket; production weapon visual disabled.');
@@ -96,14 +96,14 @@ export class PlayerRuntime {
     this.productionVisualActive = active && this.characterModel.isLoaded;
     this.characterModel.setVisible(this.productionVisualActive);
     this.faceSystem.setVisible(!this.productionVisualActive);
-    this.weaponVisual.setVisible(this.productionVisualActive && this.activeWeapon !== 'bow');
+    this.weaponVisual.setVisible(this.productionVisualActive);
   }
 
   setActiveWeapon(weaponId: WeaponId): void {
     this.activeWeapon = weaponId;
     this.characterModel.setActiveWeapon(weaponId);
     this.weaponVisual.setActiveWeapon(weaponId);
-    this.weaponVisual.setVisible(this.productionVisualActive && weaponId !== 'bow');
+    this.weaponVisual.setVisible(this.productionVisualActive);
   }
 
   playWeaponFire(weaponId: WeaponId): boolean {
@@ -114,6 +114,7 @@ export class PlayerRuntime {
       // otherwise keep combat-event timing visible with the compatible pistol one-shot.
       return this.characterModel.playShotgunFire() || this.characterModel.playPistolFire();
     }
+    if (weaponId === 'bow') return this.weaponVisual.playBowRelease();
     return false;
   }
 
@@ -123,6 +124,7 @@ export class PlayerRuntime {
     if (weaponId === 'shotgun') {
       return this.characterModel.playShotgunReload() || this.characterModel.playPistolReload();
     }
+    if (weaponId === 'bow') return this.weaponVisual.playBowReload();
     return false;
   }
 
@@ -138,7 +140,7 @@ export class PlayerRuntime {
     this.root.position.set(this.controller.position.x, this.controller.position.y - 0.35, this.controller.position.z);
     this.root.rotation.y = Math.atan2(-this.facing.x, -this.facing.z);
     this.characterModel.update(dt, targetSpeed);
-    this.weaponVisual.update();
+    this.weaponVisual.update(dt);
     return { targetSpeed, movementSpreadMultiplier };
   }
 
@@ -155,7 +157,7 @@ export class PlayerRuntime {
   }
 
   muzzle(out: THREE.Vector3): THREE.Vector3 {
-    if (this.productionVisualActive && this.activeWeapon !== 'bow' && this.weaponVisual.getMuzzleWorldPosition(out)) return out;
+    if (this.productionVisualActive && this.weaponVisual.getMuzzleWorldPosition(out)) return out;
     return out.copy(this.root.position).add(this.muzzleOffset).addScaledVector(this.facing, 0.5);
   }
 

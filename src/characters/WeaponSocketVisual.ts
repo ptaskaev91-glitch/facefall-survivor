@@ -2,13 +2,15 @@ import * as THREE from 'three';
 import type { WeaponId } from '../combat/types';
 
 /**
- * Production weapon presentation driven by the animated right-hand socket.
- * Position follows the hand bone; weapon forward remains aligned with gameplay facing
- * so authored wrist roll cannot turn long barrels sideways.
+ * Production weapon presentation driven by animated hand sockets.
+ * Firearms follow the right hand, while the bow follows the left hand.
+ * Weapon forward stays aligned with gameplay facing so authored wrist roll
+ * cannot turn barrels or the arrow trajectory sideways.
  */
 export class WeaponSocketVisual {
   private characterRoot: THREE.Object3D | null = null;
-  private hand: THREE.Bone | null = null;
+  private rightHand: THREE.Bone | null = null;
+  private leftHand: THREE.Bone | null = null;
   private socket: THREE.Group | null = null;
   private readonly weaponGroups = new Map<WeaponId, THREE.Group>();
   private readonly muzzles = new Map<WeaponId, THREE.Object3D>();
@@ -18,46 +20,92 @@ export class WeaponSocketVisual {
   private activeWeapon: WeaponId = 'pistol';
   private enabled = false;
 
+  private bowStringGeometry: THREE.BufferGeometry | null = null;
+  private bowArrow: THREE.Group | null = null;
+  private bowDraw = 1;
+  private bowDrawTarget = 1;
+  private bowArrowVisible = true;
+
   constructor(private readonly shadows: boolean) {}
 
   attach(characterRoot: THREE.Object3D, boneName = 'hand_r'): boolean {
     this.detach();
     characterRoot.updateWorldMatrix(true, true);
 
-    const hand = characterRoot.getObjectByName(boneName);
-    if (!(hand instanceof THREE.Bone)) return false;
+    const rightHand = characterRoot.getObjectByName(boneName);
+    if (!(rightHand instanceof THREE.Bone)) return false;
+    const left = characterRoot.getObjectByName('hand_l');
 
     const socket = new THREE.Group();
     socket.name = 'weapon-socket-production';
 
     const pistol = this.buildPistol();
     const shotgun = this.buildShotgun();
-    socket.add(pistol.group, shotgun.group);
+    const bow = this.buildBow();
+    socket.add(pistol.group, shotgun.group, bow.group);
     this.weaponGroups.set('pistol', pistol.group);
     this.weaponGroups.set('shotgun', shotgun.group);
+    this.weaponGroups.set('bow', bow.group);
     this.muzzles.set('pistol', pistol.muzzle);
     this.muzzles.set('shotgun', shotgun.muzzle);
+    this.muzzles.set('bow', bow.muzzle);
 
     characterRoot.add(socket);
     this.characterRoot = characterRoot;
-    this.hand = hand;
+    this.rightHand = rightHand;
+    this.leftHand = left instanceof THREE.Bone ? left : rightHand;
     this.socket = socket;
+    this.updateBowGeometry();
     this.updateVisibility();
-    this.update();
+    this.update(0);
     return true;
   }
 
   setActiveWeapon(weaponId: WeaponId): void {
     this.activeWeapon = weaponId;
+    if (weaponId === 'bow' && this.bowDrawTarget >= 1) {
+      this.bowDraw = 1;
+      this.bowArrowVisible = true;
+      this.updateBowGeometry();
+    }
     this.updateVisibility();
   }
 
-  update(): void {
-    if (!this.characterRoot || !this.hand || !this.socket || !this.enabled) return;
+  playBowRelease(): boolean {
+    if (this.activeWeapon !== 'bow' || !this.bowArrow) return false;
+    this.bowDraw = 0;
+    this.bowDrawTarget = 0;
+    this.bowArrowVisible = false;
+    this.updateBowGeometry();
+    return true;
+  }
+
+  playBowReload(): boolean {
+    if (!this.bowArrow) return false;
+    this.bowDraw = 0;
+    this.bowDrawTarget = 1;
+    this.bowArrowVisible = true;
+    this.updateBowGeometry();
+    return true;
+  }
+
+  update(dt = 0): void {
+    if (!this.characterRoot || !this.socket || !this.enabled) return;
+    const hand = this.activeWeapon === 'bow' ? this.leftHand : this.rightHand;
+    if (!hand) return;
+
     this.characterRoot.updateWorldMatrix(true, true);
-    this.hand.getWorldPosition(this.handWorldPosition);
+    hand.getWorldPosition(this.handWorldPosition);
     this.socket.position.copy(this.characterRoot.worldToLocal(this.handWorldPosition));
     this.socket.quaternion.identity();
+
+    if (this.bowDraw !== this.bowDrawTarget) {
+      const speed = 3.6;
+      const delta = Math.max(0, dt) * speed;
+      if (this.bowDraw < this.bowDrawTarget) this.bowDraw = Math.min(this.bowDrawTarget, this.bowDraw + delta);
+      else this.bowDraw = Math.max(this.bowDrawTarget, this.bowDraw - delta);
+      this.updateBowGeometry();
+    }
   }
 
   setVisible(visible: boolean): void {
@@ -129,19 +177,14 @@ export class WeaponSocketVisual {
     const wood = this.material({ color: 0x4b2e1d, roughness: 0.72, metalness: 0.02 });
     const bead = this.material({ color: 0xb3aa86, roughness: 0.35, metalness: 0.55 });
 
-    // Pump-action proportions: ~98 cm overall. The animated hand sits near the
-    // pistol grip/receiver while the barrel extends along Facefall local +Z.
     const receiver = this.box(0.074, 0.092, 0.285, steel);
     receiver.position.set(0, 0.005, 0.105);
-
     const barrel = this.cylinder(0.017, 0.605, parkerized, 12);
     barrel.rotation.x = Math.PI / 2;
     barrel.position.set(0, 0.044, 0.535);
-
     const magazineTube = this.cylinder(0.014, 0.49, parkerized, 10);
     magazineTube.rotation.x = Math.PI / 2;
     magazineTube.position.set(0, -0.005, 0.455);
-
     const pump = this.box(0.068, 0.082, 0.185, polymer);
     pump.position.set(0, -0.006, 0.385);
     for (const x of [-0.024, -0.012, 0, 0.012, 0.024]) {
@@ -149,21 +192,16 @@ export class WeaponSocketVisual {
       rib.position.set(x, -0.006, 0.385);
       group.add(rib);
     }
-
     const pistolGrip = this.box(0.058, 0.145, 0.085, polymer);
     pistolGrip.position.set(0, -0.092, -0.035);
     pistolGrip.rotation.x = -0.22;
-
     const stock = this.box(0.078, 0.105, 0.34, wood);
     stock.position.set(0, -0.006, -0.245);
     stock.rotation.x = -0.035;
-
     const buttPad = this.box(0.085, 0.118, 0.025, polymer);
     buttPad.position.set(0, -0.012, -0.425);
-
     const beadSight = this.box(0.012, 0.014, 0.012, bead);
     beadSight.position.set(0, 0.067, 0.827);
-
     group.add(receiver, barrel, magazineTube, pump, pistolGrip, stock, buttPad, beadSight);
 
     const muzzle = new THREE.Object3D();
@@ -171,6 +209,83 @@ export class WeaponSocketVisual {
     muzzle.position.set(0, 0.044, 0.842);
     group.add(muzzle);
     return { group, muzzle };
+  }
+
+  private buildBow(): { group: THREE.Group; muzzle: THREE.Object3D } {
+    const group = new THREE.Group();
+    group.name = 'weapon-bow';
+    // Keep the bow just forward of the left palm and vertically oriented.
+    group.position.set(-0.035, 0.01, 0.05);
+
+    const riserMaterial = this.material({ color: 0x443122, roughness: 0.68, metalness: 0.04 });
+    const limbMaterial = this.material({ color: 0x181d1a, roughness: 0.52, metalness: 0.2 });
+    const stringMaterial = this.lineMaterial({ color: 0xc9c4ad });
+    const shaftMaterial = this.material({ color: 0x5f4931, roughness: 0.78, metalness: 0 });
+    const pointMaterial = this.material({ color: 0x777d78, roughness: 0.28, metalness: 0.72 });
+    const fletchingMaterial = this.material({ color: 0x6e2f25, roughness: 0.92, metalness: 0 });
+
+    const riser = this.box(0.045, 0.29, 0.052, riserMaterial);
+    riser.position.z = 0.012;
+    const grip = this.box(0.058, 0.12, 0.068, riserMaterial);
+    grip.position.z = -0.012;
+
+    const upperCurve = new THREE.QuadraticBezierCurve3(
+      new THREE.Vector3(0, 0.13, 0.02),
+      new THREE.Vector3(0, 0.43, 0.115),
+      new THREE.Vector3(0, 0.70, 0.065)
+    );
+    const lowerCurve = new THREE.QuadraticBezierCurve3(
+      new THREE.Vector3(0, -0.13, 0.02),
+      new THREE.Vector3(0, -0.43, 0.115),
+      new THREE.Vector3(0, -0.70, 0.065)
+    );
+    const upperLimb = new THREE.Mesh(this.geometry(new THREE.TubeGeometry(upperCurve, 14, 0.014, 6, false)), limbMaterial);
+    const lowerLimb = new THREE.Mesh(this.geometry(new THREE.TubeGeometry(lowerCurve, 14, 0.014, 6, false)), limbMaterial);
+    upperLimb.castShadow = this.shadows;
+    lowerLimb.castShadow = this.shadows;
+
+    const stringGeometry = this.geometry(new THREE.BufferGeometry());
+    stringGeometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(9), 3));
+    const bowString = new THREE.Line(stringGeometry, stringMaterial);
+    bowString.name = 'bow-string';
+    this.bowStringGeometry = stringGeometry;
+
+    const arrow = new THREE.Group();
+    arrow.name = 'bow-nocked-arrow';
+    const shaft = this.cylinder(0.006, 0.82, shaftMaterial, 8);
+    shaft.rotation.x = Math.PI / 2;
+    const point = new THREE.Mesh(this.geometry(new THREE.ConeGeometry(0.015, 0.045, 8)), pointMaterial);
+    point.rotation.x = Math.PI / 2;
+    point.position.z = 0.432;
+    point.castShadow = this.shadows;
+    const fletchingA = this.box(0.035, 0.026, 0.075, fletchingMaterial);
+    fletchingA.position.z = -0.345;
+    const fletchingB = this.box(0.026, 0.035, 0.075, fletchingMaterial);
+    fletchingB.position.z = -0.345;
+    arrow.add(shaft, point, fletchingA, fletchingB);
+    this.bowArrow = arrow;
+
+    group.add(riser, grip, upperLimb, lowerLimb, bowString, arrow);
+
+    const muzzle = new THREE.Object3D();
+    muzzle.name = 'weapon-muzzle-bow';
+    muzzle.position.set(0, 0, 0.54);
+    group.add(muzzle);
+    return { group, muzzle };
+  }
+
+  private updateBowGeometry(): void {
+    if (!this.bowStringGeometry || !this.bowArrow) return;
+    const drawZ = -0.34 * THREE.MathUtils.clamp(this.bowDraw, 0, 1);
+    const positions = this.bowStringGeometry.getAttribute('position') as THREE.BufferAttribute;
+    positions.setXYZ(0, 0, 0.70, 0.065);
+    positions.setXYZ(1, 0, 0, drawZ);
+    positions.setXYZ(2, 0, -0.70, 0.065);
+    positions.needsUpdate = true;
+    this.bowStringGeometry.computeBoundingSphere();
+
+    this.bowArrow.position.z = drawZ + 0.34;
+    this.bowArrow.visible = this.bowArrowVisible;
   }
 
   private updateVisibility(): void {
@@ -183,10 +298,13 @@ export class WeaponSocketVisual {
   private detach(): void {
     this.socket?.removeFromParent();
     this.characterRoot = null;
-    this.hand = null;
+    this.rightHand = null;
+    this.leftHand = null;
     this.socket = null;
     this.weaponGroups.clear();
     this.muzzles.clear();
+    this.bowStringGeometry = null;
+    this.bowArrow = null;
   }
 
   private box(width: number, height: number, depth: number, material: THREE.Material): THREE.Mesh {
@@ -213,6 +331,12 @@ export class WeaponSocketVisual {
 
   private material(parameters: THREE.MeshStandardMaterialParameters): THREE.MeshStandardMaterial {
     const material = new THREE.MeshStandardMaterial(parameters);
+    this.materials.push(material);
+    return material;
+  }
+
+  private lineMaterial(parameters: THREE.LineBasicMaterialParameters): THREE.LineBasicMaterial {
+    const material = new THREE.LineBasicMaterial(parameters);
     this.materials.push(material);
     return material;
   }
