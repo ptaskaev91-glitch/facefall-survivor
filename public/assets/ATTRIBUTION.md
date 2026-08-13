@@ -14,3 +14,6 @@ For each asset record:
 ## Current production-quality assets
 
 None yet. Current prototype/test assets are not considered final production art.
+
+## 0.12.0 family checkpoint
+No new third-party media was introduced for the family feature. Supermama visual differentiation is procedural and reuses the already documented Quaternius character/animation assets. Uploaded family photographs remain local user content and are not repository assets.

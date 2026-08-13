@@ -582,3 +582,23 @@ After every major block:
 - [x] mobile authored-level screenshot gate.
 
 Next: offline Recast navigation over the authored level, then realistic art replacement / Face System 2.0 / final HUD.
+
+---
+
+## 0.12.0 — «Супер Макар» family survival checkpoint (2026-08-14)
+
+- Игра переименована в **«Супер Макар»**.
+- Три независимых локальных фото: Супер Макар, Супермама, Суперпапа.
+- Фото персонажа отображается на увеличенной голове спереди и сзади для быстрой идентификации в TOP/3RD.
+- Супермама присоединяется после завершения 3-й волны (активна с wave 4), Суперпапа — после завершения 6-й (активен с wave 7).
+- Союзники следуют за Макаром, автоматически выбирают заражённых и ведут огонь.
+- Супермама получила отдельный процедурный силуэт/причёску; Суперпапа — отличимый масштаб корпуса. Новых внешних character assets для этого не добавлено.
+- Сложность масштабируется по номеру волны и количеству активных героев.
+- Добавлены zombie groan / pain / death WebAudio-эффекты.
+- За убийства выпадают монеты; монеты подбираются игроком. Награда: walker 2, runner 3, brute 5.
+- Магазин оружия: дробовик 20 монет, лук 30; до покупки оружие заблокировано.
+- Добавлены `FamilyCompanionSystem`, `CoinSystem`, семейный HUD/menu и regression coverage.
+- Семейный Playwright smoke загружает три разные тестовые фотографии, проверяет unlock/markers/shop и создаёт `mobile-super-makar-family.png`.
+- Финальный релизный gate: TypeScript strict, unit tests, Playwright browser/visual smoke, deploy build и sole deployment-root assertion.
+- Canonical source после merge: `main`. Продолжение разработки планируется отдельным этапом/перепиской.
+

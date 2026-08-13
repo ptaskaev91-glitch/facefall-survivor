@@ -67,3 +67,6 @@ Facefall vendors the non-root-motion Standard GLB used for hero locomotion under
 The non-root-motion variant is intentional because movement remains authoritative in Facefall's `PlayerRuntime`/collision simulation. The source archive SHA-256 and provenance are recorded in that folder's `ASSET_SOURCE.md`; the original license and README are retained verbatim.
 
 License: **CC0 1.0 Universal / Public Domain Dedication**.
+
+## 0.12.0 family checkpoint
+No new third-party media was introduced for the family feature. Supermama visual differentiation is procedural and reuses the already documented Quaternius character/animation assets. Uploaded family photographs remain local user content and are not repository assets.
