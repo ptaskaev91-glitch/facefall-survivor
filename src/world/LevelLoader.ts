@@ -1,4 +1,4 @@
-import type { Group } from 'three';
+import { Group, Mesh } from 'three';
 import type { CollisionWorld } from '../physics/CollisionWorld';
 import { AssetManager } from './AssetManager';
 import { parseLevelManifest, type LevelManifest } from './LevelManifest';
@@ -41,7 +41,19 @@ export class LevelLoader {
 
     const root = gltf.scene;
     AssetManager.prepareRenderable(root, request.shadows);
-    this.collisionWorld?.rebuild(root);
+    root.name = root.name || 'authored-level-root';
+    if (this.collisionWorld) {
+      const collisionRoot = new Group();
+      root.updateMatrixWorld(true);
+      root.traverse((object) => {
+        if (!(object instanceof Mesh) || object.name.startsWith('decor-')) return;
+        const proxy = new Mesh(object.geometry);
+        proxy.matrix.copy(object.matrixWorld);
+        proxy.matrixAutoUpdate = false;
+        collisionRoot.add(proxy);
+      });
+      this.collisionWorld.rebuild(collisionRoot);
+    }
 
     return { root, manifest };
   }
