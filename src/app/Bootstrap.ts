@@ -17,10 +17,10 @@ function markBuildUi(): void {
   const badge = document.querySelector<HTMLElement>('.lab-badge');
   const kicker = document.querySelector<HTMLElement>('.menu-kicker');
   const notes = [...document.querySelectorAll<HTMLElement>('.menu-note')];
-  if (badge) badge.textContent = 'FACEFALL // 0.9.1 PISTOL ANIM';
-  if (kicker) kicker.textContent = 'FACEFALL SURVIVOR · ENGINE NEXT 0.9.1';
+  if (badge) badge.textContent = 'FACEFALL // 0.9.3 WEAPON SLICE';
+  if (kicker) kicker.textContent = 'FACEFALL SURVIVOR · ENGINE NEXT 0.9.3';
   if (notes[0]) {
-    notes[0].textContent = 'TOP: коснись любой свободной точки — джойстик появится под пальцем, герой сам выбирает цель и поворачивается к ней. 3RD: крестик всегда в центре, auto-aim доворачивает по горизонтали; свайп справа — ручной yaw. FIRE остаётся ручным; выстрел и перезарядка синхронизированы с анимацией героя.';
+    notes[0].textContent = 'TOP: коснись свободной точки — джойстик появится под пальцем, герой сам выбирает цель. 3RD: крестик в центре, свайп справа — ручной yaw. WEAP переключает pistol / shotgun / bow. FIRE и R синхронизированы с production weapon presentation; у лука стрела и тетива реагируют на реальный выстрел и перезарядку.';
   }
 }
 
