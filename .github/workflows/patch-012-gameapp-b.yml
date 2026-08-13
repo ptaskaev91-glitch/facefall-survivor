@@ -1,0 +1,47 @@
+name: Patch 012 GameApp B
+on:
+  push:
+    branches:
+      - 'feature/0.12.0-super-makar-family'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Patch GameApp runtime loop
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/app/GameApp.ts'); s=p.read_text()
+          pairs=[
+          ("    this.combat.dispose(); this.unregisterPlayerDamage(); this.waveDirector.stop(); this.enemySystem.reset(); this.pickups.dispose();", "    this.combat.dispose(); this.unregisterPlayerDamage(); this.waveDirector.stop(); this.family.dispose(); this.coinSystem.dispose(); this.enemySystem.reset(); this.pickups.dispose();"),
+          ("    this.dom.restart?.addEventListener('click', this.onRestart);", "    this.dom.restart?.addEventListener('click', this.onRestart);\n    this.dom.buyShotgun?.addEventListener('click', () => this.buyWeapon('shotgun', 20));\n    this.dom.buyBow?.addEventListener('click', () => this.buyWeapon('bow', 30));"),
+          ("    this.pickups.update(dt, this.player.position);\n    for (const request of this.waveDirector.update(dt, this.enemySystem.activeCount, this.maxActiveEnemies)) this.enemySystem.spawn(request.type, request.position);", "    this.pickups.update(dt, this.player.position);\n    this.coinSystem.update(dt, this.player.position);\n    const effectiveMax = this.maxActiveEnemies + (this.family.heroCount - 1) * 6;\n    for (const request of this.waveDirector.update(dt, this.enemySystem.activeCount, effectiveMax, this.family.heroCount)) this.enemySystem.spawn(request.type, request.position);\n    void this.family.syncWave(this.waveDirector.wave);\n    this.family.update(dt, this.player.position, this.player.facing);"),
+          ("    this.enemySystem.reset(); this.weaponSystem.reset();", "    this.enemySystem.reset(); this.family.reset(); this.coinSystem.reset(); this.coins = 0; this.weaponSystem.reset();")]
+          for a,b in pairs:
+            if a not in s: raise SystemExit('missing '+a[:60])
+            s=s.replace(a,b)
+          marker='  private refreshStatus(): void {'
+          shop="""  private buyWeapon(id: 'shotgun' | 'bow', price: number): void {\n    if (this.weaponSystem.isUnlocked(id)) { this.weaponSystem.select(id); this.player.setActiveWeapon(id); return; }\n    if (this.coins < price) { this.hud.setLastEvent(`НУЖНО ${price} МОНЕТ`); return; }\n    this.coins -= price; this.weaponSystem.unlock(id); this.weaponSystem.select(id); this.player.setActiveWeapon(id);\n    this.hud.setLastEvent(id === 'shotgun' ? 'ДРОБОВИК КУПЛЕН' : 'ЛУК КУПЛЕН'); this.refreshStatus();\n  }\n\n"""
+          if marker not in s: raise SystemExit('missing refresh marker')
+          s=s.replace(marker,shop+marker)
+          old='  private refreshStatus(): void {\n    const runtime'
+          new="""  private refreshStatus(): void {\n    if (this.dom.coins) this.dom.coins.textContent = String(this.coins);\n    if (this.dom.buyShotgun) { this.dom.buyShotgun.textContent = this.weaponSystem.isUnlocked('shotgun') ? 'ДРОБОВИК ✓' : 'ДРОБОВИК · 20'; this.dom.buyShotgun.disabled = !this.weaponSystem.isUnlocked('shotgun') && this.coins < 20; }\n    if (this.dom.buyBow) { this.dom.buyBow.textContent = this.weaponSystem.isUnlocked('bow') ? 'ЛУК ✓' : 'ЛУК · 30'; this.dom.buyBow.disabled = !this.weaponSystem.isUnlocked('bow') && this.coins < 30; }\n    const runtime"""
+          if old not in s: raise SystemExit('missing refresh body')
+          s=s.replace(old,new)
+          p.write_text(s)
+          PY
+          npm ci
+          npm run typecheck
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/patch-012-gameapp-b.yml
+          git add src/app/GameApp.ts
+          git commit -m 'feat: add family wave scaling and weapon shop'
+          git push origin HEAD:feature/0.12.0-super-makar-family
