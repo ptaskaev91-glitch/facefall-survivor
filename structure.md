@@ -607,3 +607,21 @@ src/
 10. No external asset is shipped without license/provenance record.
 11. Significant ownership/file changes update `structure.md`.
 12. Risky visual/refactor PRs should produce inspectable CI screenshots.
+
+
+---
+
+## 0.10.0 Production Core additions
+
+- `src/app/CombatRuntime.ts` — combat event/hitscan coordination boundary.
+- `src/app/RunSession.ts` — run score/kills state.
+- `src/assets/AssetBudget.ts` — byte and infected LOD budgets.
+- `src/characters/HeroCombatPose.ts` — skeletal overlays for shotgun/bow/hit/death states missing from the compact authored library.
+- `public/assets/weapons/shotgun.glb` — lazy production shotgun asset.
+- `public/assets/weapons/bow-arrow.glb` — lazy production bow + arrow asset.
+- `src/enemies/RiggedWalkerVisual.ts` now provides the shared production infected rig for Walker/Runner/Brute, action reactions, bone hit proxies and distance LOD.
+- `tests/smoke/production-weapons.spec.ts` — lazy weapon assets + hero reactions gate.
+- `tests/smoke/production-infected.spec.ts` — three-archetype rig/hit-zone/reuse visual gate.
+- `tests/unit/asset-budget.test.ts`, `weapon-assets.test.ts`, `run-session.test.ts` — production-core unit contracts.
+
+`EnemyRuntime` and `PresentationRuntime` remain intentionally uncreated: current `EnemySystem` and presentation boundaries are cohesive, so additional wrappers would add indirection without reducing responsibility.

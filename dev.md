@@ -2,12 +2,12 @@
 
 Последняя актуализация: **2026-08-13**  
 Repository: `ptaskaev91-glitch/facefall-survivor`  
-Source of truth: `visual/0.9.1-pistol-animation` until PR #21 merge, then `main`  
+Source of truth: `milestone/0.10.0-production-core` until PR #27 merge, then `main`  
 Hosting: **Vercel only**  
 Primary URL: `https://facefall-survivor-pavels-projects-0b29bb12.vercel.app`
 
-Текущий стабильный architecture checkpoint: **0.8.5–0.8.7 HARDENING**.  
-Текущий активный visual checkpoint: **0.9.1 PISTOL COMBAT ANIMATION — real FIRE/R events + one-shot overrides + mobile visual gate**.
+Текущий стабильный architecture checkpoint: **0.10.0 PRODUCTION CORE — CombatRuntime + RunSession**.  
+Текущий активный visual checkpoint: **0.10.0 PRODUCTION CORE — hero combat poses + weapon GLBs + Walker/Runner/Brute production infected**.
 
 Этот файл отражает только фактическую реализацию. Prototype/fallback не считается final implementation.
 
@@ -78,10 +78,10 @@ Reuse policy:
 
 ## Mobile 3RD
 
-- [x] fixed-center crosshair;
+- [x] reticle is allowed to move in X/Y under mobile aim-assist;
 - [x] no vertical manual aiming;
-- [x] horizontal swipe/yaw only;
-- [x] horizontal auto-aim steering toward infected;
+- [x] horizontal swipe/yaw remains manual camera control;
+- [x] auto-aim steers the visible reticle toward infected and firing uses the same NDC point;
 - [x] raised/pulled-back camera validated as usable on Android;
 - [x] camera collision.
 
@@ -236,22 +236,21 @@ Extracted:
 
 Still intentionally owns orchestration/order plus:
 
-- combat event wiring;
-- Weapon/Damage/Projectile systems;
+- construction/order of Weapon/Damage/Projectile systems while `CombatRuntime` owns combat event/hitscan coordination;
 - EnemySystem/WaveDirector/Pickup coordination;
 - aim coordination;
-- session score/kills;
+- `RunSession` owns session score/kills;
 - top-level lifecycle/state transitions.
 
 This is a substantial reduction in responsibility and creates clean insertion points for GLB hero/animation and authored world work.
 
 Remaining decomposition, **do incrementally only when useful**:
 
-- [ ] extract `CombatRuntime` before combat complexity grows further;
-- [ ] extract `RunSession` when progression/run statistics expand;
-- [ ] optionally extract `EnemyRuntime` during authored AI/nav integration;
-- [ ] optionally extract `PresentationRuntime` if FX/audio ownership grows;
-- [ ] avoid service locator / DI framework.
+- [x] extracted `CombatRuntime` for shot/reload/hit/kill coordination and hitscan resolution;
+- [x] extracted `RunSession` for kill/score/reset accounting;
+- [x] architecture decision: keep `EnemySystem` as the current cohesive enemy boundary; do **not** add `EnemyRuntime` until authored AI/nav creates real ownership pressure;
+- [x] architecture decision: keep current FX/audio ownership; do **not** add `PresentationRuntime` until presentation lifecycle materially grows;
+- [x] no service locator / DI framework introduced.
 
 Hard rule: do not turn `GameApp` back into the home of CharacterModel, AnimationMixer or authored-level implementation.
 
@@ -268,6 +267,8 @@ Playwright now automatically captures mobile-sized checkpoints:
 - [x] `mobile-face-front.png` with a synthetic uploaded face for head-bone inspection;
 - [x] `mobile-pistol-fire-third.png` after real held touch FIRE;
 - [x] `mobile-pistol-reload-front.png` during real touch reload state;
+- [x] `mobile-production-weapons-third.png` validates lazy shotgun/bow GLB presentation + hero reaction states;
+- [x] `mobile-production-infected-third.png` validates Walker/Runner/Brute production presentation and bone hit proxies;
 - [x] screenshots uploaded as `facefall-visual-checkpoints` artifact;
 - [x] assistant can download and inspect screenshots before merge.
 
@@ -297,7 +298,7 @@ Do not add broad mechanics before the screenshot stops looking like an engine pr
 - [x] `CharacterModel` wrapper lives behind `PlayerRuntime`;
 - [x] curved uploaded-face surface attached to the real `Head` bone;
 - [x] production weapon socket foundation on animated `hand_r`;
-- [ ] LOD/initial-download asset budget optimization.
+- [x] LOD/initial-download budget: weapon GLBs lazy-load on first selection; infected share one cached GLB; far infected disable decorative wounds/dynamic shadows; byte budgets are unit-tested.
 
 ## 8.2 Hero animation
 
@@ -306,28 +307,28 @@ Do not add broad mechanics before the screenshot stops looking like an engine pr
 - [x] walk;
 - [x] run;
 - [~] pistol aim foundation + [x] fire/reload one-shot animation overrides bound to actual combat events;
-- [ ] shotgun aim/fire/reload;
-- [ ] bow draw/release;
-- [ ] hit;
-- [ ] death;
+- [x] shotgun aim/fire/reload via upper-body skeletal combat overlay with authored-clip preference if a future library provides one;
+- [x] bow draw/release skeletal overlay synchronized with string/arrow presentation;
+- [x] hit reaction with authored-clip preference and procedural skeletal fallback;
+- [x] death reaction with authored-clip preference and persistent procedural skeletal fallback;
 - [x] locomotion state resolver + crossfades;
 - [x] animation state unit tests where state logic is pure.
 
 ## 8.3 Weapons art
 
 - [~] production-direction pistol visual at realistic ~21 cm scale; final GLB remains optional if materially better;
-- [ ] shotgun GLB;
-- [ ] bow + arrow GLB;
+- [x] shotgun GLB generated from the production-direction weapon geometry and lazy-loaded on first shotgun selection;
+- [x] bow + arrow GLB generated from the production-direction geometry; nocked GLB arrow remains connected to draw/release state;
 - [x] animated right-hand position socket foundation;
 - [x] muzzle anchor from active production weapon rather than approximate player offset.
 
 ## 8.4 Production infected
 
-- [ ] Walker GLB + locomotion/attack/stagger/death;
-- [ ] Runner GLB + distinct silhouette/animation;
-- [ ] Brute GLB + distinct mass/silhouette/animation;
-- [ ] body-part hit metadata/colliders mapped to real meshes;
-- [ ] pool/reuse assets instead of loading per spawn.
+- [x] Walker production GLB presentation + native-bind locomotion/attack/stagger/death;
+- [x] Runner uses the shared production zombie GLB with a narrower silhouette, forward lean, faster gait and distinct reactions — no duplicate binary payload;
+- [x] Brute uses the shared production zombie GLB with larger mass/width/depth, slower heavy gait and distinct reactions — no duplicate binary payload;
+- [x] body-part hit proxies are attached to real head/torso/arm/leg bones; visual skin raycast is disabled for gameplay;
+- [x] one cached zombie GLB source is reused/cloned for every archetype/spawn instead of network-loading per spawn.
 
 Exit criterion: hero and infected read as actual characters in both TOP and 3RD screenshots.
 
