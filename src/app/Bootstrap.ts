@@ -17,10 +17,10 @@ function markBuildUi(): void {
   const badge = document.querySelector<HTMLElement>('.lab-badge');
   const kicker = document.querySelector<HTMLElement>('.menu-kicker');
   const notes = [...document.querySelectorAll<HTMLElement>('.menu-note')];
-  if (badge) badge.textContent = 'FACEFALL // 0.9.4 INFECTED SLICE';
-  if (kicker) kicker.textContent = 'FACEFALL SURVIVOR · ENGINE NEXT 0.9.4';
+  if (badge) badge.textContent = 'FACEFALL // 0.10.0 PRODUCTION CORE';
+  if (kicker) kicker.textContent = 'FACEFALL SURVIVOR · ENGINE NEXT 0.10.0';
   if (notes[0]) {
-    notes[0].textContent = 'TOP: коснись свободной точки — джойстик появится под пальцем, герой сам выбирает цель. 3RD: свайп справа — ручной yaw, мобильный aim-assist двигает крестик к видимой цели, и выстрел идёт через ту же точку. WEAP переключает pistol / shotgun / bow. Walker теперь использует отдельный ригованный infected mesh; runner и brute пока остаются процедурными.';
+    notes[0].textContent = 'TOP: герой автоматически выбирает цель. 3RD: мобильный aim-assist двигает крестик по X/Y к видимому заражённому, и выстрел идёт через ту же точку. WEAP переключает pistol / shotgun / bow; shotgun и bow GLB загружаются лениво при первом выборе. Walker / Runner / Brute используют общий production infected rig с разными силуэтами, походкой и combat reactions.';
   }
 }
 
