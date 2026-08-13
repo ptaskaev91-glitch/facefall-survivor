@@ -462,7 +462,29 @@ Next: pistol fire/reload animation integration, then shotgun/bow production visu
 
 ---
 
-# 21. How to continue this file
+# 21. 0.9.1 — pistol combat animation integration
+
+PR #21 on `visual/0.9.1-pistol-animation` connected the production hero animation layer to actual combat events instead of decorative playback.
+
+Implemented:
+
+- `CharacterModel` gained temporary one-shot animation overrides above locomotion and clean return to the current idle/walk/run state;
+- actual player `shot` events trigger the pistol fire clip;
+- actual `weaponReload` events trigger the pistol reload clip;
+- a GLB asset-contract unit test reads the vendored `UAL1_Standard.glb` and verifies compatible pistol fire/reload clips exist;
+- `PlayerRuntime` tracks the active weapon, hides the pistol when shotgun/bow is selected and uses production muzzle position only for pistol;
+- mobile visual smoke now models FIRE as a true held pointer action (`pointerdown` across fixed updates) and validates ammo consumption, cooldown, reload state and animation screenshots;
+- the test found that instantaneous synthetic `tap()` is not equivalent to Facefall's held FIRE semantics; the test was corrected rather than weakening production input behavior;
+- stale build text in `Bootstrap.markBuildUi()` was fixed so runtime no longer rewrites the UI back to 0.8.5;
+- deployment-root CI was made version-independent: production `index.html` must be byte-identical to the compiled `engine-lab.html`, instead of grepping for a hard-coded 0.8 string.
+
+Visual review confirmed distinct pistol fire and reload poses while the uploaded face remains attached to the animated head.
+
+Next ordered work: shotgun production visual/socket + animation, then bow draw/release, then production infected.
+
+---
+
+# 22. How to continue this file
 
 At every major checkpoint record:
 

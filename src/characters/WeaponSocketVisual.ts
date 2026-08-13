@@ -88,6 +88,10 @@ export class WeaponSocketVisual {
     this.socket.quaternion.identity();
   }
 
+  setVisible(visible: boolean): void {
+    if (this.socket) this.socket.visible = visible;
+  }
+
   getMuzzleWorldPosition(out: THREE.Vector3): boolean {
     if (!this.muzzle) return false;
     this.muzzle.getWorldPosition(out);

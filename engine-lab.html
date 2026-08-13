@@ -27,7 +27,7 @@
 <body>
   <div id="app"></div>
   <div class="lab-ui">
-    <div class="lab-badge">FACEFALL // ENGINE NEXT 0.8.1 AIM+CHARACTER</div>
+    <div class="lab-badge">FACEFALL // 0.9.1 PISTOL ANIM</div>
     <div class="run-hud"><span>HP <b id="runHp">100</b></span><span>WAVE <b id="runWave">1</b></span><span>KILLS <b id="runKills">0</b></span><span>SCORE <b id="runScore">000000</b></span></div>
     <div class="lab-controls"><button id="camTop" data-active="true">TOP</button><button id="camThird" data-active="false">3RD</button></div>
     <div class="aim-reticle" id="aimReticle" data-mode="top" aria-hidden="true"><i></i></div>
@@ -38,7 +38,7 @@
 
   <section class="product-menu" id="productMenu" data-visible="true" aria-label="Facefall start menu">
     <div class="menu-card">
-      <div class="menu-kicker">FACEFALL SURVIVOR · ENGINE NEXT 0.8.1</div>
+      <div class="menu-kicker">FACEFALL SURVIVOR · ENGINE NEXT 0.9.1</div>
       <h1>ТВОЁ ЛИЦО.<br>ТВОЯ НОЧЬ.</h1>
       <p>Загрузи фотографию — она останется только в этом браузере. Выбери камеру и начинай забег.</p>
       <div class="menu-grid">
@@ -54,7 +54,7 @@
             <label class="setting-row"><span>AIM ASSIST</span><input id="aimAssist" type="range" min="0" max="1" step="0.05" value="0.72"><output id="aimAssistValue">72%</output></label>
             <label class="setting-row"><span>ЗВУК</span><input id="masterVolume" type="range" min="0" max="1" step="0.05" value="0.72"><output id="masterVolumeValue">72%</output></label>
           </div></div>
-          <div class="menu-section"><h3>УПРАВЛЕНИЕ</h3><div class="menu-note">TOP: свайп двигает направление блеклого лазерного луча. 3RD: крестик всегда в центре, свайп поворачивает героя и камеру только влево/вправо. FIRE стреляет по активному направлению.</div></div>
+          <div class="menu-section"><h3>УПРАВЛЕНИЕ</h3><div class="menu-note">TOP: герой автоматически доворачивается к цели, движение — динамический джойстик. 3RD: крестик в центре, свайп поворачивает камеру по горизонтали. FIRE стреляет по активному направлению.</div></div>
           <button class="start-game" id="startGame" type="button">НАЧАТЬ ЗАБЕГ</button>
           <div class="menu-loading" id="menuLoading"></div><div class="menu-error" id="menuError"></div>
           <div class="menu-note">Фото и настройки сохраняются только локально в этом браузере.</div>

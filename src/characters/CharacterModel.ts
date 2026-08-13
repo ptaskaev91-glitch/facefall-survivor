@@ -27,6 +27,9 @@ export class CharacterModel {
   private readonly actions = new Map<LocomotionState, THREE.AnimationAction>();
   private readonly clips: THREE.AnimationClip[] = [];
   private model: THREE.Object3D | null = null;
+  private overrideAction: THREE.AnimationAction | null = null;
+  private overrideTime = 0;
+  private desiredLocomotion: LocomotionState = 'idle';
   private mixer: THREE.AnimationMixer | null = null;
   private activeState: LocomotionState | null = null;
   private headBone: THREE.Bone | null = null;
@@ -126,8 +129,36 @@ export class CharacterModel {
 
   update(dt: number, speed: number): void {
     if (!this.loaded || !this.mixer) return;
-    this.setLocomotion(resolveLocomotionState(speed));
-    this.mixer.update(Math.max(0, dt));
+    const safeDt = Math.max(0, dt);
+    this.desiredLocomotion = resolveLocomotionState(speed);
+
+    if (this.overrideAction) {
+      this.overrideTime = Math.max(0, this.overrideTime - safeDt);
+      this.mixer.update(safeDt);
+      if (this.overrideTime <= 0) this.finishOverride();
+      return;
+    }
+
+    this.setLocomotion(this.desiredLocomotion);
+    this.mixer.update(safeDt);
+  }
+
+  playPistolFire(): boolean {
+    const clip = this.findClip(
+      ['Pistol_Fire', 'Pistol_Shoot', 'Pistol_Shot'],
+      [/pistol.*(fire|shoot|shot)/i, /(fire|shoot|shot).*pistol/i]
+    );
+    if (!clip) return false;
+    return this.playOverride(clip, Math.min(0.42, Math.max(0.12, clip.duration)), 0.035);
+  }
+
+  playPistolReload(): boolean {
+    const clip = this.findClip(
+      ['Pistol_Reload', 'Reload_Pistol'],
+      [/pistol.*reload/i, /reload.*pistol/i]
+    );
+    if (!clip) return false;
+    return this.playOverride(clip, Math.max(0.25, clip.duration), 0.08);
   }
 
   dispose(): void {
@@ -140,6 +171,8 @@ export class CharacterModel {
   private bindLocomotionActions(clips: THREE.AnimationClip[]): void {
     this.mixer?.stopAllAction();
     this.actions.clear();
+    this.overrideAction = null;
+    this.overrideTime = 0;
     this.activeState = null;
     if (!this.mixer) return;
 
@@ -155,6 +188,43 @@ export class CharacterModel {
     if (idle) this.actions.set('idle', this.mixer.clipAction(idle));
     if (walk) this.actions.set('walk', this.mixer.clipAction(walk));
     if (run) this.actions.set('run', this.mixer.clipAction(run));
+  }
+
+  private findClip(exactNames: string[], patterns: RegExp[]): THREE.AnimationClip | undefined {
+    for (const name of exactNames) {
+      const exact = this.clips.find((clip) => clip.name.toLowerCase() === name.toLowerCase());
+      if (exact) return exact;
+    }
+    return this.clips.find((clip) => patterns.some((pattern) => pattern.test(clip.name)));
+  }
+
+  private playOverride(clip: THREE.AnimationClip, duration: number, fade: number): boolean {
+    if (!this.mixer) return false;
+
+    const action = this.mixer.clipAction(clip);
+    if (this.overrideAction && this.overrideAction !== action) this.overrideAction.fadeOut(fade);
+    const locomotion = this.activeState ? this.actions.get(this.activeState) : undefined;
+    locomotion?.fadeOut(fade);
+
+    action
+      .reset()
+      .setLoop(THREE.LoopOnce, 1)
+      .setEffectiveTimeScale(1)
+      .setEffectiveWeight(1);
+    action.clampWhenFinished = false;
+    action.fadeIn(fade).play();
+    this.overrideAction = action;
+    this.overrideTime = duration;
+    return true;
+  }
+
+  private finishOverride(): void {
+    if (!this.overrideAction) return;
+    this.overrideAction.fadeOut(0.08);
+    this.overrideAction = null;
+    this.overrideTime = 0;
+    this.activeState = null;
+    this.setLocomotion(this.desiredLocomotion);
   }
 
   private setLocomotion(state: LocomotionState, immediate = false): void {
@@ -415,6 +485,9 @@ export class CharacterModel {
     this.mixer = null;
     this.actions.clear();
     this.clips.splice(0);
+    this.overrideAction = null;
+    this.overrideTime = 0;
+    this.desiredLocomotion = 'idle';
     this.activeState = null;
     this.headBone = null;
     this.eyes = null;

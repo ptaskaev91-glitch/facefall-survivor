@@ -15,13 +15,29 @@ const testFaceSvg = `
   <path d="M55 104 Q160 17 265 104" fill="none" stroke="#3f2c22" stroke-width="30" stroke-linecap="round"/>
 </svg>`;
 
+const pointerDown = (pointerId: number) => ({
+  pointerId,
+  pointerType: 'touch',
+  isPrimary: true,
+  button: 0,
+  buttons: 1
+});
+
+const pointerUp = (pointerId: number) => ({
+  pointerId,
+  pointerType: 'touch',
+  isPrimary: true,
+  button: 0,
+  buttons: 0
+});
+
 test.use({
   viewport: { width: 412, height: 915 },
   hasTouch: true,
   isMobile: true
 });
 
-test('capture mobile TOP, 3RD and uploaded-face checkpoints', async ({ page }) => {
+test('capture mobile TOP, 3RD, pistol fire/reload and uploaded-face checkpoints', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
 
@@ -44,12 +60,59 @@ test('capture mobile TOP, 3RD and uploaded-face checkpoints', async ({ page }) =
   await page.waitForTimeout(800);
   await page.screenshot({ path: `${artifactDir}/mobile-third.png`, fullPage: true });
 
-  // CI-only inspection shot. The runtime is already exposed by Bootstrap for diagnostics;
-  // pausing prevents CameraDirector from replacing this temporary camera pose.
+  const magazineBefore = await page.evaluate(() => {
+    const runtimeWindow = window as Window & { __facefallApp?: any };
+    const app = runtimeWindow.__facefallApp;
+    if (!app) throw new Error('Facefall runtime is unavailable for ammo inspection');
+    return app.weaponSystem.runtime().magazine as number;
+  });
+
+  // FIRE is intentionally a held action in TouchInput. Keep pointerdown alive across
+  // several fixed updates rather than using an instantaneous synthetic tap.
+  const fire = page.locator('#touchFire');
+  await fire.dispatchEvent('pointerdown', pointerDown(41));
+  await page.waitForTimeout(110);
+  await fire.dispatchEvent('pointerup', pointerUp(41));
+  await page.waitForTimeout(40);
+
+  const magazineAfter = await page.evaluate(() => {
+    const runtimeWindow = window as Window & { __facefallApp?: any };
+    const app = runtimeWindow.__facefallApp;
+    if (!app) throw new Error('Facefall runtime is unavailable for ammo inspection');
+    return app.weaponSystem.runtime().magazine as number;
+  });
+  expect(magazineAfter).toBeLessThan(magazineBefore);
+  await page.screenshot({ path: `${artifactDir}/mobile-pistol-fire-third.png`, fullPage: true });
+
+  // Let the short fire cooldown finish before asking WeaponSystem to enter reload.
+  await page.waitForTimeout(450);
+  const stateBeforeReload = await page.evaluate(() => {
+    const runtimeWindow = window as Window & { __facefallApp?: any };
+    const app = runtimeWindow.__facefallApp;
+    if (!app) throw new Error('Facefall runtime is unavailable for reload inspection');
+    return app.weaponSystem.runtime().state as string;
+  });
+  expect(stateBeforeReload).toBe('idle');
+
+  const reload = page.locator('#touchReload');
+  await reload.dispatchEvent('pointerdown', pointerDown(42));
+  await page.waitForTimeout(45);
+  await reload.dispatchEvent('pointerup', pointerUp(42));
+  await page.waitForTimeout(110);
+
+  const reloadState = await page.evaluate(() => {
+    const runtimeWindow = window as Window & { __facefallApp?: any };
+    const app = runtimeWindow.__facefallApp;
+    if (!app) throw new Error('Facefall runtime is unavailable for reload inspection');
+    return app.weaponSystem.runtime().state as string;
+  });
+  expect(reloadState).toBe('reloading');
+
+  // Freeze reload pose and inspect the hero/front face deterministically.
   await page.evaluate(() => {
     const runtimeWindow = window as Window & { __facefallApp?: any };
     const app = runtimeWindow.__facefallApp;
-    if (!app) throw new Error('Facefall runtime is unavailable for face inspection');
+    if (!app) throw new Error('Facefall runtime is unavailable for reload inspection');
     app.pause();
 
     const player = app.player;
@@ -68,7 +131,8 @@ test('capture mobile TOP, 3RD and uploaded-face checkpoints', async ({ page }) =
     camera.updateProjectionMatrix();
     world.render();
   });
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(80);
+  await page.screenshot({ path: `${artifactDir}/mobile-pistol-reload-front.png`, fullPage: true });
   await page.screenshot({ path: `${artifactDir}/mobile-face-front.png`, fullPage: true });
 
   expect(errors, `Fatal browser errors: ${errors.join(' | ')}`).toEqual([]);

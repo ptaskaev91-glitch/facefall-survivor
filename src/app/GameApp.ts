@@ -271,7 +271,10 @@ export class GameApp {
     this.unsubscribeEvents.push(this.events.on('shot', (shot) => {
       this.effects.play(`${shot.weaponId}-shot`, { origin: shot.origin, direction: shot.direction });
       const definition = WEAPONS[shot.weaponId];
-      if (shot.sourceId === 'player') this.applyWeaponRecoil(definition);
+      if (shot.sourceId === 'player') {
+        this.player.playWeaponFire(shot.weaponId);
+        this.applyWeaponRecoil(definition);
+      }
 
       if (definition.fireModel === 'projectile') {
         const projectileDirection = this.spreadDirection(shot.direction, definition.spread * this.movementSpreadMultiplier);
@@ -307,6 +310,10 @@ export class GameApp {
           critical: hitZone === 'head'
         });
       }
+    }));
+
+    this.unsubscribeEvents.push(this.events.on('weaponReload', ({ weaponId }) => {
+      this.player.playWeaponReload(weaponId);
     }));
 
     this.unsubscribeEvents.push(this.events.on('hit', (hit) => {
@@ -380,7 +387,7 @@ export class GameApp {
     this.world.updateSimulation(dt);
 
     if (this.input.consumePressed('toggleCamera')) this.setCameraMode(this.cameraMode === 'top' ? 'third' : 'top');
-    if (this.input.consumePressed('switchWeapon')) this.weaponSystem.cycle();
+    if (this.input.consumePressed('switchWeapon')) this.player.setActiveWeapon(this.weaponSystem.cycle());
     if (this.input.consumePressed('reload')) this.weaponSystem.reload();
     if (controls.fire) {
       this.player.muzzle(this.muzzle);
@@ -471,6 +478,7 @@ export class GameApp {
   private resetRun(): void {
     this.enemySystem.reset();
     this.weaponSystem.reset();
+    this.player.setActiveWeapon(this.weaponSystem.selected);
     this.projectileSystem.reset();
     this.playerHealth.reset();
     this.pickups.reset();

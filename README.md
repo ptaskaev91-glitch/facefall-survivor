@@ -20,22 +20,25 @@ Current gameplay foundation:
 - rain, fog, storm/lightning, grass, pooled particles/decals/lights and procedural Web Audio;
 - strict TypeScript, reproducible `npm ci`, unit-test baseline and Playwright desktop/mobile browser smoke tests.
 
-### 0.9.0 hero vertical slice
+### 0.9.0–0.9.1 hero vertical slice
 
-The player is no longer limited to the procedural low-poly body. The active 0.9.0 branch adds a real rigged GLTF hero behind `PlayerRuntime`:
+The player is no longer limited to the procedural low-poly body. The 0.9.x visual slice adds a real rigged GLTF hero behind `PlayerRuntime`:
 
 - verified CC0 Quaternius Universal Base Characters male asset;
 - 65-bone humanoid skeleton loaded with `GLTFLoader` and cloned with `SkeletonUtils`;
 - scale normalized from anatomical skeleton height rather than unreliable undeformed SkinnedMesh bounds;
-- CC0 Universal Animation Library locomotion with rotation-only retargeting, preserving the hero's own bone lengths;
+- CC0 Universal Animation Library with rotation-only retargeting, preserving the hero's own bone lengths;
 - idle / walk / run crossfades through `AnimationMixer`;
 - uploaded photo rendered on a curved face shell attached to the real `Head` bone;
 - gameplay-facing corrected to match Facefall aiming;
 - production pistol visual follows the animated `hand_r` position;
-- muzzle origin now comes from the production weapon socket when the production hero is active;
+- muzzle origin comes from the production pistol socket when pistol is active;
+- actual player `shot` and `weaponReload` combat events trigger pistol fire/reload animation overrides;
+- switching away from pistol hides its production visual and stops using its muzzle for other weapons;
+- fire/reload overrides return cleanly to the current locomotion state;
 - legacy procedural player remains an automatic fallback if the production asset fails to load.
 
-Playwright visual smoke now uploads TOP, 3RD and front-facing uploaded-face inspection checkpoints so character regressions are caught before merge.
+Playwright visual smoke uploads TOP, 3RD, pistol-fire, pistol-reload and front-facing uploaded-face inspection checkpoints. The mobile combat smoke uses the actual `TouchInput` pointerdown/pointerup path, verifies ammo consumption and reload state, and therefore catches both visual and input/event regressions.
 
 ## Architecture
 
@@ -65,7 +68,7 @@ npm run test:smoke
 npm run build:deploy
 ```
 
-The Vite development entrypoint is `/engine-lab.html`; production promotes the same compiled application to `/`.
+The Vite development entrypoint is `/engine-lab.html`; production promotes the exact same compiled document to `/` and CI verifies the two built HTML files are byte-identical.
 
 ## Hosting
 
@@ -77,15 +80,14 @@ Production URL:
 
 ## Next major product work
 
-The visual vertical slice is now the priority. Ordered next work:
+The visual vertical slice remains the priority. Ordered next work:
 
-1. pistol fire/reload animation integration and final weapon-art pass;
-2. shotgun and bow production weapon visuals/sockets;
-3. production Walker / Runner / Brute models and animation;
-4. authored `Abandoned Outskirts` level GLB;
-5. offline Recast navmesh for the authored level;
-6. Face System 2.0 crop/fitting polish on the production head;
-7. final survivor-style HUD and Android performance pass.
+1. shotgun and bow production weapon visuals/sockets and matching combat animations;
+2. production Walker / Runner / Brute models and animation;
+3. authored `Abandoned Outskirts` level GLB;
+4. offline Recast navmesh for the authored level;
+5. Face System 2.0 crop/fitting polish on the production head;
+6. final survivor-style HUD and Android performance/asset-budget pass.
 
 ## Asset / source licensing
 
