@@ -1,0 +1,31 @@
+name: Merge PR30 Git
+on:
+  push:
+    branches: [feature/0.12.0-super-makar-family]
+permissions:
+  contents: write
+jobs:
+  merge:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/0.12.0-super-makar-family
+          fetch-depth: 0
+      - name: Clean helper and merge feature into main
+        shell: bash
+        run: |
+          git config user.name ptaskaev91-glitch
+          git config user.email p.taskaev91@gmail.com
+
+          rm -f .github/workflows/merge-pr30-git.yml
+          git add -A
+          git commit -m "chore: remove git merge helper"
+          git push origin HEAD:feature/0.12.0-super-makar-family
+          FEATURE_SHA="$(git rev-parse HEAD)"
+
+          git fetch origin main
+          git checkout -B main origin/main
+          git merge --no-ff "$FEATURE_SHA" -m "Merge pull request #30: Super Makar 0.12.0 family survival"
+          git push origin main
