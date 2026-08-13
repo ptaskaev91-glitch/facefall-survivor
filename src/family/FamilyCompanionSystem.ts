@@ -51,6 +51,46 @@ export class FamilyCompanionSystem {
   dispose(): void { for (const c of Object.values(this.companions)) { c.model.dispose(); c.root.removeFromParent(); } }
   private get active(): Companion[] { return Object.values(this.companions).filter((c) => c.unlocked); }
   private make(role: FamilyRole): Companion { const root = new THREE.Group(); root.name = `super-${role}`; root.visible = false; const model = new CharacterModel(this.quality.shadows); root.add(model.root); this.scene.add(root); return { role, root, model, fireTimer: 0, unlocked: false, face: null }; }
-  private async unlock(c: Companion): Promise<void> { c.unlocked = true; c.root.visible = true; try { await c.model.load(HERO); await c.model.loadAnimations(ANIM); await c.model.setFaceDataUrl(c.face); c.model.setVisible(true); c.model.setActiveWeapon('pistol'); } catch (error) { console.warn(`[Super Makar] ${c.role} model unavailable`, error); } }
+  private async unlock(c: Companion): Promise<void> {
+    c.unlocked = true;
+    c.root.visible = true;
+    try {
+      await c.model.load(HERO);
+      await c.model.loadAnimations(ANIM);
+      await c.model.setFaceDataUrl(c.face);
+      c.model.setVisible(true);
+      c.model.setActiveWeapon('pistol');
+      this.decorate(c);
+    } catch (error) {
+      console.warn(`[Super Makar] ${c.role} model unavailable`, error);
+    }
+  }
+  private decorate(c: Companion): void {
+    if (c.model.root.getObjectByName(`super-${c.role}-marker`)) return;
+    if (c.role === 'mama') {
+      const head = c.model.root.getObjectByName('Head') ?? c.model.root;
+      const hairMaterial = new THREE.MeshStandardMaterial({ color: 0x36251f, roughness: 0.82 });
+      const bun = new THREE.Mesh(new THREE.SphereGeometry(0.095, 10, 8), hairMaterial);
+      bun.name = 'super-mama-marker';
+      bun.position.set(0, 0.07, 0.095);
+      bun.scale.set(1.05, 1.15, 1.05);
+      bun.castShadow = this.quality.shadows;
+      head.add(bun);
+
+      const tail = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.15, 5, 8), hairMaterial.clone());
+      tail.name = 'super-mama-ponytail';
+      tail.rotation.x = 0.3;
+      tail.position.set(0, -0.07, 0.14);
+      tail.castShadow = this.quality.shadows;
+      head.add(tail);
+
+      c.model.root.scale.x *= 0.94;
+    } else {
+      const marker = new THREE.Group();
+      marker.name = 'super-papa-marker';
+      c.model.root.add(marker);
+      c.model.root.scale.x *= 1.04;
+    }
+  }
   private nearest(from: THREE.Vector3): THREE.Object3D | null { let best: THREE.Object3D | null = null; let bestDistance = 900; for (const root of this.enemies.aimTargets) { if (!root.visible || !root.userData.damageTargetId) continue; const distance = root.position.distanceToSquared(from); if (distance < bestDistance) { bestDistance = distance; best = root; } } return best; }
 }
