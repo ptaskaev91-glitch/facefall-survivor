@@ -1,0 +1,31 @@
+name: Patch 012 Audio
+on:
+  push:
+    branches:
+      - 'feature/0.12.0-super-makar-family'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch audio
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/presentation/audio/AudioSystem.ts'); s=p.read_text()
+          s=s.replace("    this.cleanups.push(events.on('enemyAttack', (event) => {", "    this.cleanups.push(events.on('enemyGroan', (event) => { const base = event.kind === 'brute' ? 52 : event.kind === 'runner' ? 104 : 72; this.zombieVoice(base, event.kind === 'brute' ? 0.62 : 0.42, event.kind === 'brute' ? 0.055 : 0.035); }));\n    this.cleanups.push(events.on('enemyAttack', (event) => {")
+          s=s.replace("      else this.noiseBurst(event.critical ? 0.11 : 0.06, event.critical ? 0.10 : 0.055, 1300);", "      else { this.noiseBurst(event.critical ? 0.11 : 0.06, event.critical ? 0.10 : 0.055, 1300); this.zombieVoice(event.critical ? 118 : 92, event.lethal ? 0.48 : 0.24, event.lethal ? 0.09 : 0.045); }")
+          s=s.replace("    this.cleanups.push(events.on('kill', () => this.pulse(180, 0.08, 0.035, 'triangle')));", "    this.cleanups.push(events.on('kill', (event) => { if (event.targetId !== 'player') this.zombieVoice(70, 0.62, 0.11); this.pulse(180, 0.08, 0.035, 'triangle'); }));")
+          marker='  private pulse(frequency: number'
+          method="""  private zombieVoice(base: number, duration: number, gainValue: number): void {\n    const context = this.context; const master = this.master; if (!context || !master || context.state !== 'running') return;\n    const oscillator = context.createOscillator(); const gain = context.createGain(); const filter = context.createBiquadFilter(); const now = context.currentTime;\n    oscillator.type = 'sawtooth'; oscillator.frequency.setValueAtTime(base, now); oscillator.frequency.linearRampToValueAtTime(base * 0.72, now + duration * 0.55); oscillator.frequency.linearRampToValueAtTime(base * 0.9, now + duration);\n    filter.type = 'lowpass'; filter.frequency.value = 620; gain.gain.setValueAtTime(0.0001, now); gain.gain.exponentialRampToValueAtTime(gainValue, now + 0.035); gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);\n    oscillator.connect(filter).connect(gain).connect(master); oscillator.start(now); oscillator.stop(now + duration + 0.02);\n  }\n\n"""
+          s=s.replace(marker,method+marker)
+          p.write_text(s)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/patch-012-audio.yml
+          git add src/presentation/audio/AudioSystem.ts
+          git commit -m 'feat: add zombie vocal audio'
+          git push origin HEAD:feature/0.12.0-super-makar-family
