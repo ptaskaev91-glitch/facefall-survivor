@@ -42,7 +42,10 @@ export function resolveGameAppDom(): GameAppDom {
     touchFire: optional<HTMLElement>('#touchFire'),
     touchReload: optional<HTMLElement>('#touchReload'),
     touchWeapon: optional<HTMLElement>('#touchWeapon'),
-    touchCamera: optional<HTMLElement>('#touchCamera')
+    touchCamera: optional<HTMLElement>('#touchCamera'),
+    coins: optional<HTMLElement>('#coinCount'),
+    buyShotgun: optional<HTMLButtonElement>('#buyShotgun'),
+    buyBow: optional<HTMLButtonElement>('#buyBow')
   };
 }
 
