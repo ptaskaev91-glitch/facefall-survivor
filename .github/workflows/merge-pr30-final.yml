@@ -1,0 +1,31 @@
+name: Merge PR30 Final
+on:
+  push:
+    branches: [feature/0.12.0-super-makar-family]
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  merge:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/0.12.0-super-makar-family
+          fetch-depth: 0
+      - name: Remove helper and merge PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          rm -f .github/workflows/merge-pr30-final.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "chore: remove final merge helper"
+          git push origin HEAD:feature/0.12.0-super-makar-family
+          NEW_SHA="$(git rev-parse HEAD)"
+          gh api --method PUT repos/ptaskaev91-glitch/facefall-survivor/pulls/30/merge \
+            -f merge_method=merge \
+            -f sha="$NEW_SHA"
