@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { resolveLocomotionState, type LocomotionState } from './CharacterLocomotion';
+import { HeroCombatPose } from './HeroCombatPose';
 import type { WeaponId } from '../combat/types';
 
 export interface CharacterLoadResult {
@@ -26,6 +27,7 @@ export class CharacterModel {
 
   private readonly loader = new GLTFLoader();
   private readonly actions = new Map<LocomotionState, THREE.AnimationAction>();
+  private readonly combatPose = new HeroCombatPose();
   private readonly clips: THREE.AnimationClip[] = [];
   private model: THREE.Object3D | null = null;
   private overrideAction: THREE.AnimationAction | null = null;
@@ -79,6 +81,7 @@ export class CharacterModel {
     this.mixer = new THREE.AnimationMixer(instance);
     this.headBone = this.findBone(instance, 'Head');
     this.eyes = instance.getObjectByName('Eyes') ?? null;
+    this.combatPose.bind(instance);
     this.loaded = true;
 
     this.clips.splice(0, this.clips.length, ...gltf.animations);
@@ -137,12 +140,14 @@ export class CharacterModel {
     if (this.overrideAction) {
       this.overrideTime = Math.max(0, this.overrideTime - safeDt);
       this.mixer.update(safeDt);
+      this.combatPose.update(safeDt, this.activeWeapon);
       if (this.overrideTime <= 0) this.finishOverride();
       return;
     }
 
     this.setLocomotion(this.desiredLocomotion);
     this.mixer.update(safeDt);
+    this.combatPose.update(safeDt, this.activeWeapon);
   }
 
   setActiveWeapon(weaponId: WeaponId): void {
@@ -176,8 +181,21 @@ export class CharacterModel {
       ['Shotgun_Fire', 'Shotgun_Shoot', 'Shotgun_Shot', 'Rifle_Fire', 'Rifle_Shoot', 'Rifle_Shot'],
       [/(shotgun|rifle).*(fire|shoot|shot)/i, /(fire|shoot|shot).*(shotgun|rifle)/i]
     );
-    if (!clip) return false;
-    return this.playOverride(clip, Math.min(0.56, Math.max(0.16, clip.duration)), 0.045);
+    if (clip) return this.playOverride(clip, Math.min(0.56, Math.max(0.16, clip.duration)), 0.045);
+    return this.combatPose.play('shotgun-fire', 0.38);
+  }
+
+  playHit(): boolean {
+    const clip = this.findClip(['Hit', 'Hit_Reaction', 'Damage'], [/hit/i, /damage/i, /impact/i]);
+    return clip ? this.playOverride(clip, Math.min(0.55, Math.max(0.2, clip.duration)), 0.04) : this.combatPose.play('hit', 0.42);
+  }
+
+  playDeath(): boolean {
+    const clip = this.findClip(['Death', 'Die', 'Death_01'], [/death/i, /die/i, /dying/i]);
+    if (clip) return this.playOverride(clip, Math.max(0.8, clip.duration), 0.08);
+    const started = this.combatPose.play('death', 1.1, 0.35);
+    if (started) this.combatPose.update(0, this.activeWeapon);
+    return started;
   }
 
   playShotgunReload(): boolean {
@@ -185,8 +203,16 @@ export class CharacterModel {
       ['Shotgun_Reload', 'Reload_Shotgun', 'Rifle_Reload', 'Reload_Rifle'],
       [/(shotgun|rifle).*reload/i, /reload.*(shotgun|rifle)/i]
     );
-    if (!clip) return false;
-    return this.playOverride(clip, Math.max(0.32, clip.duration), 0.08);
+    if (clip) return this.playOverride(clip, Math.max(0.32, clip.duration), 0.08);
+    return this.combatPose.play('shotgun-reload', 0.92);
+  }
+
+  playBowDraw(): boolean {
+    return this.combatPose.play('bow-draw', 0.78);
+  }
+
+  playBowRelease(): boolean {
+    return this.combatPose.play('bow-release', 0.34);
   }
 
   dispose(): void {
@@ -520,6 +546,7 @@ export class CharacterModel {
     this.clips.splice(0);
     this.overrideAction = null;
     this.overrideTime = 0;
+    this.combatPose.clear();
     this.desiredLocomotion = 'idle';
     this.activeState = null;
     this.headBone = null;

@@ -494,3 +494,26 @@ At every major checkpoint record:
 - what failed and what tests found;
 - CI/device evidence;
 - next ordered milestone.
+
+
+---
+
+# 0.10.0 — Production Core milestone
+
+PR #27 closes the remaining architecture + Visual Vertical Slice checklist items from sections 6 and 8 without forcing optional abstractions.
+
+Implemented:
+
+- `CombatRuntime` extracted from `GameApp` for combat events and hitscan resolution;
+- `RunSession` extracted for kills/score/reset accounting;
+- explicit decision not to create `EnemyRuntime` / `PresentationRuntime` until real ownership pressure appears;
+- no service locator or DI framework;
+- hero shotgun aim/fire/reload, bow draw/release, hit and death skeletal overlays;
+- real generated shotgun GLB and bow+arrow GLB, lazy-loaded on first selection;
+- one cached CC0 Mesh2Motion zombie GLB reused for Walker / Runner / Brute;
+- distinct infected scale/silhouette/gait plus attack/stagger/death reactions;
+- invisible hit proxies attached to real skeleton bones; presentation skin no longer determines gameplay hit zone;
+- far infected LOD removes decorative wounds/dynamic shadows while preserving hit proxies;
+- byte-budget unit tests and expanded Playwright production visual gates.
+
+Design rule reinforced: prefer shared assets + archetype presentation profiles over duplicated binaries, and extract runtimes only when they reduce actual coupling.

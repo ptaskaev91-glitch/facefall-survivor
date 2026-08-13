@@ -109,22 +109,28 @@ export class PlayerRuntime {
   playWeaponFire(weaponId: WeaponId): boolean {
     if (!this.productionVisualActive) return false;
     if (weaponId === 'pistol') return this.characterModel.playPistolFire();
-    if (weaponId === 'shotgun') {
-      // UAL1_Standard currently has no long-gun clip. Prefer one if a future library adds it,
-      // otherwise keep combat-event timing visible with the compatible pistol one-shot.
-      return this.characterModel.playShotgunFire() || this.characterModel.playPistolFire();
+    if (weaponId === 'shotgun') return this.characterModel.playShotgunFire();
+    if (weaponId === 'bow') {
+      const pose = this.characterModel.playBowRelease();
+      const visual = this.weaponVisual.playBowRelease();
+      return pose || visual;
     }
-    if (weaponId === 'bow') return this.weaponVisual.playBowRelease();
     return false;
   }
+
+  playHit(): boolean { return this.productionVisualActive && this.characterModel.playHit(); }
+
+  playDeath(): boolean { return this.productionVisualActive && this.characterModel.playDeath(); }
 
   playWeaponReload(weaponId: WeaponId): boolean {
     if (!this.productionVisualActive) return false;
     if (weaponId === 'pistol') return this.characterModel.playPistolReload();
-    if (weaponId === 'shotgun') {
-      return this.characterModel.playShotgunReload() || this.characterModel.playPistolReload();
+    if (weaponId === 'shotgun') return this.characterModel.playShotgunReload();
+    if (weaponId === 'bow') {
+      const pose = this.characterModel.playBowDraw();
+      const visual = this.weaponVisual.playBowReload();
+      return pose || visual;
     }
-    if (weaponId === 'bow') return this.weaponVisual.playBowReload();
     return false;
   }
 

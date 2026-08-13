@@ -6,7 +6,7 @@ import { DamageSystem } from '../combat/DamageSystem';
 import { Health } from '../combat/Health';
 import { ProjectileSystem, type ProjectileCollision } from '../combat/ProjectileSystem';
 import { ProjectileVisuals } from '../combat/ProjectileVisuals';
-import type { FacefallEvents, HitZone, ShotEvent } from '../combat/types';
+import type { FacefallEvents, HitZone } from '../combat/types';
 import { WEAPONS, type WeaponDefinition } from '../combat/weapons';
 import { WeaponSystem } from '../combat/WeaponSystem';
 import { EventBus } from '../core/EventBus';
@@ -26,8 +26,10 @@ import { PlayerRuntime } from '../player/PlayerRuntime';
 import { WaveDirector } from '../waves/WaveDirector';
 import type { LevelManifest } from '../world/LevelManifest';
 import { WorldRuntime } from '../world/WorldRuntime';
+import { CombatRuntime } from './CombatRuntime';
 import { GameHud } from './GameHud';
 import { GameStateController } from './GameState';
+import { RunSession } from './RunSession';
 
 export interface GameAppDom {
   app: HTMLDivElement;
@@ -54,12 +56,7 @@ export interface StartRunOptions {
   faceDataUrl?: string | null;
 }
 
-/**
- * Top-level gameplay orchestrator.
- * Renderer/world lifecycle, player visual/collider lifecycle and DOM presentation
- * are delegated to dedicated runtimes so GLB/animation work does not grow this
- * class back into a God Object.
- */
+/** Top-level gameplay orchestrator; dedicated runtimes own combat/session/world/player detail. */
 export class GameApp {
   readonly state = new GameStateController();
   readonly events = new EventBus<FacefallEvents>();
@@ -68,6 +65,8 @@ export class GameApp {
   private readonly world: WorldRuntime;
   private readonly player: PlayerRuntime;
   private readonly hud: GameHud;
+  private readonly session = new RunSession();
+  private readonly combat: CombatRuntime;
 
   private readonly weaponSystem = new WeaponSystem(this.events);
   private readonly damageSystem = new DamageSystem(this.events);
@@ -104,8 +103,6 @@ export class GameApp {
   private disposed = false;
   private levelId = 'lab-fallback';
   private manifest: LevelManifest | null = null;
-  private score = 0;
-  private kills = 0;
   private aimAssistStrength = 0.72;
   private movementSpreadMultiplier = 1;
   private footstepTimer = 0;
@@ -119,71 +116,52 @@ export class GameApp {
     this.keyboard = new KeyboardMouseInput(this.input);
 
     this.lightPool = new LightPool(this.world.scene, Math.max(1, this.quality.maxDynamicLights));
-    this.runtimeFx = new RuntimeFx(
-      this.world.scene,
-      this.quality.id === 'mobile-low' ? 220 : 360,
-      this.quality.id === 'mobile-low' ? 48 : 80
-    );
+    this.runtimeFx = new RuntimeFx(this.world.scene, this.quality.id === 'mobile-low' ? 220 : 360, this.quality.id === 'mobile-low' ? 48 : 80);
     this.effects = new EffectSystem({
       ...this.runtimeFx.adapters,
       spawnLight: (recipe, context) => {
-        this.lightPool.spawn({
-          color: recipe.color,
-          intensity: recipe.intensity,
-          distance: recipe.distance,
-          lifetime: recipe.lifetime,
-          position: context.origin
-        });
+        this.lightPool.spawn({ color: recipe.color, intensity: recipe.intensity, distance: recipe.distance, lifetime: recipe.lifetime, position: context.origin });
       }
     });
 
-    this.projectileSystem = new ProjectileSystem(
-      this.damageSystem,
-      (from, to) => this.queryProjectileCollision(from, to),
-      this.quality.id === 'mobile-low' ? 32 : 48
-    );
+    this.projectileSystem = new ProjectileSystem(this.damageSystem, (from, to) => this.queryProjectileCollision(from, to), this.quality.id === 'mobile-low' ? 32 : 48);
     this.projectileVisuals = new ProjectileVisuals(this.world.scene, this.quality.id === 'mobile-low' ? 32 : 48);
-    this.enemySystem = new EnemySystem(this.world.scene, this.damageSystem, {
-      shadows: this.quality.shadows,
-      maxActive: this.maxActiveEnemies
-    });
+    this.enemySystem = new EnemySystem(this.world.scene, this.damageSystem, { shadows: this.quality.shadows, maxActive: this.maxActiveEnemies });
     this.pickups = new PickupSystem(this.world.scene, {
       heal: (amount) => this.playerHealth.heal(amount) > 0,
       ammo: (amount) => this.weaponSystem.addReserve(amount),
-      collected: (kind, amount) => {
-        this.hud.setLastEvent(kind === 'health' ? `MEDKIT +${amount}` : `AMMO +${amount}`);
-        this.refreshStatus();
-      }
+      collected: (kind, amount) => { this.hud.setLastEvent(kind === 'health' ? `MEDKIT +${amount}` : `AMMO +${amount}`); this.refreshStatus(); }
     });
     this.unregisterPlayerDamage = this.damageSystem.register({ id: 'player', health: this.playerHealth });
 
     this.enemySystem.setNavigationQuery(new CollisionNavigationQuery(this.world.collisionWorld));
-    this.bindCombatEvents();
+    this.combat = new CombatRuntime({
+      events: this.events,
+      damageSystem: this.damageSystem,
+      projectileSystem: this.projectileSystem,
+      enemySystem: this.enemySystem,
+      player: this.player,
+      world: this.world,
+      effects: this.effects,
+      hud: this.hud,
+      session: this.session,
+      movementSpread: () => this.movementSpreadMultiplier,
+      applyWeaponRecoil: (definition) => this.applyWeaponRecoil(definition),
+      resolveHitZone: (object, point) => this.getHitZone(object, point),
+      refreshStatus: () => this.refreshStatus(),
+      endRun: () => this.endRun()
+    });
     this.bindUi();
 
-    this.loop = new GameLoop({
-      fixedUpdate: (dt) => this.fixedUpdate(dt),
-      render: (_alpha, frameDt) => this.render(frameDt)
-    }, {
-      fixedStep: 1 / 60,
-      maxFrameDelta: 0.1,
-      maxSubSteps: 5
-    });
+    this.loop = new GameLoop({ fixedUpdate: (dt) => this.fixedUpdate(dt), render: (_alpha, frameDt) => this.render(frameDt) }, { fixedStep: 1 / 60, maxFrameDelta: 0.1, maxSubSteps: 5 });
   }
 
-  configureAimAssist(strength: number): void {
-    this.aimAssistStrength = Math.max(0, Math.min(1, Number.isFinite(strength) ? strength : 0));
-  }
+  configureAimAssist(strength: number): void { this.aimAssistStrength = Math.max(0, Math.min(1, Number.isFinite(strength) ? strength : 0)); }
 
   enterMenu(): void {
     if (this.disposed || this.state.is('menu')) return;
-    this.loop.stop();
-    this.waveDirector.stop();
-    this.input.reset();
-    this.hud.hideGameOver();
-    if (this.state.is('boot') || this.state.is('error') || this.state.is('gameover') || this.state.is('playing') || this.state.is('paused')) {
-      this.state.transition('menu');
-    }
+    this.loop.stop(); this.waveDirector.stop(); this.input.reset(); this.hud.hideGameOver();
+    if (this.state.is('boot') || this.state.is('error') || this.state.is('gameover') || this.state.is('playing') || this.state.is('paused')) this.state.transition('menu');
     this.refreshStatus();
   }
 
@@ -191,158 +169,36 @@ export class GameApp {
     if (this.disposed) throw new Error('Cannot start a disposed GameApp');
     if (this.state.is('boot')) this.enterMenu();
     if (!this.state.is('menu') && !this.state.is('face_setup') && !this.state.is('error')) return;
-
     this.state.transition('loading');
     this.dom.status.textContent = 'ENGINE NEXT · загружаем уровень и gameplay manifest…';
     try {
       if (!this.manifest) await this.loadLevelManifest();
       await this.player.setFaceDataUrl(options.faceDataUrl ?? null);
-      this.attachRuntimeInput();
-      this.resetRun();
-      this.setCameraMode(options.cameraMode ?? 'top');
-      this.state.transition('playing');
-      this.loop.start();
-      this.refreshStatus();
-    } catch (error) {
-      this.state.transition('error');
-      throw error;
-    }
+      this.attachRuntimeInput(); this.resetRun(); this.setCameraMode(options.cameraMode ?? 'top'); this.state.transition('playing'); this.loop.start(); this.refreshStatus();
+    } catch (error) { this.state.transition('error'); throw error; }
   }
 
   restart(): void {
     if (!this.state.is('gameover')) return;
-    this.state.transition('loading');
-    this.resetRun();
-    this.state.transition('playing');
-    this.loop.start();
-    this.refreshStatus();
+    this.state.transition('loading'); this.resetRun(); this.state.transition('playing'); this.loop.start(); this.refreshStatus();
   }
-
-  pause(): void {
-    if (!this.state.is('playing')) return;
-    this.loop.stop();
-    this.input.reset();
-    this.state.transition('paused');
-    this.refreshStatus();
-  }
-
-  resume(): void {
-    if (!this.state.is('paused')) return;
-    this.state.transition('playing');
-    this.loop.start();
-    this.refreshStatus();
-  }
+  pause(): void { if (!this.state.is('playing')) return; this.loop.stop(); this.input.reset(); this.state.transition('paused'); this.refreshStatus(); }
+  resume(): void { if (!this.state.is('paused')) return; this.state.transition('playing'); this.loop.start(); this.refreshStatus(); }
 
   dispose(): void {
     if (this.disposed) return;
-    this.disposed = true;
-    this.loop.stop();
-    this.keyboard.detach();
-    this.touch?.detach();
-    this.touch = null;
-    window.removeEventListener('resize', this.onResize);
-    document.removeEventListener('visibilitychange', this.onVisibilityChange);
+    this.disposed = true; this.loop.stop(); this.keyboard.detach(); this.touch?.detach(); this.touch = null;
+    window.removeEventListener('resize', this.onResize); document.removeEventListener('visibilitychange', this.onVisibilityChange);
     for (const unsubscribe of this.unsubscribeEvents.splice(0)) unsubscribe();
-
-    this.unregisterPlayerDamage();
-    this.waveDirector.stop();
-    this.enemySystem.reset();
-    this.pickups.dispose();
-    this.projectileVisuals.dispose();
-    this.runtimeFx.dispose();
-    this.lightPool.dispose();
-    this.player.dispose();
-    this.world.dispose();
-    this.events.clear();
-    this.dom.app.replaceChildren();
-    if (!this.state.is('disposed')) this.state.transition('disposed');
+    this.combat.dispose(); this.unregisterPlayerDamage(); this.waveDirector.stop(); this.enemySystem.reset(); this.pickups.dispose();
+    this.projectileVisuals.dispose(); this.runtimeFx.dispose(); this.lightPool.dispose(); this.player.dispose(); this.world.dispose(); this.events.clear();
+    this.dom.app.replaceChildren(); if (!this.state.is('disposed')) this.state.transition('disposed');
   }
 
   private attachRuntimeInput(): void {
     if (this.runtimeInputAttached) return;
-    this.runtimeInputAttached = true;
-    this.keyboard.attach();
-    this.attachTouchInput();
-    window.addEventListener('resize', this.onResize);
-    document.addEventListener('visibilitychange', this.onVisibilityChange);
-  }
-
-  private bindCombatEvents(): void {
-    this.unsubscribeEvents.push(this.events.on('shot', (shot) => {
-      this.effects.play(`${shot.weaponId}-shot`, { origin: shot.origin, direction: shot.direction });
-      const definition = WEAPONS[shot.weaponId];
-      if (shot.sourceId === 'player') {
-        this.player.playWeaponFire(shot.weaponId);
-        this.applyWeaponRecoil(definition);
-      }
-
-      if (definition.fireModel === 'projectile') {
-        const projectileDirection = this.spreadDirection(shot.direction, definition.spread * this.movementSpreadMultiplier);
-        const projectileShot: ShotEvent = { ...shot, direction: projectileDirection };
-        this.projectileSystem.spawnFromShot(projectileShot);
-        return;
-      }
-
-      const effectiveSpread = definition.spread * this.movementSpreadMultiplier;
-      for (let pellet = 0; pellet < definition.pellets; pellet++) {
-        const direction = this.spreadDirection(shot.direction, effectiveSpread);
-        this.raycaster.set(shot.origin, direction);
-        this.raycaster.far = 70;
-        const intersections = this.raycaster.intersectObjects([...this.enemySystem.meshes], true);
-        const intersection = intersections.find((entry) => entry.object.visible && entry.object.userData.damageTargetId);
-        if (!intersection) continue;
-
-        const worldHit = this.world.collisionWorld.raycast(shot.origin, direction, intersection.distance);
-        if (worldHit && worldHit.distance < intersection.distance) continue;
-
-        const targetId = intersection.object.userData.damageTargetId as string;
-        const hitZone = this.getHitZone(intersection.object, intersection.point);
-        const multiplier = hitZone === 'head' ? definition.headMultiplier : hitZone === 'limb' ? definition.limbMultiplier : 1;
-        this.damageSystem.apply({
-          amount: definition.damage * multiplier,
-          kind: shot.weaponId === 'shotgun' ? 'pellet' : 'bullet',
-          sourceId: shot.sourceId,
-          targetId,
-          hitPoint: intersection.point.clone(),
-          direction: direction.clone(),
-          impulse: definition.impulse,
-          hitZone,
-          critical: hitZone === 'head'
-        });
-      }
-    }));
-
-    this.unsubscribeEvents.push(this.events.on('weaponReload', ({ weaponId }) => {
-      this.player.playWeaponReload(weaponId);
-    }));
-
-    this.unsubscribeEvents.push(this.events.on('hit', (hit) => {
-      this.effects.play(hit.critical || hit.amount >= 60 ? 'flesh-hit-heavy' : 'flesh-hit', {
-        origin: hit.hitPoint,
-        direction: hit.direction,
-        parent: this.world.scene
-      });
-      if (hit.targetId === 'player') {
-        this.hud.setLastEvent(`PLAYER -${Math.round(hit.amount)} HP`);
-      } else {
-        const stagger = hit.critical ? 0.42 : hit.amount >= 60 ? 0.32 : hit.amount >= 25 ? 0.16 : 0.08;
-        this.enemySystem.stagger(hit.targetId, stagger, hit.direction, hit.impulse * 0.16);
-        this.hud.setLastEvent(`${hit.hitZone.toUpperCase()} ${Math.round(hit.amount)} DMG`);
-      }
-      this.refreshStatus();
-    }));
-
-    this.unsubscribeEvents.push(this.events.on('kill', (hit) => {
-      if (hit.targetId === 'player') {
-        this.endRun();
-        return;
-      }
-      if (!this.enemySystem.kill(hit.targetId)) return;
-      this.kills += 1;
-      this.score += 100 + Math.round(hit.amount * 2) + (hit.critical ? 75 : 0);
-      this.hud.setLastEvent(`KILL +${hit.critical ? 175 : 100}`);
-      this.refreshStatus();
-    }));
+    this.runtimeInputAttached = true; this.keyboard.attach(); this.attachTouchInput();
+    window.addEventListener('resize', this.onResize); document.addEventListener('visibilitychange', this.onVisibilityChange);
   }
 
   private bindUi(): void {
@@ -354,194 +210,102 @@ export class GameApp {
   private attachTouchInput(): void {
     const { joystick, stick, touchFire } = this.dom;
     if (!joystick || !stick || !touchFire || this.touch) return;
-    this.touch = new TouchInput(this.input, {
-      joystick,
-      stick,
-      fire: touchFire,
-      aimSurface: this.world.renderer.domElement,
-      reload: this.dom.touchReload,
-      switchWeapon: this.dom.touchWeapon,
-      toggleCamera: this.dom.touchCamera
-    });
+    this.touch = new TouchInput(this.input, { joystick, stick, fire: touchFire, aimSurface: this.world.renderer.domElement, reload: this.dom.touchReload, switchWeapon: this.dom.touchWeapon, toggleCamera: this.dom.touchCamera });
     this.touch.attach();
   }
 
   private fixedUpdate(dt: number): void {
     if (!this.state.is('playing')) return;
-    const controls = this.input.snapshot();
-    this.updateAim(dt);
+    const controls = this.input.snapshot(); this.updateAim(dt);
     const movement = this.player.move(controls.moveX, controls.moveY, controls.sprint, dt, this.world.collisionWorld);
     this.movementSpreadMultiplier = movement.movementSpreadMultiplier;
-
     this.updateFootsteps(dt, movement.targetSpeed, controls.sprint);
-    this.weaponSystem.update(dt);
-    this.projectileSystem.update(dt);
-    this.enemySystem.update(dt, this.player.position, (actor) => this.applyEnemyAttack(actor));
+    this.weaponSystem.update(dt); this.projectileSystem.update(dt); this.enemySystem.update(dt, this.player.position, (actor) => this.applyEnemyAttack(actor));
     this.pickups.update(dt, this.player.position);
-    for (const request of this.waveDirector.update(dt, this.enemySystem.activeCount, this.maxActiveEnemies)) {
-      this.enemySystem.spawn(request.type, request.position);
-    }
-    this.effects.update(dt);
-    this.runtimeFx.update(dt);
-    this.lightPool.update(dt);
-    this.world.updateSimulation(dt);
-
+    for (const request of this.waveDirector.update(dt, this.enemySystem.activeCount, this.maxActiveEnemies)) this.enemySystem.spawn(request.type, request.position);
+    this.effects.update(dt); this.runtimeFx.update(dt); this.lightPool.update(dt); this.world.updateSimulation(dt);
     if (this.input.consumePressed('toggleCamera')) this.setCameraMode(this.cameraMode === 'top' ? 'third' : 'top');
     if (this.input.consumePressed('switchWeapon')) this.player.setActiveWeapon(this.weaponSystem.cycle());
     if (this.input.consumePressed('reload')) this.weaponSystem.reload();
-    if (controls.fire) {
-      this.player.muzzle(this.muzzle);
-      this.weaponSystem.fire('player', this.muzzle, this.player.facing);
-    }
-
-    this.statusRefresh -= dt;
-    if (this.statusRefresh <= 0) {
-      this.statusRefresh = 0.18;
-      this.refreshStatus();
-    }
+    if (controls.fire) { this.player.muzzle(this.muzzle); this.weaponSystem.fire('player', this.muzzle, this.player.facing); }
+    this.statusRefresh -= dt; if (this.statusRefresh <= 0) { this.statusRefresh = 0.18; this.refreshStatus(); }
   }
 
   private applyEnemyAttack(actor: EnemyActor): void {
     this.aimDirection.copy(this.player.position).sub(actor.root.position).setY(0);
     if (this.aimDirection.lengthSq() > 1e-5) this.aimDirection.normalize();
     this.events.emit('enemyAttack', { sourceId: actor.id, position: actor.root.position.clone(), kind: actor.archetype.id });
-    this.damageSystem.apply({
-      amount: actor.archetype.attackDamage,
-      kind: 'melee',
-      sourceId: actor.id,
-      targetId: 'player',
-      hitPoint: this.player.position.clone().add(this.temp.set(0, 1.0, 0)),
-      direction: this.aimDirection.clone(),
-      impulse: actor.archetype.mass * 0.02,
-      hitZone: 'torso',
-      critical: false
-    });
+    this.damageSystem.apply({ amount: actor.archetype.attackDamage, kind: 'melee', sourceId: actor.id, targetId: 'player', hitPoint: this.player.position.clone().add(this.temp.set(0, 1.0, 0)), direction: this.aimDirection.clone(), impulse: actor.archetype.mass * 0.02, hitZone: 'torso', critical: false });
   }
 
   private updateAim(dt: number): void {
     if (this.coarsePointer && this.aimAssistStrength > 0 && this.enemySystem.activeCount > 0) {
       aimController.getNdc(this.aimNdc);
-      this.aimAssist.findCorrection(
-        this.world.camera,
-        this.aimNdc,
-        this.enemySystem.aimTargets,
-        this.aimAssistStrength,
-        this.cameraMode,
-        this.assistDelta
-      );
-      this.assistDelta.multiplyScalar(Math.min(1, dt * 30));
-      aimController.nudgeNdc(this.assistDelta);
+      this.aimAssist.findCorrection(this.world.camera, this.aimNdc, this.enemySystem.aimTargets, this.aimAssistStrength, this.cameraMode, this.assistDelta);
+      this.assistDelta.multiplyScalar(Math.min(1, dt * 30)); aimController.nudgeNdc(this.assistDelta);
     }
-
     aimController.updateWorldAim(this.world.camera, this.player.position);
     if (this.cameraMode !== 'top') return;
     this.aimDirection.copy(aimController.getWorldDirection(this.aimDirection)).setY(0);
     if (this.aimDirection.lengthSq() <= 1e-5) return;
-    this.aimDirection.normalize();
-    this.player.facing.lerp(this.aimDirection, 1 - Math.exp(-dt * 18)).normalize();
+    this.aimDirection.normalize(); this.player.facing.lerp(this.aimDirection, 1 - Math.exp(-dt * 18)).normalize();
   }
 
   private updateFootsteps(dt: number, targetSpeed: number, sprinting: boolean): void {
-    if (targetSpeed <= 0.2) {
-      this.footstepTimer = 0;
-      return;
-    }
-    this.footstepTimer -= dt;
-    if (this.footstepTimer > 0) return;
-    this.footstepTimer = sprinting ? 0.33 : 0.48;
-    this.events.emit('footstep', { position: this.player.position.clone(), sprinting });
+    if (targetSpeed <= 0.2) { this.footstepTimer = 0; return; }
+    this.footstepTimer -= dt; if (this.footstepTimer > 0) return;
+    this.footstepTimer = sprinting ? 0.33 : 0.48; this.events.emit('footstep', { position: this.player.position.clone(), sprinting });
   }
 
   private applyWeaponRecoil(definition: WeaponDefinition): void {
     const recoil = definition.recoil;
     const pitch = recoil.pitchMin + Math.random() * Math.max(0, recoil.pitchMax - recoil.pitchMin);
     const yaw = recoil.yawMin + Math.random() * Math.max(0, recoil.yawMax - recoil.yawMin);
-    aimController.applyRecoil(yaw, pitch);
-    this.runtimeFx.cameraImpulse.add(recoil.cameraKick);
+    aimController.applyRecoil(yaw, pitch); this.runtimeFx.cameraImpulse.add(recoil.cameraKick);
   }
 
   private render(frameDt: number): void {
-    this.world.updateFrame(this.player.position, this.player.facing, frameDt);
-    this.runtimeFx.cameraImpulse.apply(this.world.camera, frameDt);
-    this.projectileVisuals.sync(this.projectileSystem.active());
-    this.world.render();
+    this.world.updateFrame(this.player.position, this.player.facing, frameDt); this.runtimeFx.cameraImpulse.apply(this.world.camera, frameDt);
+    this.projectileVisuals.sync(this.projectileSystem.active()); this.world.render();
   }
 
   private async loadLevelManifest(): Promise<void> {
-    const loaded = await this.world.loadManifest();
-    this.manifest = loaded.manifest;
-    this.levelId = loaded.levelId;
-    this.waveDirector.configure(loaded.manifest.markers);
-    this.pickups.configure(loaded.manifest.markers);
+    const loaded = await this.world.loadManifest(); this.manifest = loaded.manifest; this.levelId = loaded.levelId;
+    this.waveDirector.configure(loaded.manifest.markers); this.pickups.configure(loaded.manifest.markers);
   }
 
   private resetRun(): void {
-    this.enemySystem.reset();
-    this.weaponSystem.reset();
-    this.player.setActiveWeapon(this.weaponSystem.selected);
-    this.projectileSystem.reset();
-    this.playerHealth.reset();
-    this.pickups.reset();
-    this.score = 0;
-    this.kills = 0;
-    this.footstepTimer = 0;
-    this.movementSpreadMultiplier = 1;
-    this.hud.clearLastEvent();
-    this.waveDirector.reset();
-    this.hud.hideGameOver();
-
+    this.enemySystem.reset(); this.weaponSystem.reset(); this.player.setActiveWeapon(this.weaponSystem.selected); this.projectileSystem.reset();
+    this.playerHealth.reset(); this.pickups.reset(); this.session.reset(); this.footstepTimer = 0; this.movementSpreadMultiplier = 1;
+    this.hud.clearLastEvent(); this.waveDirector.reset(); this.hud.hideGameOver();
     const playerSpawn = this.manifest?.markers.find((marker) => marker.kind === 'player-spawn');
-    this.player.reset(playerSpawn, this.cameraMode);
-    this.input.reset();
-    aimController.reset(this.cameraMode);
-    this.refreshStatus();
+    this.player.reset(playerSpawn, this.cameraMode); this.input.reset(); aimController.reset(this.cameraMode); this.refreshStatus();
   }
 
   private endRun(): void {
     if (!this.state.is('playing')) return;
-    this.waveDirector.stop();
-    this.loop.stop();
-    this.input.reset();
-    this.state.transition('gameover');
-    this.hud.showGameOver(this.waveDirector.wave, this.kills, this.score);
-    this.hud.setLastEvent('RUN ENDED');
-    this.refreshStatus();
+    this.waveDirector.stop(); this.loop.stop(); this.input.reset(); this.state.transition('gameover');
+    this.hud.showGameOver(this.waveDirector.wave, this.session.kills, this.session.score); this.hud.setLastEvent('RUN ENDED'); this.refreshStatus();
   }
 
   private queryProjectileCollision(from: THREE.Vector3, to: THREE.Vector3): ProjectileCollision | null {
-    const direction = this.temp.copy(to).sub(from);
-    const distance = direction.length();
-    if (distance <= 1e-6) return null;
-    direction.multiplyScalar(1 / distance);
-    this.raycaster.set(from, direction);
-    this.raycaster.far = distance;
-    const enemyHit = this.raycaster.intersectObjects([...this.enemySystem.meshes], true)
-      .find((entry) => entry.object.visible && entry.object.userData.damageTargetId);
+    const direction = this.temp.copy(to).sub(from); const distance = direction.length();
+    if (distance <= 1e-6) return null; direction.multiplyScalar(1 / distance);
+    this.raycaster.set(from, direction); this.raycaster.far = distance;
+    const enemyHit = this.raycaster.intersectObjects([...this.enemySystem.meshes], true).find((entry) => entry.object.visible && entry.object.userData.damageTargetId);
     const worldHit = this.world.collisionWorld.segmentCast(from, to);
-
-    if (enemyHit && (!worldHit || enemyHit.distance <= worldHit.distance)) {
-      return {
-        targetId: enemyHit.object.userData.damageTargetId as string,
-        point: enemyHit.point.clone(),
-        hitZone: this.getHitZone(enemyHit.object, enemyHit.point)
-      };
-    }
-    if (worldHit) {
-      this.effects.play('surface-hit', { origin: worldHit.position, direction });
-      return { point: worldHit.position, hitZone: 'environment' };
-    }
+    if (enemyHit && (!worldHit || enemyHit.distance <= worldHit.distance)) return { targetId: enemyHit.object.userData.damageTargetId as string, point: enemyHit.point.clone(), hitZone: this.getHitZone(enemyHit.object, enemyHit.point) };
+    if (worldHit) { this.effects.play('surface-hit', { origin: worldHit.position, direction }); return { point: worldHit.position, hitZone: 'environment' }; }
     return null;
   }
 
   private setCameraMode(mode: CameraMode): void {
-    this.cameraMode = mode;
-    this.world.setCameraMode(mode);
-    this.dom.topButton.dataset.active = String(mode === 'top');
-    this.dom.thirdButton.dataset.active = String(mode === 'third');
-    this.refreshStatus();
+    this.cameraMode = mode; this.world.setCameraMode(mode); this.dom.topButton.dataset.active = String(mode === 'top'); this.dom.thirdButton.dataset.active = String(mode === 'third'); this.refreshStatus();
   }
 
   private getHitZone(object: THREE.Object3D, point: THREE.Vector3): HitZone {
+    const authored = object.userData.hitZone as HitZone | undefined;
+    if (authored === 'head' || authored === 'torso' || authored === 'limb') return authored;
     const rootId = object.userData.damageTargetId as string | undefined;
     const root = rootId ? this.enemySystem.rootFor(rootId) : undefined;
     if (!root) return 'torso';
@@ -552,43 +316,20 @@ export class GameApp {
   }
 
   private spreadDirection(base: THREE.Vector3, spread: number): THREE.Vector3 {
-    const result = base.clone();
-    result.x += (Math.random() - 0.5) * spread;
-    result.y += (Math.random() - 0.5) * spread * 0.45;
-    result.z += (Math.random() - 0.5) * spread;
-    return result.normalize();
+    const result = base.clone(); result.x += (Math.random() - 0.5) * spread; result.y += (Math.random() - 0.5) * spread * 0.45; result.z += (Math.random() - 0.5) * spread; return result.normalize();
   }
 
   private refreshStatus(): void {
     const runtime = this.weaponSystem.runtime();
-    this.hud.refresh({
-      state: this.state.current,
-      levelId: this.levelId,
-      hp: this.playerHealth.value,
-      wave: this.waveDirector.wave,
-      kills: this.kills,
-      score: this.score,
-      qualityId: this.quality.id,
-      cameraMode: this.cameraMode,
-      weaponLabel: WEAPONS[this.weaponSystem.selected].label,
-      magazine: runtime.magazine,
-      reserve: runtime.reserve,
-      activeEnemies: this.enemySystem.activeCount,
-      maxActiveEnemies: this.maxActiveEnemies,
-      pickups: this.pickups.activeCount,
-      projectiles: this.projectileSystem.active().length,
-      spatialCells: this.enemySystem.occupiedCellCount,
-      aimAssistStrength: this.aimAssistStrength,
-      effectRecipeCount: Object.keys(EFFECTS).length
-    });
+    this.hud.refresh({ state: this.state.current, levelId: this.levelId, hp: this.playerHealth.value, wave: this.waveDirector.wave, kills: this.session.kills, score: this.session.score,
+      qualityId: this.quality.id, cameraMode: this.cameraMode, weaponLabel: WEAPONS[this.weaponSystem.selected].label, magazine: runtime.magazine, reserve: runtime.reserve,
+      activeEnemies: this.enemySystem.activeCount, maxActiveEnemies: this.maxActiveEnemies, pickups: this.pickups.activeCount, projectiles: this.projectileSystem.active().length,
+      spatialCells: this.enemySystem.occupiedCellCount, aimAssistStrength: this.aimAssistStrength, effectRecipeCount: Object.keys(EFFECTS).length });
   }
 
   private onTopCamera = (): void => this.setCameraMode('top');
   private onThirdCamera = (): void => this.setCameraMode('third');
   private onRestart = (): void => this.restart();
   private onResize = (): void => this.world.resize();
-  private onVisibilityChange = (): void => {
-    if (document.hidden) this.pause();
-    else this.resume();
-  };
+  private onVisibilityChange = (): void => { if (document.hidden) this.pause(); else this.resume(); };
 }

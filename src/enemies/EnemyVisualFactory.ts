@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { EnemyId } from './archetypes';
-import { hydrateRiggedWalker, updateRiggedWalker } from './RiggedWalkerVisual';
+import { hydrateRiggedInfected, playRiggedInfectedAction, setRiggedInfectedLod, updateRiggedInfected } from './RiggedWalkerVisual';
 
 interface ZombiePalette {
   skin: number;
@@ -38,10 +38,7 @@ function addMesh(
   return mesh;
 }
 
-/**
- * Lightweight humanoid infected fallback. Walker hydrates into a cached rigged visual
- * after EnemySystem finishes assigning its stable target id and scene parent.
- */
+/** Lightweight fallback shown until the shared production zombie GLB hydrates. */
 export function createEnemyVisual(type: EnemyId, shadows: boolean): THREE.Group {
   const palette = PALETTES[type];
   const root = new THREE.Group();
@@ -58,36 +55,14 @@ export function createEnemyVisual(type: EnemyId, shadows: boolean): THREE.Group 
   const torsoWidth = type === 'brute' ? 1.05 : 0.72;
   const torsoHeight = type === 'brute' ? 0.88 : 0.74;
 
-  const torso = addMesh(
-    root,
-    new THREE.BoxGeometry(torsoWidth, torsoHeight, type === 'brute' ? 0.52 : 0.38),
-    shirt,
-    [0, 1.18, 0],
-    'torso', shadows, 'torso'
-  );
+  const torso = addMesh(root, new THREE.BoxGeometry(torsoWidth, torsoHeight, type === 'brute' ? 0.52 : 0.38), shirt, [0, 1.18, 0], 'torso', shadows, 'torso');
   torso.rotation.x = type === 'runner' ? 0.18 : 0.08;
-
-  const chestWound = addMesh(
-    root,
-    new THREE.BoxGeometry(type === 'brute' ? 0.34 : 0.24, 0.09, 0.02),
-    wound,
-    [type === 'runner' ? -0.18 : 0.2, 1.24, -0.205],
-    'torso', false, 'chest-wound'
-  );
+  const chestWound = addMesh(root, new THREE.BoxGeometry(type === 'brute' ? 0.34 : 0.24, 0.09, 0.02), wound, [type === 'runner' ? -0.18 : 0.2, 1.24, -0.205], 'torso', false, 'chest-wound');
   chestWound.rotation.z = -0.18;
-
   const neck = addMesh(root, new THREE.CylinderGeometry(0.12, 0.14, 0.18, 7), skin, [0, 1.63, -0.03], 'torso', shadows, 'neck');
   neck.rotation.x = 0.12;
-
-  const head = addMesh(
-    root,
-    new THREE.DodecahedronGeometry(type === 'brute' ? 0.31 : 0.27, 0),
-    skin,
-    [0, type === 'brute' ? 1.88 : 1.84, -0.11],
-    'head', shadows, 'head'
-  );
+  const head = addMesh(root, new THREE.DodecahedronGeometry(type === 'brute' ? 0.31 : 0.27, 0), skin, [0, type === 'brute' ? 1.88 : 1.84, -0.11], 'head', shadows, 'head');
   head.rotation.z = type === 'walker' ? 0.13 : type === 'runner' ? -0.12 : 0.04;
-
   const eyeY = head.position.y + 0.035;
   for (const x of [-0.085, 0.085]) {
     const e = addMesh(root, new THREE.SphereGeometry(0.027, 6, 4), eye, [x, eyeY, -0.35], 'head', false, 'eye');
@@ -104,7 +79,6 @@ export function createEnemyVisual(type: EnemyId, shadows: boolean): THREE.Group 
 
   const hip = addMesh(root, new THREE.BoxGeometry(type === 'brute' ? 0.72 : 0.55, 0.24, 0.34), pants, [0, 0.72, 0.02], 'torso', shadows, 'hip');
   hip.rotation.x = -0.03;
-
   const legRadius = type === 'brute' ? 0.15 : 0.115;
   const legHeight = type === 'brute' ? 0.74 : 0.68;
   const legGeometry = new THREE.CylinderGeometry(legRadius, legRadius * 1.06, legHeight, 7);
@@ -112,37 +86,26 @@ export function createEnemyVisual(type: EnemyId, shadows: boolean): THREE.Group 
   const rightLeg = addMesh(root, legGeometry.clone(), pants, [0.18 * scale, 0.34, 0.02], 'limb', shadows, 'leg-right');
   leftLeg.rotation.z = type === 'walker' ? 0.07 : 0;
   rightLeg.rotation.z = type === 'walker' ? -0.04 : 0;
-
   const footGeometry = new THREE.BoxGeometry(type === 'brute' ? 0.31 : 0.24, 0.13, type === 'runner' ? 0.39 : 0.34);
   addMesh(root, footGeometry.clone(), pants, [-0.18 * scale, 0.05, -0.08], 'limb', shadows, 'foot-left');
   addMesh(root, footGeometry.clone(), pants, [0.18 * scale, 0.05, -0.08], 'limb', shadows, 'foot-right');
-
-  if (type === 'brute') {
-    addMesh(root, new THREE.DodecahedronGeometry(0.26, 0), shirt, [-0.54, 1.46, 0], 'torso', shadows, 'brute-shoulder');
-  } else if (type === 'runner') {
-    addMesh(root, new THREE.BoxGeometry(0.18, 0.3, 0.22), wound, [0.46, 1.28, -0.08], 'limb', shadows, 'runner-torn-sleeve');
-  }
+  if (type === 'brute') addMesh(root, new THREE.DodecahedronGeometry(0.26, 0), shirt, [-0.54, 1.46, 0], 'torso', shadows, 'brute-shoulder');
+  else if (type === 'runner') addMesh(root, new THREE.BoxGeometry(0.18, 0.3, 0.22), wound, [0.46, 1.28, -0.08], 'limb', shadows, 'runner-torn-sleeve');
 
   root.scale.setScalar(scale);
   root.userData.baseScale = scale;
   root.userData.type = type;
   root.userData.gaitPhase = Math.random() * Math.PI * 2;
-
-  if (type === 'walker') {
-    queueMicrotask(() => { void hydrateRiggedWalker(root, shadows); });
-  }
+  queueMicrotask(() => { void hydrateRiggedInfected(root, type, shadows); });
   return root;
 }
 
-/** Uses the rigged animation mixer when available, otherwise keeps the procedural fallback alive. */
 export function animateEnemyVisual(root: THREE.Group, speed: number, dt: number): void {
-  if (root.userData.type === 'walker' && updateRiggedWalker(root, speed, dt)) return;
-
+  if (updateRiggedInfected(root, speed, dt)) return;
   const phase = ((root.userData.gaitPhase as number | undefined) ?? 0) + dt * (2.8 + speed * 1.25);
   root.userData.gaitPhase = phase;
   const stride = Math.min(0.55, speed * 0.11);
   const swing = Math.sin(phase) * stride;
-
   const leftArm = root.getObjectByName('arm-left');
   const rightArm = root.getObjectByName('arm-right');
   const leftLeg = root.getObjectByName('leg-left');
@@ -152,3 +115,9 @@ export function animateEnemyVisual(root: THREE.Group, speed: number, dt: number)
   if (leftLeg) leftLeg.rotation.x = -swing * 0.7;
   if (rightLeg) rightLeg.rotation.x = swing * 0.7;
 }
+
+export function playEnemyVisualAction(root: THREE.Group, action: 'attack' | 'stagger' | 'death'): boolean {
+  return playRiggedInfectedAction(root, action);
+}
+
+export function updateEnemyVisualLod(root: THREE.Group, distance: number): boolean { return setRiggedInfectedLod(root, distance); }

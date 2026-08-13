@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { WeaponId } from '../combat/types';
 
 /**
@@ -8,6 +9,7 @@ import type { WeaponId } from '../combat/types';
  * cannot turn barrels or the arrow trajectory sideways.
  */
 export class WeaponSocketVisual {
+  private readonly loader = new GLTFLoader();
   private characterRoot: THREE.Object3D | null = null;
   private rightHand: THREE.Bone | null = null;
   private leftHand: THREE.Bone | null = null;
@@ -19,6 +21,9 @@ export class WeaponSocketVisual {
   private readonly materials: THREE.Material[] = [];
   private activeWeapon: WeaponId = 'pistol';
   private enabled = false;
+  private assetGeneration = 0;
+  private readonly loadedWeaponAssets = new Set<'shotgun' | 'bow'>();
+  private readonly loadingWeaponAssets = new Set<'shotgun' | 'bow'>();
 
   private bowStringGeometry: THREE.BufferGeometry | null = null;
   private bowArrow: THREE.Group | null = null;
@@ -58,11 +63,14 @@ export class WeaponSocketVisual {
     this.updateBowGeometry();
     this.updateVisibility();
     this.update(0);
+    this.assetGeneration += 1;
+    this.ensureWeaponAsset(this.activeWeapon);
     return true;
   }
 
   setActiveWeapon(weaponId: WeaponId): void {
     this.activeWeapon = weaponId;
+    this.ensureWeaponAsset(weaponId);
     if (weaponId === 'bow' && this.bowDrawTarget >= 1) {
       this.bowDraw = 1;
       this.bowArrowVisible = true;
@@ -170,6 +178,8 @@ export class WeaponSocketVisual {
   private buildShotgun(): { group: THREE.Group; muzzle: THREE.Object3D } {
     const group = new THREE.Group();
     group.name = 'weapon-shotgun';
+    const fallback = new THREE.Group();
+    fallback.name = 'weapon-shotgun-procedural-fallback';
 
     const steel = this.material({ color: 0x202522, roughness: 0.34, metalness: 0.72 });
     const parkerized = this.material({ color: 0x121614, roughness: 0.48, metalness: 0.58 });
@@ -202,7 +212,8 @@ export class WeaponSocketVisual {
     buttPad.position.set(0, -0.012, -0.425);
     const beadSight = this.box(0.012, 0.014, 0.012, bead);
     beadSight.position.set(0, 0.067, 0.827);
-    group.add(receiver, barrel, magazineTube, pump, pistolGrip, stock, buttPad, beadSight);
+    fallback.add(receiver, barrel, magazineTube, pump, pistolGrip, stock, buttPad, beadSight);
+    group.add(fallback);
 
     const muzzle = new THREE.Object3D();
     muzzle.name = 'weapon-muzzle-shotgun';
@@ -214,6 +225,8 @@ export class WeaponSocketVisual {
   private buildBow(): { group: THREE.Group; muzzle: THREE.Object3D } {
     const group = new THREE.Group();
     group.name = 'weapon-bow';
+    const fallback = new THREE.Group();
+    fallback.name = 'weapon-bow-procedural-fallback';
     // Keep the bow just forward of the left palm and vertically oriented.
     group.position.set(-0.035, 0.01, 0.05);
 
@@ -265,13 +278,67 @@ export class WeaponSocketVisual {
     arrow.add(shaft, point, fletchingA, fletchingB);
     this.bowArrow = arrow;
 
-    group.add(riser, grip, upperLimb, lowerLimb, bowString, arrow);
+    fallback.add(riser, grip, upperLimb, lowerLimb, arrow);
+    group.add(fallback, bowString);
 
     const muzzle = new THREE.Object3D();
     muzzle.name = 'weapon-muzzle-bow';
     muzzle.position.set(0, 0, 0.54);
     group.add(muzzle);
     return { group, muzzle };
+  }
+
+  private ensureWeaponAsset(weaponId: WeaponId): void {
+    if (weaponId !== 'shotgun' && weaponId !== 'bow') return;
+    if (!this.socket || this.loadedWeaponAssets.has(weaponId) || this.loadingWeaponAssets.has(weaponId)) return;
+    this.loadingWeaponAssets.add(weaponId);
+    const url = weaponId === 'shotgun' ? '/assets/weapons/shotgun.glb' : '/assets/weapons/bow-arrow.glb';
+    const generation = this.assetGeneration;
+    void this.hydrateWeaponGlb(weaponId, url, generation).finally(() => this.loadingWeaponAssets.delete(weaponId));
+  }
+
+  private async hydrateWeaponGlb(weaponId: 'shotgun' | 'bow', url: string, generation: number): Promise<void> {
+    try {
+      const gltf = await this.loader.loadAsync(url);
+      if (generation !== this.assetGeneration) {
+        this.disposeLoadedObject(gltf.scene);
+        return;
+      }
+      const group = this.weaponGroups.get(weaponId);
+      if (!group) {
+        this.disposeLoadedObject(gltf.scene);
+        return;
+      }
+      gltf.scene.name = `weapon-${weaponId}-glb-visual`;
+      gltf.scene.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return;
+        object.castShadow = this.shadows;
+        object.receiveShadow = false;
+        this.geometries.push(object.geometry);
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        this.materials.push(...materials);
+      });
+      group.add(gltf.scene);
+      this.loadedWeaponAssets.add(weaponId);
+      const fallback = group.getObjectByName(`weapon-${weaponId}-procedural-fallback`);
+      if (fallback) fallback.visible = false;
+      if (weaponId === 'bow') {
+        const arrow = gltf.scene.getObjectByName('bow-arrow-glb');
+        if (arrow instanceof THREE.Group) this.bowArrow = arrow;
+        this.updateBowGeometry();
+      }
+    } catch (error) {
+      console.warn(`[Facefall] ${weaponId} GLB unavailable; keeping procedural fallback.`, error);
+    }
+  }
+
+  private disposeLoadedObject(root: THREE.Object3D): void {
+    root.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      object.geometry.dispose();
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      for (const material of materials) material.dispose();
+    });
   }
 
   private updateBowGeometry(): void {
@@ -296,6 +363,7 @@ export class WeaponSocketVisual {
   }
 
   private detach(): void {
+    this.assetGeneration += 1;
     this.socket?.removeFromParent();
     this.characterRoot = null;
     this.rightHand = null;
@@ -303,6 +371,8 @@ export class WeaponSocketVisual {
     this.socket = null;
     this.weaponGroups.clear();
     this.muzzles.clear();
+    this.loadedWeaponAssets.clear();
+    this.loadingWeaponAssets.clear();
     this.bowStringGeometry = null;
     this.bowArrow = null;
   }
