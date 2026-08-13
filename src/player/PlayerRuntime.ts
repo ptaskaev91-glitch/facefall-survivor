@@ -83,7 +83,7 @@ export class PlayerRuntime {
     // Sample the idle pose before deriving the hand position used by the production socket.
     this.characterModel.update(0, 0);
     if (!this.weaponVisual.attach(this.characterModel.root, 'hand_r')) {
-      console.warn('Production hero has no hand_r weapon socket; pistol visual disabled.');
+      console.warn('Production hero has no hand_r weapon socket; production weapon visual disabled.');
     }
 
     this.weaponVisual.setActiveWeapon(this.activeWeapon);
@@ -109,14 +109,20 @@ export class PlayerRuntime {
   playWeaponFire(weaponId: WeaponId): boolean {
     if (!this.productionVisualActive) return false;
     if (weaponId === 'pistol') return this.characterModel.playPistolFire();
-    if (weaponId === 'shotgun') return this.characterModel.playShotgunFire();
+    if (weaponId === 'shotgun') {
+      // UAL1_Standard currently has no long-gun clip. Prefer one if a future library adds it,
+      // otherwise keep combat-event timing visible with the compatible pistol one-shot.
+      return this.characterModel.playShotgunFire() || this.characterModel.playPistolFire();
+    }
     return false;
   }
 
   playWeaponReload(weaponId: WeaponId): boolean {
     if (!this.productionVisualActive) return false;
     if (weaponId === 'pistol') return this.characterModel.playPistolReload();
-    if (weaponId === 'shotgun') return this.characterModel.playShotgunReload();
+    if (weaponId === 'shotgun') {
+      return this.characterModel.playShotgunReload() || this.characterModel.playPistolReload();
+    }
     return false;
   }
 
