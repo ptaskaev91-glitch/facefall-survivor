@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 
-const MODEL_URL = '/assets/characters/quaternius-universal-base-male/Superhero_Male_FullBody.gltf';
+const MODEL_URL = '/assets/enemies/mesh2motion-human-zombie/human-zombie.glb';
 const ANIMATIONS_URL = '/assets/animations/quaternius-universal-animation-library/UAL1_Standard.glb';
 const TARGET_HEIGHT = 1.78;
 const SKELETON_TO_FULL_HEIGHT = 1.12;
@@ -57,9 +57,13 @@ function findBone(root: THREE.Object3D, name: string): THREE.Bone | null {
   return found instanceof THREE.Bone ? found : null;
 }
 
+function findHead(root: THREE.Object3D): THREE.Bone | null {
+  return findBone(root, 'head') ?? findBone(root, 'Head');
+}
+
 function estimateHeight(root: THREE.Object3D): number {
   root.updateMatrixWorld(true);
-  const head = findBone(root, 'Head');
+  const head = findHead(root);
   const feet = [findBone(root, 'foot_l'), findBone(root, 'foot_r')].filter((bone): bone is THREE.Bone => bone !== null);
   if (head && feet.length > 0) {
     const headWorld = new THREE.Vector3();
@@ -103,21 +107,10 @@ function groundFromFeet(root: THREE.Object3D): void {
 function infectedMaterial(source: THREE.Material): THREE.Material {
   const material = source.clone();
   if (material instanceof THREE.MeshStandardMaterial) {
-    const lowerName = material.name.toLowerCase();
-    if (lowerName.includes('superhero')) {
-      // The current source body texture is healthy and dark. Keep its normal map but replace
-      // albedo so the silhouette reads as dead/grey-green even under the very dark night rig.
-      material.map = null;
-      material.color.set(0x74816f);
-      material.roughness = 0.92;
-    } else if (lowerName.includes('eyes')) {
-      material.color.set(0xc4d09a);
-      material.emissive.set(0x4b5627);
-      material.emissiveIntensity = 0.34;
-    } else {
-      material.color.multiply(new THREE.Color(0x4f554c));
-      material.roughness = Math.max(0.82, material.roughness);
-    }
+    // Preserve the dedicated zombie mesh's authored albedo and only bias it slightly toward
+    // cold/rotting skin so detail survives the game's dark lighting instead of becoming black.
+    material.color.multiply(new THREE.Color(0x9aa693));
+    material.roughness = Math.max(0.86, material.roughness);
     material.metalness = 0;
   }
   return material;
@@ -148,23 +141,23 @@ function addInfectionDetails(wrapper: THREE.Group, damageTargetId: string, shado
   const woundMaterial = new THREE.MeshStandardMaterial({ color: 0x5e0b08, roughness: 0.96, metalness: 0 });
   const driedBlood = new THREE.MeshStandardMaterial({ color: 0x260504, roughness: 1, metalness: 0 });
 
-  const chest = new THREE.Mesh(new THREE.CircleGeometry(0.22, 14), woundMaterial);
+  const chest = new THREE.Mesh(new THREE.CircleGeometry(0.18, 14), woundMaterial);
   chest.name = 'walker-chest-wound';
-  chest.position.set(0.14, 1.18, -0.245);
+  chest.position.set(0.12, 1.17, -0.24);
   chest.rotation.y = Math.PI;
   chest.rotation.z = -0.32;
-  chest.scale.set(1.35, 0.62, 1);
+  chest.scale.set(1.25, 0.58, 1);
   chest.userData.hitZone = 'torso';
 
-  const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.105, 10, 8), driedBlood);
+  const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), driedBlood);
   shoulder.name = 'walker-shoulder-wound';
-  shoulder.position.set(-0.31, 1.42, -0.14);
-  shoulder.scale.set(1.55, 0.72, 0.48);
+  shoulder.position.set(-0.28, 1.42, -0.13);
+  shoulder.scale.set(1.45, 0.7, 0.45);
   shoulder.userData.hitZone = 'limb';
 
-  const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.065, 0.03), woundMaterial);
+  const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.055, 0.03), woundMaterial);
   jaw.name = 'walker-jaw-wound';
-  jaw.position.set(0.06, 1.68, -0.205);
+  jaw.position.set(0.055, 1.67, -0.19);
   jaw.rotation.z = -0.23;
   jaw.userData.hitZone = 'head';
 
@@ -222,7 +215,7 @@ export async function hydrateRiggedWalker(root: THREE.Group, shadows: boolean): 
       idle,
       walk,
       active: null,
-      head: findBone(model, 'Head'),
+      head: findHead(model),
       spine: findBone(model, 'spine_03'),
       clavicleL: findBone(model, 'clavicle_l'),
       clavicleR: findBone(model, 'clavicle_r'),
@@ -258,8 +251,6 @@ export function setRiggedWalkerMotion(root: THREE.Group, speed: number): boolean
 }
 
 function applyInfectedPose(runtime: WalkerRuntime, phase: number): void {
-  // Mixer writes the authored pose first; these local offsets are applied afterwards and are
-  // therefore refreshed every frame instead of accumulating. The asymmetry is intentional.
   runtime.spine?.rotateX(-0.20);
   runtime.spine?.rotateZ(0.06 + Math.sin(phase * 0.55) * 0.035);
   runtime.head?.rotateX(0.13);
