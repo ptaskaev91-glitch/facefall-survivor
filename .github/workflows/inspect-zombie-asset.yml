@@ -1,0 +1,45 @@
+name: Inspect CC0 Zombie Asset
+
+on:
+  push:
+    branches:
+      - visual/0.9.4-rigged-infected
+    paths:
+      - .github/workflows/inspect-zombie-asset.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download pinned Mesh2Motion zombie
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/Mesh2Motion/mesh2motion-app/c1897f21957d3bb24f59b0ea191f810cefcbff38/static/models-variation/human-zombie.glb" -o /tmp/human-zombie.glb
+          test "$(wc -c < /tmp/human-zombie.glb)" -eq 162820
+          sha256sum /tmp/human-zombie.glb
+      - name: Inspect GLB structure
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const b = fs.readFileSync('/tmp/human-zombie.glb');
+          if (b.toString('ascii', 0, 4) !== 'glTF') throw new Error('Not GLB');
+          let offset = 12;
+          let json = null;
+          while (offset + 8 <= b.length) {
+            const len = b.readUInt32LE(offset);
+            const type = b.toString('ascii', offset + 4, offset + 8);
+            if (type === 'JSON') json = JSON.parse(b.toString('utf8', offset + 8, offset + 8 + len).replace(/\u0000+$/g, '').trim());
+            offset += 8 + len;
+          }
+          if (!json) throw new Error('Missing GLB JSON chunk');
+          const names = (json.nodes || []).map(n => n.name).filter(Boolean);
+          console.log(JSON.stringify({
+            meshes: (json.meshes || []).length,
+            skins: (json.skins || []).length,
+            animations: (json.animations || []).length,
+            materials: (json.materials || []).map(m => m.name || '(unnamed)'),
+            nodeNames: names
+          }, null, 2));
+          NODE
