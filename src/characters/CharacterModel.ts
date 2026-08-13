@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { resolveLocomotionState, type LocomotionState } from './CharacterLocomotion';
+import type { WeaponId } from '../combat/types';
 
 export interface CharacterLoadResult {
   clipNames: string[];
@@ -30,6 +31,7 @@ export class CharacterModel {
   private overrideAction: THREE.AnimationAction | null = null;
   private overrideTime = 0;
   private desiredLocomotion: LocomotionState = 'idle';
+  private activeWeapon: WeaponId = 'pistol';
   private mixer: THREE.AnimationMixer | null = null;
   private activeState: LocomotionState | null = null;
   private headBone: THREE.Bone | null = null;
@@ -143,6 +145,14 @@ export class CharacterModel {
     this.mixer.update(safeDt);
   }
 
+  setActiveWeapon(weaponId: WeaponId): void {
+    if (this.activeWeapon === weaponId) return;
+    this.activeWeapon = weaponId;
+    if (!this.mixer || this.clips.length === 0) return;
+    this.bindLocomotionActions(this.clips);
+    this.setLocomotion(this.desiredLocomotion, true);
+  }
+
   playPistolFire(): boolean {
     const clip = this.findClip(
       ['Pistol_Fire', 'Pistol_Shoot', 'Pistol_Shot'],
@@ -159,6 +169,24 @@ export class CharacterModel {
     );
     if (!clip) return false;
     return this.playOverride(clip, Math.max(0.25, clip.duration), 0.08);
+  }
+
+  playShotgunFire(): boolean {
+    const clip = this.findClip(
+      ['Shotgun_Fire', 'Shotgun_Shoot', 'Shotgun_Shot', 'Rifle_Fire', 'Rifle_Shoot', 'Rifle_Shot'],
+      [/(shotgun|rifle).*(fire|shoot|shot)/i, /(fire|shoot|shot).*(shotgun|rifle)/i]
+    );
+    if (!clip) return false;
+    return this.playOverride(clip, Math.min(0.56, Math.max(0.16, clip.duration)), 0.045);
+  }
+
+  playShotgunReload(): boolean {
+    const clip = this.findClip(
+      ['Shotgun_Reload', 'Reload_Shotgun', 'Rifle_Reload', 'Reload_Rifle'],
+      [/(shotgun|rifle).*reload/i, /reload.*(shotgun|rifle)/i]
+    );
+    if (!clip) return false;
+    return this.playOverride(clip, Math.max(0.32, clip.duration), 0.08);
   }
 
   dispose(): void {
@@ -181,7 +209,12 @@ export class CharacterModel {
     const fuzzy = (...patterns: RegExp[]): THREE.AnimationClip | undefined =>
       clips.find((clip) => patterns.some((pattern) => pattern.test(clip.name)));
 
-    const idle = exact('Pistol_Idle_Loop', 'Idle_Loop') ?? fuzzy(/pistol.*idle/i, /idle/i, /stand/i) ?? clips[0];
+    const stanceIdle = this.activeWeapon === 'pistol'
+      ? exact('Pistol_Idle_Loop') ?? fuzzy(/pistol.*idle/i)
+      : this.activeWeapon === 'shotgun'
+        ? exact('Shotgun_Idle_Loop', 'Rifle_Idle_Loop', 'Rifle_Aim_Idle_Loop') ?? fuzzy(/(shotgun|rifle).*(idle|aim)/i)
+        : exact('Bow_Idle_Loop') ?? fuzzy(/bow.*idle/i);
+    const idle = stanceIdle ?? exact('Idle_Loop') ?? fuzzy(/idle/i, /stand/i) ?? clips[0];
     const walk = exact('Walk_Loop', 'Jog_Fwd_Loop') ?? fuzzy(/walk.*loop/i, /jog.*fwd/i, /walk/i);
     const run = exact('Sprint_Loop', 'Jog_Fwd_Loop') ?? fuzzy(/sprint/i, /jog.*fwd/i, /run/i);
 

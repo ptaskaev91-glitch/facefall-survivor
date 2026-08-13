@@ -24,7 +24,7 @@ function animationNames(): string[] {
   return (document.animations ?? []).map((animation) => animation.name ?? '').filter(Boolean);
 }
 
-test('vendored Universal Animation Library contains pistol combat clips', () => {
+test('vendored Universal Animation Library contains pistol combat clips used as the current firearm fallback', () => {
   const names = animationNames();
   const fire = names.find((name) => /pistol.*(fire|shoot|shot)|(fire|shoot|shot).*pistol/i.test(name));
   const reload = names.find((name) => /pistol.*reload|reload.*pistol/i.test(name));
