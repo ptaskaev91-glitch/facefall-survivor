@@ -1,0 +1,36 @@
+name: Patch 012 GameApp A
+on:
+  push:
+    branches:
+      - 'feature/0.12.0-super-makar-family'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch GameApp dependencies
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/app/GameApp.ts'); s=p.read_text()
+          pairs=[
+          ("import { WaveDirector } from '../waves/WaveDirector';", "import { WaveDirector } from '../waves/WaveDirector';\nimport { FamilyCompanionSystem } from '../family/FamilyCompanionSystem';\nimport { CoinSystem } from '../economy/CoinSystem';"),
+          ("  faceDataUrl?: string | null;\n}", "  faceDataUrl?: string | null;\n  mamaFaceDataUrl?: string | null;\n  papaFaceDataUrl?: string | null;\n}"),
+          ("  touchCamera?: HTMLElement;\n}", "  touchCamera?: HTMLElement;\n  coins?: HTMLElement;\n  buyShotgun?: HTMLButtonElement;\n  buyBow?: HTMLButtonElement;\n}"),
+          ("  private readonly waveDirector = new WaveDirector();", "  private readonly waveDirector = new WaveDirector();\n  private readonly family: FamilyCompanionSystem;\n  private readonly coinSystem: CoinSystem;\n  private coins = 0;"),
+          ("    this.enemySystem = new EnemySystem(this.world.scene, this.damageSystem, { shadows: this.quality.shadows, maxActive: this.maxActiveEnemies });", "    this.enemySystem = new EnemySystem(this.world.scene, this.damageSystem, { shadows: this.quality.shadows, maxActive: this.maxActiveEnemies, onGroan: (actor) => this.events.emit('enemyGroan', { position: actor.root.position.clone(), kind: actor.archetype.id }) });\n    this.family = new FamilyCompanionSystem(this.world.scene, this.quality, this.enemySystem, this.damageSystem);\n    this.coinSystem = new CoinSystem(this.world.scene, (amount) => { this.coins += amount; this.hud.setLastEvent(`МОНЕТЫ +${amount}`); this.refreshStatus(); });"),
+          ("    this.bindUi();", "    this.unsubscribeEvents.push(this.events.on('kill', (hit) => { if (hit.targetId === 'player') return; const amount = hit.targetId.includes('-brute-') ? 5 : hit.targetId.includes('-runner-') ? 3 : 2; this.coinSystem.spawn(hit.hitPoint, amount); }));\n    this.bindUi();"),
+          ("      await this.player.setFaceDataUrl(options.faceDataUrl ?? null);", "      await this.player.setFaceDataUrl(options.faceDataUrl ?? null);\n      this.family.configureFaces({ mamaFaceDataUrl: options.mamaFaceDataUrl, papaFaceDataUrl: options.papaFaceDataUrl });")]
+          for a,b in pairs:
+            if a not in s: raise SystemExit('missing '+a[:60])
+            s=s.replace(a,b)
+          p.write_text(s)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/patch-012-gameapp-a.yml
+          git add src/app/GameApp.ts
+          git commit -m 'feat: connect family and coin runtimes'
+          git push origin HEAD:feature/0.12.0-super-makar-family
