@@ -86,8 +86,10 @@ test('3RD auto-aim moves the visible reticle onto a live infected', async ({ pag
   console.log(`AUTOAIM_LOCK ${JSON.stringify(diagnostic)}`);
   expect(diagnostic.coarsePointer).toBe(true);
   expect(diagnostic.cameraMode).toBe('third');
+  // The real contract is spatial: the rendered reticle must converge onto the live target.
+  // A target may legitimately project through the vertical screen center, so requiring
+  // styleTop != 50% made this test flaky even when the lock was already correct.
   expect(diagnostic.distance).toBeLessThan(42);
-  expect(diagnostic.styleTop).not.toBe('50%');
   await page.screenshot({ path: 'test-artifacts/mobile-third-autoaim-lock.png', fullPage: true });
   expect(errors, `Fatal browser errors: ${errors.join(' | ')}`).toEqual([]);
 });
