@@ -86,6 +86,8 @@ export class PlayerRuntime {
       console.warn('Production hero has no hand_r weapon socket; pistol visual disabled.');
     }
 
+    this.weaponVisual.setActiveWeapon(this.activeWeapon);
+    this.characterModel.setActiveWeapon(this.activeWeapon);
     this.setProductionVisualActive(activate);
     return { ...result, clipNames };
   }
@@ -94,22 +96,28 @@ export class PlayerRuntime {
     this.productionVisualActive = active && this.characterModel.isLoaded;
     this.characterModel.setVisible(this.productionVisualActive);
     this.faceSystem.setVisible(!this.productionVisualActive);
-    this.weaponVisual.setVisible(this.productionVisualActive && this.activeWeapon === 'pistol');
+    this.weaponVisual.setVisible(this.productionVisualActive && this.activeWeapon !== 'bow');
   }
 
   setActiveWeapon(weaponId: WeaponId): void {
     this.activeWeapon = weaponId;
-    this.weaponVisual.setVisible(this.productionVisualActive && weaponId === 'pistol');
+    this.characterModel.setActiveWeapon(weaponId);
+    this.weaponVisual.setActiveWeapon(weaponId);
+    this.weaponVisual.setVisible(this.productionVisualActive && weaponId !== 'bow');
   }
 
   playWeaponFire(weaponId: WeaponId): boolean {
-    if (!this.productionVisualActive || weaponId !== 'pistol') return false;
-    return this.characterModel.playPistolFire();
+    if (!this.productionVisualActive) return false;
+    if (weaponId === 'pistol') return this.characterModel.playPistolFire();
+    if (weaponId === 'shotgun') return this.characterModel.playShotgunFire();
+    return false;
   }
 
   playWeaponReload(weaponId: WeaponId): boolean {
-    if (!this.productionVisualActive || weaponId !== 'pistol') return false;
-    return this.characterModel.playPistolReload();
+    if (!this.productionVisualActive) return false;
+    if (weaponId === 'pistol') return this.characterModel.playPistolReload();
+    if (weaponId === 'shotgun') return this.characterModel.playShotgunReload();
+    return false;
   }
 
   move(moveX: number, moveY: number, sprint: boolean, dt: number, collisionWorld: CollisionWorld): PlayerMovementResult {
@@ -141,7 +149,7 @@ export class PlayerRuntime {
   }
 
   muzzle(out: THREE.Vector3): THREE.Vector3 {
-    if (this.productionVisualActive && this.activeWeapon === 'pistol' && this.weaponVisual.getMuzzleWorldPosition(out)) return out;
+    if (this.productionVisualActive && this.activeWeapon !== 'bow' && this.weaponVisual.getMuzzleWorldPosition(out)) return out;
     return out.copy(this.root.position).add(this.muzzleOffset).addScaledVector(this.facing, 0.5);
   }
 

@@ -137,3 +137,66 @@ test('capture mobile TOP, 3RD, pistol fire/reload and uploaded-face checkpoints'
 
   expect(errors, `Fatal browser errors: ${errors.join(' | ')}`).toEqual([]);
 });
+
+
+test('capture mobile shotgun fire and reload production checkpoints', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+
+  await page.goto('/engine-lab.html', { waitUntil: 'domcontentloaded' });
+  await page.locator('#menuCamThird').click();
+  await page.locator('#startGame').click();
+  await expect(page.locator('#status')).toContainText('state=playing', { timeout: 20_000 });
+  await page.waitForTimeout(1200);
+
+  const weapon = page.locator('#touchWeapon');
+  await weapon.dispatchEvent('pointerdown', pointerDown(61));
+  await page.waitForTimeout(45);
+  await weapon.dispatchEvent('pointerup', pointerUp(61));
+  await page.waitForTimeout(120);
+
+  const selected = await page.evaluate(() => {
+    const runtimeWindow = window as Window & { __facefallApp?: any };
+    const app = runtimeWindow.__facefallApp;
+    if (!app) throw new Error('Facefall runtime is unavailable for weapon inspection');
+    return app.weaponSystem.selected as string;
+  });
+  expect(selected).toBe('shotgun');
+
+  const magazineBefore = await page.evaluate(() => {
+    const runtimeWindow = window as Window & { __facefallApp?: any };
+    const app = runtimeWindow.__facefallApp;
+    return app.weaponSystem.runtime('shotgun').magazine as number;
+  });
+
+  const fire = page.locator('#touchFire');
+  await fire.dispatchEvent('pointerdown', pointerDown(62));
+  await page.waitForTimeout(120);
+  await fire.dispatchEvent('pointerup', pointerUp(62));
+  await page.waitForTimeout(70);
+
+  const magazineAfter = await page.evaluate(() => {
+    const runtimeWindow = window as Window & { __facefallApp?: any };
+    const app = runtimeWindow.__facefallApp;
+    return app.weaponSystem.runtime('shotgun').magazine as number;
+  });
+  expect(magazineAfter).toBeLessThan(magazineBefore);
+  await page.screenshot({ path: `${artifactDir}/mobile-shotgun-fire-third.png`, fullPage: true });
+
+  await page.waitForTimeout(700);
+  const reload = page.locator('#touchReload');
+  await reload.dispatchEvent('pointerdown', pointerDown(63));
+  await page.waitForTimeout(45);
+  await reload.dispatchEvent('pointerup', pointerUp(63));
+  await page.waitForTimeout(130);
+
+  const reloadState = await page.evaluate(() => {
+    const runtimeWindow = window as Window & { __facefallApp?: any };
+    const app = runtimeWindow.__facefallApp;
+    return app.weaponSystem.runtime('shotgun').state as string;
+  });
+  expect(reloadState).toBe('reloading');
+  await page.screenshot({ path: `${artifactDir}/mobile-shotgun-reload-third.png`, fullPage: true });
+
+  expect(errors, `Fatal browser errors: ${errors.join(' | ')}`).toEqual([]);
+});
