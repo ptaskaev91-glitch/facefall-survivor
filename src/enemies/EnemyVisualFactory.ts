@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { EnemyId } from './archetypes';
-import { updateRiggedWalker } from './RiggedWalkerVisual';
+import { hydrateRiggedWalker, updateRiggedWalker } from './RiggedWalkerVisual';
 
 interface ZombiePalette {
   skin: number;
@@ -39,8 +39,8 @@ function addMesh(
 }
 
 /**
- * Lightweight humanoid infected fallback. Walker is hydrated into a rigged visual
- * asynchronously in EnemySystem; Runner/Brute stay procedural until their own slices land.
+ * Lightweight humanoid infected fallback. Walker hydrates into a cached rigged visual
+ * after EnemySystem finishes assigning its stable target id and scene parent.
  */
 export function createEnemyVisual(type: EnemyId, shadows: boolean): THREE.Group {
   const palette = PALETTES[type];
@@ -127,6 +127,10 @@ export function createEnemyVisual(type: EnemyId, shadows: boolean): THREE.Group 
   root.userData.baseScale = scale;
   root.userData.type = type;
   root.userData.gaitPhase = Math.random() * Math.PI * 2;
+
+  if (type === 'walker') {
+    queueMicrotask(() => { void hydrateRiggedWalker(root, shadows); });
+  }
   return root;
 }
 
