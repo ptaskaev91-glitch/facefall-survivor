@@ -17,10 +17,10 @@ function markBuildUi(): void {
   const badge = document.querySelector<HTMLElement>('.lab-badge');
   const kicker = document.querySelector<HTMLElement>('.menu-kicker');
   const notes = [...document.querySelectorAll<HTMLElement>('.menu-note')];
-  if (badge) badge.textContent = 'FACEFALL // 0.9.3 WEAPON SLICE';
-  if (kicker) kicker.textContent = 'FACEFALL SURVIVOR · ENGINE NEXT 0.9.3';
+  if (badge) badge.textContent = 'FACEFALL // 0.9.4 RIGGED WALKER';
+  if (kicker) kicker.textContent = 'FACEFALL SURVIVOR · ENGINE NEXT 0.9.4';
   if (notes[0]) {
-    notes[0].textContent = 'TOP: коснись свободной точки — джойстик появится под пальцем, герой сам выбирает цель. 3RD: крестик в центре, свайп справа — ручной yaw. WEAP переключает pistol / shotgun / bow. FIRE и R синхронизированы с production weapon presentation; у лука стрела и тетива реагируют на реальный выстрел и перезарядку.';
+    notes[0].textContent = 'TOP: коснись свободной точки — джойстик появится под пальцем, герой сам выбирает цель. 3RD: крестик в центре, свайп справа — ручной yaw. WEAP переключает pistol / shotgun / bow. Первый Walker теперь использует ригованную анимированную презентацию с безопасным procedural fallback.';
   }
 }
 

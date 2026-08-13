@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { EnemyId } from './archetypes';
+import { hydrateRiggedWalker, updateRiggedWalker } from './RiggedWalkerVisual';
 
 interface ZombiePalette {
   skin: number;
@@ -38,9 +39,8 @@ function addMesh(
 }
 
 /**
- * Lightweight humanoid infected used until authored GLBs land.
- * Unlike the old capsule markers, these have readable head/torso/limbs,
- * distinct silhouettes and per-mesh hit-zone metadata.
+ * Lightweight humanoid infected fallback. Walker hydrates into a cached rigged visual
+ * after EnemySystem finishes assigning its stable target id and scene parent.
  */
 export function createEnemyVisual(type: EnemyId, shadows: boolean): THREE.Group {
   const palette = PALETTES[type];
@@ -127,11 +127,17 @@ export function createEnemyVisual(type: EnemyId, shadows: boolean): THREE.Group 
   root.userData.baseScale = scale;
   root.userData.type = type;
   root.userData.gaitPhase = Math.random() * Math.PI * 2;
+
+  if (type === 'walker') {
+    queueMicrotask(() => { void hydrateRiggedWalker(root, shadows); });
+  }
   return root;
 }
 
-/** Simple procedural gait so infected read as moving humanoids before GLB animations land. */
+/** Uses the rigged animation mixer when available, otherwise keeps the procedural fallback alive. */
 export function animateEnemyVisual(root: THREE.Group, speed: number, dt: number): void {
+  if (root.userData.type === 'walker' && updateRiggedWalker(root, speed, dt)) return;
+
   const phase = ((root.userData.gaitPhase as number | undefined) ?? 0) + dt * (2.8 + speed * 1.25);
   root.userData.gaitPhase = phase;
   const stride = Math.min(0.55, speed * 0.11);
