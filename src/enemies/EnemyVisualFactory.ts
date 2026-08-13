@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { EnemyId } from './archetypes';
-import { hydrateRiggedInfected, playRiggedInfectedAction, updateRiggedInfected } from './RiggedWalkerVisual';
+import { hydrateRiggedInfected, playRiggedInfectedAction, setRiggedInfectedLod, updateRiggedInfected } from './RiggedWalkerVisual';
 
 interface ZombiePalette {
   skin: number;
@@ -119,3 +119,5 @@ export function animateEnemyVisual(root: THREE.Group, speed: number, dt: number)
 export function playEnemyVisualAction(root: THREE.Group, action: 'attack' | 'stagger' | 'death'): boolean {
   return playRiggedInfectedAction(root, action);
 }
+
+export function updateEnemyVisualLod(root: THREE.Group, distance: number): boolean { return setRiggedInfectedLod(root, distance); }

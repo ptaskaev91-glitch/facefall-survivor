@@ -6,7 +6,7 @@ import { DirectNavigationQuery, type NavigationQuery } from '../navigation/Navig
 import { SpatialHash, type SpatialHashItem } from '../physics/SpatialHash';
 import { ENEMY_ARCHETYPES, type EnemyArchetype, type EnemyId } from './archetypes';
 import { EnemyBrain } from './EnemyBrain';
-import { animateEnemyVisual, createEnemyVisual, playEnemyVisualAction } from './EnemyVisualFactory';
+import { animateEnemyVisual, createEnemyVisual, playEnemyVisualAction, updateEnemyVisualLod } from './EnemyVisualFactory';
 
 interface EnemySpatialItem extends SpatialHashItem { root: THREE.Object3D; }
 
@@ -99,6 +99,7 @@ export class EnemySystem {
 
       this.offset.copy(playerPosition).sub(actor.root.position).setY(0);
       const distance = this.offset.length();
+      updateEnemyVisualLod(actor.root, distance);
       const sightRange = actor.archetype.id === 'runner' ? 30 : actor.archetype.id === 'brute' ? 25 : 27;
       const inSightRange = distance <= sightRange;
       const hasLineOfSight = inSightRange && (this.options.canSeeTarget?.(actor.root.position, playerPosition) ?? true);

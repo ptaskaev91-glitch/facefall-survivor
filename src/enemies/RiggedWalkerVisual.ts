@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import type { EnemyId } from './archetypes';
+import { ASSET_BUDGET } from '../assets/AssetBudget';
 
 const MODEL_URL = '/assets/enemies/mesh2motion-human-zombie/human-zombie.glb';
 const BASE_TARGET_HEIGHT = 1.78;
@@ -299,6 +300,21 @@ export function updateRiggedInfected(root: THREE.Group, speed: number, dt: numbe
   runtime.clock += Math.max(0, dt) * pace;
   if (runtime.action) runtime.actionTime += Math.max(0, dt);
   applyNativePose(runtime, speed); applyAction(runtime); return true;
+}
+
+
+export function setRiggedInfectedLod(root: THREE.Group, distance: number): boolean {
+  const runtime = root.userData.riggedInfectedRuntime as InfectedRuntime | undefined;
+  if (!runtime) return false;
+  const near = distance <= ASSET_BUDGET.infectedNearLodDistance;
+  const tier = near ? 'near' : 'far';
+  if (root.userData.infectedLodTier === tier) return true;
+  root.userData.infectedLodTier = tier;
+  runtime.wrapper.traverse((object) => {
+    if (object.userData.decorative) object.visible = near;
+    if (object instanceof THREE.Mesh && object.userData.visualOnly) object.castShadow = near;
+  });
+  return true;
 }
 
 export function updateRiggedWalker(root: THREE.Group, speed: number, dt: number): boolean { return updateRiggedInfected(root, speed, dt); }

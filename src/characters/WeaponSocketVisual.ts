@@ -22,6 +22,8 @@ export class WeaponSocketVisual {
   private activeWeapon: WeaponId = 'pistol';
   private enabled = false;
   private assetGeneration = 0;
+  private readonly loadedWeaponAssets = new Set<'shotgun' | 'bow'>();
+  private readonly loadingWeaponAssets = new Set<'shotgun' | 'bow'>();
 
   private bowStringGeometry: THREE.BufferGeometry | null = null;
   private bowArrow: THREE.Group | null = null;
@@ -61,14 +63,14 @@ export class WeaponSocketVisual {
     this.updateBowGeometry();
     this.updateVisibility();
     this.update(0);
-    const generation = ++this.assetGeneration;
-    void this.hydrateWeaponGlb('shotgun', '/assets/weapons/shotgun.glb', generation);
-    void this.hydrateWeaponGlb('bow', '/assets/weapons/bow-arrow.glb', generation);
+    this.assetGeneration += 1;
+    this.ensureWeaponAsset(this.activeWeapon);
     return true;
   }
 
   setActiveWeapon(weaponId: WeaponId): void {
     this.activeWeapon = weaponId;
+    this.ensureWeaponAsset(weaponId);
     if (weaponId === 'bow' && this.bowDrawTarget >= 1) {
       this.bowDraw = 1;
       this.bowArrowVisible = true;
@@ -286,6 +288,15 @@ export class WeaponSocketVisual {
     return { group, muzzle };
   }
 
+  private ensureWeaponAsset(weaponId: WeaponId): void {
+    if (weaponId !== 'shotgun' && weaponId !== 'bow') return;
+    if (!this.socket || this.loadedWeaponAssets.has(weaponId) || this.loadingWeaponAssets.has(weaponId)) return;
+    this.loadingWeaponAssets.add(weaponId);
+    const url = weaponId === 'shotgun' ? '/assets/weapons/shotgun.glb' : '/assets/weapons/bow-arrow.glb';
+    const generation = this.assetGeneration;
+    void this.hydrateWeaponGlb(weaponId, url, generation).finally(() => this.loadingWeaponAssets.delete(weaponId));
+  }
+
   private async hydrateWeaponGlb(weaponId: 'shotgun' | 'bow', url: string, generation: number): Promise<void> {
     try {
       const gltf = await this.loader.loadAsync(url);
@@ -308,6 +319,7 @@ export class WeaponSocketVisual {
         this.materials.push(...materials);
       });
       group.add(gltf.scene);
+      this.loadedWeaponAssets.add(weaponId);
       const fallback = group.getObjectByName(`weapon-${weaponId}-procedural-fallback`);
       if (fallback) fallback.visible = false;
       if (weaponId === 'bow') {
@@ -359,6 +371,8 @@ export class WeaponSocketVisual {
     this.socket = null;
     this.weaponGroups.clear();
     this.muzzles.clear();
+    this.loadedWeaponAssets.clear();
+    this.loadingWeaponAssets.clear();
     this.bowStringGeometry = null;
     this.bowArrow = null;
   }
