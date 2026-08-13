@@ -625,3 +625,8 @@ src/
 - `tests/unit/asset-budget.test.ts`, `weapon-assets.test.ts`, `run-session.test.ts` — production-core unit contracts.
 
 `EnemyRuntime` and `PresentationRuntime` remain intentionally uncreated: current `EnemySystem` and presentation boundaries are cohesive, so additional wrappers would add indirection without reducing responsibility.
+
+
+### 0.11.0 authored world
+
+`public/assets/levels/abandoned-outskirts/level.glb` is now the active static world asset. `WorldRuntime` owns its lifecycle, `LevelLoader` builds structural collision while ignoring `decor-*` meshes, and `level.manifest.json` continues to own gameplay markers.

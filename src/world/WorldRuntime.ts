@@ -64,9 +64,12 @@ export class WorldRuntime {
 
   async loadManifest(): Promise<{ manifest: LevelManifest; levelId: string }> {
     try {
-      const manifest = await this.levelLoader.loadManifest('/assets/levels/abandoned-outskirts/level.manifest.json');
-      this.applyManifestLights(manifest);
-      return { manifest, levelId: manifest.id };
+      const loaded = await this.levelLoader.load({ glbUrl: '/assets/levels/abandoned-outskirts/level.glb', manifestUrl: '/assets/levels/abandoned-outskirts/level.manifest.json', shadows: this.quality.shadows });
+      AssetManager.disposeObject(this.staticWorld);
+      this.staticWorld.clear();
+      this.staticWorld.add(loaded.root);
+      this.applyManifestLights(loaded.manifest);
+      return { manifest: loaded.manifest, levelId: loaded.manifest.id };
     } catch (error) {
       console.warn('Facefall: manifest load failed, keeping procedural fallback', error);
       const manifest = this.fallbackManifest();
