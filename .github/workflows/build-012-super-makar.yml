@@ -1,0 +1,231 @@
+name: Build 012 Super Makar
+on:
+  push:
+    branches: [feature/0.12.0-super-makar-family]
+permissions:
+  contents: write
+jobs:
+  build-family:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Apply family gameplay milestone
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def write(path, text):
+              p=Path(path); p.parent.mkdir(parents=True, exist_ok=True); p.write_text(text, encoding='utf-8')
+          def repl(path, old, new):
+              p=Path(path); s=p.read_text(encoding='utf-8')
+              if old not in s: raise SystemExit(f'missing pattern in {path}: {old[:80]}')
+              p.write_text(s.replace(old,new), encoding='utf-8')
+
+          write('src/family/FamilyCompanionSystem.ts', r'''import * as THREE from 'three';
+import { CharacterModel } from '../characters/CharacterModel';
+import type { DamageSystem } from '../combat/DamageSystem';
+import type { EnemySystem } from '../enemies/EnemySystem';
+import type { QualityProfile } from '../graphics/quality';
+
+export type FamilyRole = 'mama' | 'papa';
+export interface FamilyFaces { mamaFaceDataUrl?: string | null; papaFaceDataUrl?: string | null; }
+interface Companion { role: FamilyRole; root: THREE.Group; model: CharacterModel; fireTimer: number; unlocked: boolean; face: string | null; }
+const HERO_URL='/assets/characters/quaternius-universal-base-male/Superhero_Male_FullBody.gltf';
+const ANIM_URL='/assets/animations/quaternius-universal-animation-library/UAL1_Standard.glb';
+
+export class FamilyCompanionSystem {
+  private readonly companions: Record<FamilyRole, Companion>;
+  private readonly temp = new THREE.Vector3();
+  private readonly target = new THREE.Vector3();
+  constructor(private readonly scene: THREE.Scene, private readonly quality: QualityProfile, private readonly enemies: EnemySystem, private readonly damage: DamageSystem) {
+    this.companions={mama:this.make('mama'),papa:this.make('papa')};
+  }
+  configureFaces(faces: FamilyFaces): void { this.companions.mama.face=faces.mamaFaceDataUrl??null; this.companions.papa.face=faces.papaFaceDataUrl??null; }
+  reset(): void { for(const c of Object.values(this.companions)){c.unlocked=false;c.root.visible=false;c.fireTimer=0;} }
+  async syncWave(wave:number): Promise<void> {
+    if(wave>=4 && !this.companions.mama.unlocked) await this.unlock(this.companions.mama);
+    if(wave>=7 && !this.companions.papa.unlocked) await this.unlock(this.companions.papa);
+  }
+  update(dt:number, playerPosition:THREE.Vector3, playerFacing:THREE.Vector3): void {
+    const active=this.active;
+    active.forEach((c,index)=>{
+      const side=index===0?-1:1; const back=active.length===1?1.6:1.9;
+      const desired=this.temp.copy(playerPosition).add(new THREE.Vector3(side*1.45,0,back));
+      c.root.position.lerp(desired,1-Math.exp(-dt*5.5));
+      const enemy=this.nearestEnemy(c.root.position);
+      if(enemy){
+        enemy.getWorldPosition(this.target); const dir=this.target.clone().sub(c.root.position).setY(0);
+        if(dir.lengthSq()>1e-5)c.root.rotation.y=Math.atan2(-dir.x,-dir.z);
+        c.fireTimer-=dt;
+        if(c.fireTimer<=0){c.fireTimer=c.role==='mama'?0.72:0.58; const id=enemy.userData.damageTargetId as string|undefined; if(id){
+          const hitPoint=this.target.clone().add(new THREE.Vector3(0,1.0,0)); const shotDir=hitPoint.clone().sub(c.root.position).normalize();
+          this.damage.apply({amount:c.role==='mama'?17:21,kind:'bullet',sourceId:`super-${c.role}`,targetId:id,hitPoint,direction:shotDir,impulse:5,hitZone:'torso',critical:false});
+          c.model.playPistolFire();
+        }}
+      } else { c.root.rotation.y=Math.atan2(-playerFacing.x,-playerFacing.z); }
+      c.model.update(dt, c.root.position.distanceTo(desired)>0.08?3.8:0);
+    });
+  }
+  get heroCount(): number { return 1+this.active.length; }
+  get activeRoles(): FamilyRole[] { return this.active.map(c=>c.role); }
+  dispose(): void { for(const c of Object.values(this.companions)){c.model.dispose();c.root.removeFromParent();} }
+  private get active(): Companion[]{return Object.values(this.companions).filter(c=>c.unlocked);}
+  private make(role:FamilyRole): Companion { const root=new THREE.Group();root.name=`super-${role}`;root.visible=false;const model=new CharacterModel(this.quality.shadows);root.add(model.root);this.scene.add(root);return{role,root,model,fireTimer:0,unlocked:false,face:null}; }
+  private async unlock(c:Companion):Promise<void>{c.unlocked=true;c.root.visible=true;try{await c.model.load(HERO_URL);await c.model.loadAnimations(ANIM_URL);await c.model.setFaceDataUrl(c.face);c.model.setVisible(true);c.model.setActiveWeapon('pistol');}catch(e){console.warn(`[Super Makar] ${c.role} model unavailable`,e);}}
+  private nearestEnemy(from:THREE.Vector3):THREE.Object3D|null{let best:THREE.Object3D|null=null,bestD=30*30;for(const root of this.enemies.aimTargets){if(!root.visible||!root.userData.damageTargetId)continue;const d=root.position.distanceToSquared(from);if(d<bestD){bestD=d;best=root;}}return best;}
+}
+''')
+
+          write('src/economy/CoinSystem.ts', r'''import * as THREE from 'three';
+interface CoinActor { root:THREE.Group; amount:number; velocity:THREE.Vector3; life:number; }
+export class CoinSystem {
+  private readonly coins:CoinActor[]=[]; private readonly temp=new THREE.Vector3();
+  constructor(private readonly scene:THREE.Scene,private readonly onCollect:(amount:number)=>void){}
+  spawn(position:THREE.Vector3,amount:number):void{const root=new THREE.Group();root.name='zombie-coin';const mat=new THREE.MeshStandardMaterial({color:0xf5c542,emissive:0x8a5a00,emissiveIntensity:.35,metalness:.72,roughness:.28});const mesh=new THREE.Mesh(new THREE.CylinderGeometry(.16,.16,.055,14),mat);mesh.rotation.x=Math.PI/2;root.add(mesh);root.position.copy(position).add(new THREE.Vector3(0,.75,0));this.scene.add(root);this.coins.push({root,amount,velocity:new THREE.Vector3((Math.random()-.5)*1.8,2.2+Math.random(),(Math.random()-.5)*1.8),life:20});}
+  update(dt:number,player:THREE.Vector3):void{for(let i=this.coins.length-1;i>=0;i--){const c=this.coins[i];c.life-=dt;c.velocity.y-=5.4*dt;c.root.position.addScaledVector(c.velocity,dt);if(c.root.position.y<.18){c.root.position.y=.18;c.velocity.y=Math.abs(c.velocity.y)*.28;c.velocity.x*=.82;c.velocity.z*=.82;}c.root.rotation.y+=dt*5.2;this.temp.copy(c.root.position).sub(player).setY(0);if(this.temp.lengthSq()<1.35*1.35){this.onCollect(c.amount);this.remove(i);continue;}if(c.life<=0)this.remove(i);}}
+  reset():void{while(this.coins.length)this.remove(this.coins.length-1);} dispose():void{this.reset();}
+  get activeCount():number{return this.coins.length;}
+  private remove(i:number):void{const [c]=this.coins.splice(i,1);c.root.traverse(o=>{if(!(o instanceof THREE.Mesh))return;o.geometry.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];for(const m of ms)m.dispose();});c.root.removeFromParent();}
+}
+''')
+
+          # FaceStore supports 3 local slots.
+          write('src/persistence/FaceStore.ts', r'''export type FaceSlot='makar'|'mama'|'papa';
+export class FaceStore {
+  constructor(private readonly slot:FaceSlot='makar'){}
+  private get key():string{return `super-makar.face.${this.slot}.v1`;}
+  load():string|null{try{return localStorage.getItem(this.key)??(this.slot==='makar'?localStorage.getItem('facefall.face.v1'):null);}catch{return null;}}
+  save(dataUrl:string):void{try{localStorage.setItem(this.key,dataUrl);}catch(error){console.warn('[Super Makar] could not persist face locally',error);}}
+  remove():void{try{localStorage.removeItem(this.key);}catch{}}
+}
+''')
+
+          # Weapon locks/shop.
+          repl('src/combat/WeaponSystem.ts', "  selected: WeaponId = 'pistol';\n  private readonly resolvedDirection", "  selected: WeaponId = 'pistol';\n  private readonly unlocked = new Set<WeaponId>(['pistol']);\n  private readonly resolvedDirection")
+          repl('src/combat/WeaponSystem.ts', "    this.selected = 'pistol';\n  }", "    this.selected = 'pistol';\n    this.unlocked.clear(); this.unlocked.add('pistol');\n  }")
+          repl('src/combat/WeaponSystem.ts', "  select(id: WeaponId): boolean {\n    const current", "  isUnlocked(id: WeaponId): boolean { return this.unlocked.has(id); }\n  unlock(id: WeaponId): boolean { const before=this.unlocked.size; this.unlocked.add(id); return this.unlocked.size>before; }\n\n  select(id: WeaponId): boolean {\n    if (!this.unlocked.has(id)) return false;\n    const current")
+          repl('src/combat/WeaponSystem.ts', "    const order: WeaponId[] = ['pistol', 'shotgun', 'bow'];\n    const next = order[(order.indexOf(this.selected) + 1) % order.length];\n    this.select(next);", "    const order: WeaponId[] = ['pistol', 'shotgun', 'bow'];\n    const available = order.filter((id)=>this.unlocked.has(id));\n    const next = available[(available.indexOf(this.selected) + 1) % available.length] ?? 'pistol';\n    this.select(next);")
+
+          # Harder waves with hero count.
+          repl('src/waves/WaveDirector.ts', "  update(dt: number, activeEnemies: number, maxActive: number): SpawnRequest[] {", "  update(dt: number, activeEnemies: number, maxActive: number, heroCount = 1): SpawnRequest[] {")
+          repl('src/waves/WaveDirector.ts', "if (this.intermission <= 0) this.beginNextWave();", "if (this.intermission <= 0) this.beginNextWave(heroCount);")
+          repl('src/waves/WaveDirector.ts', "  private beginNextWave(): void {\n    this.wave += 1;\n    this.queue = this.buildComposition(this.wave);", "  private beginNextWave(heroCount: number): void {\n    this.wave += 1;\n    this.queue = this.buildComposition(this.wave, heroCount);")
+          repl('src/waves/WaveDirector.ts', "  private buildComposition(wave: number): EnemyId[] {\n    const result: EnemyId[] = [];\n    const walkers = 3 + Math.ceil(wave * 1.45);\n    const runners = Math.max(0, Math.floor((wave - 1) * 0.7));\n    const brutes = wave >= 3 ? Math.floor(wave / 3) : 0;", "  private buildComposition(wave: number, heroCount = 1): EnemyId[] {\n    const result: EnemyId[] = [];\n    const familyPressure = Math.max(0, heroCount - 1);\n    const walkers = 3 + Math.ceil(wave * 1.7) + familyPressure * 3;\n    const runners = Math.max(0, Math.floor((wave - 1) * 0.82)) + familyPressure;\n    const brutes = wave >= 3 ? Math.floor(wave / 3) + (heroCount >= 3 && wave >= 7 ? 1 : 0) : 0;")
+
+          # Enemy walking groan callback.
+          repl('src/enemies/EnemySystem.ts', "  deathTimer: number;", "  deathTimer: number;\n  groanTimer: number;")
+          repl('src/enemies/EnemySystem.ts', "  canSeeTarget?: (from: THREE.Vector3, to: THREE.Vector3) => boolean;", "  canSeeTarget?: (from: THREE.Vector3, to: THREE.Vector3) => boolean;\n  onGroan?: (actor: EnemyActor) => void;")
+          repl('src/enemies/EnemySystem.ts', "      id, archetype, root, velocity: new THREE.Vector3(), attackTimer: 0, staggerTimer: 0, alertTimer: 1.4,\n      wanderTimer: 0, deathTimer: 0,", "      id, archetype, root, velocity: new THREE.Vector3(), attackTimer: 0, staggerTimer: 0, alertTimer: 1.4,\n      wanderTimer: 0, deathTimer: 0, groanTimer: 1.5 + Math.random() * 3.5,")
+          repl('src/enemies/EnemySystem.ts', "      actor.wanderTimer = Math.max(0, actor.wanderTimer - dt);\n      animateEnemyVisual", "      actor.wanderTimer = Math.max(0, actor.wanderTimer - dt);\n      actor.groanTimer = Math.max(0, actor.groanTimer - dt);\n      if (actor.groanTimer <= 0) { actor.groanTimer = 3.4 + Math.random() * 5.2; this.options.onGroan?.(actor); }\n      animateEnemyVisual")
+
+          # New audio event.
+          repl('src/combat/types.ts', "export interface ThunderEvent", "export interface EnemyGroanEvent { position: Vector3; kind: 'walker' | 'runner' | 'brute'; }\n\nexport interface ThunderEvent")
+          repl('src/combat/types.ts', "  enemyAttack: EnemyAttackEvent;", "  enemyAttack: EnemyAttackEvent;\n  enemyGroan: EnemyGroanEvent;")
+          repl('src/presentation/audio/AudioSystem.ts', "    this.cleanups.push(events.on('enemyAttack', (event) => {", "    this.cleanups.push(events.on('enemyGroan', (event) => {\n      const base=event.kind==='brute'?52:event.kind==='runner'?104:72;\n      this.zombieVoice(base, event.kind==='brute'?0.62:0.42, event.kind==='brute'?0.055:0.035);\n    }));\n    this.cleanups.push(events.on('enemyAttack', (event) => {")
+          repl('src/presentation/audio/AudioSystem.ts', "      else this.noiseBurst(event.critical ? 0.11 : 0.06, event.critical ? 0.10 : 0.055, 1300);", "      else { this.noiseBurst(event.critical ? 0.11 : 0.06, event.critical ? 0.10 : 0.055, 1300); this.zombieVoice(event.critical?118:92,event.lethal?0.48:0.24,event.lethal?0.09:0.045); }")
+          repl('src/presentation/audio/AudioSystem.ts', "    this.cleanups.push(events.on('kill', () => this.pulse(180, 0.08, 0.035, 'triangle')));", "    this.cleanups.push(events.on('kill', (event) => { if(event.targetId!=='player') this.zombieVoice(70,0.62,0.11); this.pulse(180,0.08,0.035,'triangle'); }));")
+          repl('src/presentation/audio/AudioSystem.ts', "  private pulse(frequency: number", "  private zombieVoice(base:number,duration:number,gainValue:number):void {\n    const context=this.context, master=this.master; if(!context||!master||context.state!=='running')return;\n    const osc=context.createOscillator(), gain=context.createGain(), filter=context.createBiquadFilter(); const now=context.currentTime;\n    osc.type='sawtooth'; osc.frequency.setValueAtTime(base,now); osc.frequency.linearRampToValueAtTime(base*0.72,now+duration*.55); osc.frequency.linearRampToValueAtTime(base*.9,now+duration);\n    filter.type='lowpass'; filter.frequency.value=620; gain.gain.setValueAtTime(.0001,now); gain.gain.exponentialRampToValueAtTime(gainValue,now+.035); gain.gain.exponentialRampToValueAtTime(.0001,now+duration);\n    osc.connect(filter).connect(gain).connect(master); osc.start(now); osc.stop(now+duration+.02);\n  }\n\n  private pulse(frequency: number")
+
+          # Bigger head + rear face duplicate.
+          repl('src/characters/CharacterModel.ts', "  private faceShell: THREE.Mesh | null = null;", "  private faceShell: THREE.Mesh | null = null;\n  private rearFaceShell: THREE.Mesh | null = null;")
+          repl('src/characters/CharacterModel.ts', "    this.headBone = this.findBone(instance, 'Head');", "    this.headBone = this.findBone(instance, 'Head');\n    if (this.headBone) this.headBone.scale.multiplyScalar(1.18);")
+          repl('src/characters/CharacterModel.ts', "    const worldWidth = THREE.MathUtils.clamp(Math.max(eyeSize.x, eyeSize.z) * 1.75, 0.19, 0.27);", "    const worldWidth = THREE.MathUtils.clamp(Math.max(eyeSize.x, eyeSize.z) * 2.05, 0.23, 0.32);")
+          repl('src/characters/CharacterModel.ts', "    this.faceShell = shell;\n  }", "    this.faceShell = shell;\n    const rear = new THREE.Mesh(geometry.clone(), material.clone());\n    rear.name='uploaded-face-shell-rear'; rear.position.copy(placement.position); rear.position.z *= -1; rear.quaternion.copy(placement.quaternion).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.PI)); rear.renderOrder=3; rear.castShadow=false; rear.receiveShadow=false; this.headBone.add(rear); this.rearFaceShell=rear;\n  }")
+          # clear rear shell resources near clearFaceShell implementation.
+          repl('src/characters/CharacterModel.ts', "    this.faceShell = null;\n    this.faceMaterial", "    this.faceShell = null;\n    if (this.rearFaceShell) { this.rearFaceShell.geometry.dispose(); const rm=this.rearFaceShell.material; if(Array.isArray(rm)){for(const m of rm)m.dispose();}else rm.dispose(); this.rearFaceShell.removeFromParent(); this.rearFaceShell=null; }\n    this.faceMaterial")
+
+          # Product shell full rewrite with 3 photos while keeping settings behavior.
+          write('src/app/ProductShell.ts', r'''import { aimController } from '../aim/AimController';
+import type { CameraMode } from '../camera/CameraDirector';
+import { FaceStore, type FaceSlot } from '../persistence/FaceStore';
+import { SettingsStore, type FacefallSettings } from '../persistence/SettingsStore';
+import type { AudioSystem } from '../presentation/audio/AudioSystem';
+import type { GameApp } from './GameApp';
+interface FaceDom{input:HTMLInputElement;preview:HTMLImageElement;empty:HTMLElement;remove:HTMLButtonElement;}
+interface ProductShellDom{overlay:HTMLElement;start:HTMLButtonElement;makar:FaceDom;mama:FaceDom;papa:FaceDom;cameraTop:HTMLButtonElement;cameraThird:HTMLButtonElement;sensitivity:HTMLInputElement;sensitivityValue:HTMLElement;deadzone:HTMLInputElement;deadzoneValue:HTMLElement;aimAssist:HTMLInputElement;aimAssistValue:HTMLElement;volume:HTMLInputElement;volumeValue:HTMLElement;loading:HTMLElement;error:HTMLElement;}
+export class ProductShell{
+ private stores={makar:new FaceStore('makar'),mama:new FaceStore('mama'),papa:new FaceStore('papa')}; private faces:Record<FaceSlot,string|null>={makar:null,mama:null,papa:null}; private cameraMode:CameraMode='top'; private settingsStore=new SettingsStore(); private settings:FacefallSettings=this.settingsStore.defaults(); private busy=false;
+ constructor(private app:GameApp,private dom:ProductShellDom,private audio:AudioSystem){}
+ attach():void{for(const role of ['makar','mama','papa'] as FaceSlot[]){this.faces[role]=this.stores[role].load();this.bindFace(role);}this.settings=this.settingsStore.load();this.applySettings();this.refreshFaces();this.refreshCamera();this.refreshSettings();this.dom.cameraTop.addEventListener('click',this.onTop);this.dom.cameraThird.addEventListener('click',this.onThird);for(const e of [this.dom.sensitivity,this.dom.deadzone,this.dom.aimAssist,this.dom.volume])e.addEventListener('input',this.onSettingsInput);this.dom.start.addEventListener('click',this.onStart);this.show();}
+ detach():void{}
+ show():void{this.app.enterMenu();this.dom.overlay.dataset.visible='true';this.dom.loading.textContent='';this.dom.error.textContent='';}
+ private bindFace(role:FaceSlot):void{const d=this.dom[role];d.input.addEventListener('change',()=>void this.onFaceChange(role));d.remove.addEventListener('click',()=>{this.faces[role]=null;this.stores[role].remove();this.refreshFaces();});}
+ private async onFaceChange(role:FaceSlot):Promise<void>{const file=this.dom[role].input.files?.[0];if(!file)return;if(!file.type.startsWith('image/')||file.size>12*1024*1024){this.dom.error.textContent='Нужно изображение до 12 МБ.';return;}try{const data=await this.readFile(file);this.faces[role]=data;this.stores[role].save(data);this.dom.error.textContent='';this.refreshFaces();}catch{this.dom.error.textContent='Не удалось прочитать фотографию.';}finally{this.dom[role].input.value='';}}
+ private onTop=()=>{this.cameraMode='top';this.refreshCamera();}; private onThird=()=>{this.cameraMode='third';this.refreshCamera();};
+ private onSettingsInput=()=>{this.settings={aimSensitivity:Number(this.dom.sensitivity.value),aimDeadzone:Number(this.dom.deadzone.value),aimAssist:Number(this.dom.aimAssist.value),masterVolume:Number(this.dom.volume.value)};this.settingsStore.save(this.settings);this.applySettings();this.refreshSettings();};
+ private onStart=async()=>{if(this.busy)return;this.busy=true;this.dom.start.disabled=true;this.dom.loading.textContent='ЗАГРУЖАЕМ СУПЕР МАКАРА…';try{await this.audio.resume();await this.app.start({cameraMode:this.cameraMode,faceDataUrl:this.faces.makar,mamaFaceDataUrl:this.faces.mama,papaFaceDataUrl:this.faces.papa});this.dom.overlay.dataset.visible='false';this.dom.loading.textContent='';}catch(e){this.dom.error.textContent=`Не удалось запустить игру: ${e instanceof Error?e.message:String(e)}`;this.app.enterMenu();}finally{this.busy=false;this.dom.start.disabled=false;}};
+ private applySettings(){aimController.configure({sensitivity:this.settings.aimSensitivity,deadzone:this.settings.aimDeadzone});this.app.configureAimAssist(Math.max(.01,this.settings.aimAssist));this.audio.setVolume(this.settings.masterVolume);}
+ private refreshSettings(){this.dom.sensitivity.value=String(this.settings.aimSensitivity);this.dom.deadzone.value=String(this.settings.aimDeadzone);this.dom.aimAssist.value=String(this.settings.aimAssist);this.dom.volume.value=String(this.settings.masterVolume);this.dom.sensitivityValue.textContent=`${this.settings.aimSensitivity.toFixed(2)}×`;this.dom.deadzoneValue.textContent=`${Math.round(this.settings.aimDeadzone*100)}%`;this.dom.aimAssistValue.textContent=`${Math.round(this.settings.aimAssist*100)}%`;this.dom.volumeValue.textContent=`${Math.round(this.settings.masterVolume*100)}%`;}
+ private refreshFaces(){for(const role of ['makar','mama','papa'] as FaceSlot[]){const d=this.dom[role],src=this.faces[role];if(src){d.preview.src=src;d.preview.hidden=false;d.empty.hidden=true;d.remove.hidden=false;}else{d.preview.removeAttribute('src');d.preview.hidden=true;d.empty.hidden=false;d.remove.hidden=true;}}}
+ private refreshCamera(){this.dom.cameraTop.dataset.active=String(this.cameraMode==='top');this.dom.cameraThird.dataset.active=String(this.cameraMode==='third');}
+ private readFile(file:File):Promise<string>{return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>typeof r.result==='string'?res(r.result):rej(new Error());r.onerror=()=>rej(r.error);r.readAsDataURL(file);});}
+}
+export function resolveProductShellDom():ProductShellDom{const r=<T extends HTMLElement>(id:string):T=>{const e=document.getElementById(id) as T|null;if(!e)throw new Error(`Missing product shell element: #${id}`);return e;};const fd=(p:string):FaceDom=>({input:r<HTMLInputElement>(`${p}FaceInput`),preview:r<HTMLImageElement>(`${p}FacePreview`),empty:r<HTMLElement>(`${p}FaceEmpty`),remove:r<HTMLButtonElement>(`${p}RemoveFace`)});return{overlay:r('productMenu'),start:r<HTMLButtonElement>('startGame'),makar:fd('makar'),mama:fd('mama'),papa:fd('papa'),cameraTop:r<HTMLButtonElement>('menuCamTop'),cameraThird:r<HTMLButtonElement>('menuCamThird'),sensitivity:r<HTMLInputElement>('aimSensitivity'),sensitivityValue:r('aimSensitivityValue'),deadzone:r<HTMLInputElement>('aimDeadzone'),deadzoneValue:r('aimDeadzoneValue'),aimAssist:r<HTMLInputElement>('aimAssist'),aimAssistValue:r('aimAssistValue'),volume:r<HTMLInputElement>('masterVolume'),volumeValue:r('masterVolumeValue'),loading:r('menuLoading'),error:r('menuError')};}
+''')
+
+          # GameApp integrations.
+          repl('src/app/GameApp.ts', "import { WaveDirector } from '../waves/WaveDirector';", "import { WaveDirector } from '../waves/WaveDirector';\nimport { FamilyCompanionSystem } from '../family/FamilyCompanionSystem';\nimport { CoinSystem } from '../economy/CoinSystem';")
+          repl('src/app/GameApp.ts', "  faceDataUrl?: string | null;\n}", "  faceDataUrl?: string | null;\n  mamaFaceDataUrl?: string | null;\n  papaFaceDataUrl?: string | null;\n}")
+          repl('src/app/GameApp.ts', "  touchCamera?: HTMLElement;\n}", "  touchCamera?: HTMLElement;\n  coins?: HTMLElement; buyShotgun?: HTMLButtonElement; buyBow?: HTMLButtonElement;\n}")
+          repl('src/app/GameApp.ts', "  private readonly waveDirector = new WaveDirector();", "  private readonly waveDirector = new WaveDirector();\n  private readonly family: FamilyCompanionSystem;\n  private readonly coinSystem: CoinSystem;\n  private coins = 0;")
+          repl('src/app/GameApp.ts', "    this.enemySystem = new EnemySystem(this.world.scene, this.damageSystem, { shadows: this.quality.shadows, maxActive: this.maxActiveEnemies });", "    this.enemySystem = new EnemySystem(this.world.scene, this.damageSystem, { shadows: this.quality.shadows, maxActive: this.maxActiveEnemies, onGroan:(actor)=>this.events.emit('enemyGroan',{position:actor.root.position.clone(),kind:actor.archetype.id}) });\n    this.family = new FamilyCompanionSystem(this.world.scene,this.quality,this.enemySystem,this.damageSystem);\n    this.coinSystem = new CoinSystem(this.world.scene,(amount)=>{this.coins+=amount;this.hud.setLastEvent(`МОНЕТЫ +${amount}`);this.refreshStatus();});")
+          repl('src/app/GameApp.ts', "      await this.player.setFaceDataUrl(options.faceDataUrl ?? null);", "      await this.player.setFaceDataUrl(options.faceDataUrl ?? null);\n      this.family.configureFaces({mamaFaceDataUrl:options.mamaFaceDataUrl,papaFaceDataUrl:options.papaFaceDataUrl});")
+          repl('src/app/GameApp.ts', "    this.combat.dispose(); this.unregisterPlayerDamage(); this.waveDirector.stop(); this.enemySystem.reset(); this.pickups.dispose();", "    this.combat.dispose(); this.unregisterPlayerDamage(); this.waveDirector.stop(); this.family.dispose(); this.coinSystem.dispose(); this.enemySystem.reset(); this.pickups.dispose();")
+          repl('src/app/GameApp.ts', "    this.dom.restart?.addEventListener('click', this.onRestart);", "    this.dom.restart?.addEventListener('click', this.onRestart);\n    this.dom.buyShotgun?.addEventListener('click',()=>this.buyWeapon('shotgun',20));\n    this.dom.buyBow?.addEventListener('click',()=>this.buyWeapon('bow',30));")
+          repl('src/app/GameApp.ts', "    this.pickups.update(dt, this.player.position);\n    for (const request of this.waveDirector.update(dt, this.enemySystem.activeCount, this.maxActiveEnemies)) this.enemySystem.spawn(request.type, request.position);", "    this.pickups.update(dt, this.player.position); this.coinSystem.update(dt,this.player.position);\n    const effectiveMax=this.maxActiveEnemies+(this.family.heroCount-1)*6;\n    for (const request of this.waveDirector.update(dt, this.enemySystem.activeCount, effectiveMax, this.family.heroCount)) this.enemySystem.spawn(request.type, request.position);\n    void this.family.syncWave(this.waveDirector.wave); this.family.update(dt,this.player.position,this.player.facing);")
+          repl('src/app/GameApp.ts', "    this.enemySystem.reset(); this.weaponSystem.reset();", "    this.enemySystem.reset(); this.family.reset(); this.coinSystem.reset(); this.coins=0; this.weaponSystem.reset();")
+          repl('src/app/GameApp.ts', "  private refreshStatus(): void {", "  private buyWeapon(id:'shotgun'|'bow',price:number):void{if(this.weaponSystem.isUnlocked(id)){this.weaponSystem.select(id);this.player.setActiveWeapon(id);return;}if(this.coins<price){this.hud.setLastEvent(`НУЖНО ${price} МОНЕТ`);return;}this.coins-=price;this.weaponSystem.unlock(id);this.weaponSystem.select(id);this.player.setActiveWeapon(id);this.hud.setLastEvent(`${id==='shotgun'?'ДРОБОВИК':'ЛУК'} КУПЛЕН`);this.refreshStatus();}\n\n  private refreshStatus(): void {")
+          repl('src/app/GameApp.ts', "      spatialCells: this.enemySystem.occupiedCellCount, aimAssistStrength", "      spatialCells: this.enemySystem.occupiedCellCount, aimAssistStrength")
+          # add coin DOM updates at start of refresh
+          repl('src/app/GameApp.ts', "  private refreshStatus(): void {\n    const runtime", "  private refreshStatus(): void {\n    if(this.dom.coins)this.dom.coins.textContent=String(this.coins); if(this.dom.buyShotgun){this.dom.buyShotgun.textContent=this.weaponSystem.isUnlocked('shotgun')?'ДРОБОВИК ✓':'ДРОБОВИК · 20';this.dom.buyShotgun.disabled=!this.weaponSystem.isUnlocked('shotgun')&&this.coins<20;} if(this.dom.buyBow){this.dom.buyBow.textContent=this.weaponSystem.isUnlocked('bow')?'ЛУК ✓':'ЛУК · 30';this.dom.buyBow.disabled=!this.weaponSystem.isUnlocked('bow')&&this.coins<30;}\n    const runtime")
+
+          # Coins spawn on enemy kill from combat callback via event subscription in GameApp constructor after CombatRuntime.
+          repl('src/app/GameApp.ts', "    this.bindUi();", "    this.unsubscribeEvents.push(this.events.on('kill',(hit)=>{if(hit.targetId==='player')return;const amount=hit.targetId.includes('-brute-')?5:hit.targetId.includes('-runner-')?3:2;this.coinSystem.spawn(hit.hitPoint,amount);}));\n    this.bindUi();")
+
+          # Bootstrap DOM + name.
+          repl('src/app/Bootstrap.ts', "  if (badge) badge.textContent = 'FACEFALL // 0.11.0 ABANDONED OUTSKIRTS';", "  if (badge) badge.textContent = 'СУПЕР МАКАР // FAMILY SURVIVAL';")
+          repl('src/app/Bootstrap.ts', "  if (kicker) kicker.textContent = 'FACEFALL SURVIVOR · ENGINE NEXT 0.11.0';", "  if (kicker) kicker.textContent = 'СУПЕР МАКАР · СЕМЕЙНЫЙ ОТРЯД';")
+          repl('src/app/Bootstrap.ts', "    touchCamera: optional<HTMLElement>('#touchCamera')", "    touchCamera: optional<HTMLElement>('#touchCamera'),\n    coins: optional<HTMLElement>('#coinCount'), buyShotgun: optional<HTMLButtonElement>('#buyShotgun'), buyBow: optional<HTMLButtonElement>('#buyBow')")
+
+          # HTML: rename and replace face area with three cards; add economy HUD/shop.
+          p=Path('engine-lab.html'); s=p.read_text(encoding='utf-8')
+          s=s.replace('<title>Facefall Engine Next</title>','<title>Супер Макар</title>')
+          s=s.replace('FACEFALL // 0.9.1 PISTOL ANIM','СУПЕР МАКАР')
+          s=s.replace('FACEFALL SURVIVOR · ENGINE NEXT 0.9.1','СУПЕР МАКАР · СЕМЕЙНЫЙ ОТРЯД')
+          s=s.replace('ТВОЁ ЛИЦО.<br>ТВОЯ НОЧЬ.','СУПЕР МАКАР.<br>ВСЯ СЕМЬЯ В БОЮ.')
+          s=s.replace('Загрузи фотографию — она останется только в этом браузере. Выбери камеру и начинай забег.','Загрузи фото Макара, мамы и папы. Супермама вступит после 3-й волны, Суперпапа — после 6-й. Фото остаются только в этом браузере.')
+          old='''<div class="face-box"><img id="facePreview" alt="Предпросмотр лица" hidden><div class="face-empty" id="faceEmpty">НЕТ ФОТО<br><small>будет нейтральное лицо</small></div></div>\n          <div class="face-actions"><label class="button-like" for="faceInput">ВЫБРАТЬ ФОТО</label><input id="faceInput" type="file" accept="image/*"><button class="remove-face" id="removeFace" type="button" hidden>УДАЛИТЬ</button></div>'''
+          new='''<div class="face-box"><img id="makarFacePreview" alt="Фото Макара" hidden><div class="face-empty" id="makarFaceEmpty">СУПЕР МАКАР</div></div><div class="face-actions"><label class="button-like" for="makarFaceInput">ФОТО МАКАРА</label><input id="makarFaceInput" type="file" accept="image/*"><button class="remove-face" id="makarRemoveFace" type="button" hidden>×</button></div>\n          <div class="face-actions"><label class="button-like" for="mamaFaceInput">ФОТО МАМЫ</label><input id="mamaFaceInput" type="file" accept="image/*"><button class="remove-face" id="mamaRemoveFace" type="button" hidden>×</button></div><div style="display:none"><img id="mamaFacePreview" hidden><span id="mamaFaceEmpty">СУПЕРМАМА</span></div>\n          <div class="face-actions"><label class="button-like" for="papaFaceInput">ФОТО ПАПЫ</label><input id="papaFaceInput" type="file" accept="image/*"><button class="remove-face" id="papaRemoveFace" type="button" hidden>×</button></div><div style="display:none"><img id="papaFacePreview" hidden><span id="papaFaceEmpty">СУПЕРПАПА</span></div>'''
+          if old not in s: raise SystemExit('face html pattern missing')
+          s=s.replace(old,new)
+          s=s.replace('<div class="run-hud"><span>HP <b id="runHp">100</b></span><span>WAVE <b id="runWave">1</b></span><span>KILLS <b id="runKills">0</b></span><span>SCORE <b id="runScore">000000</b></span></div>','<div class="run-hud"><span>HP <b id="runHp">100</b></span><span>WAVE <b id="runWave">1</b></span><span>KILLS <b id="runKills">0</b></span><span>🪙 <b id="coinCount">0</b></span></div><div style="position:absolute;right:12px;top:58px;display:grid;gap:5px;pointer-events:auto"><button id="buyShotgun">ДРОБОВИК · 20</button><button id="buyBow">ЛУК · 30</button></div>')
+          s=s.replace('Фото и настройки сохраняются только локально в этом браузере.','Фото всех трёх героев и настройки сохраняются только локально в этом браузере.')
+          p.write_text(s,encoding='utf-8')
+
+          # version metadata
+          for path in ['package.json','package-lock.json']:
+              p=Path(path); s=p.read_text(); s=s.replace('"version": "0.11.0-alpha.0"','"version": "0.12.0-alpha.0"'); p.write_text(s)
+
+          # tests
+          write('tests/unit/family-wave-economy.test.ts', r'''import test from 'node:test';import assert from 'node:assert/strict';import {EventBus} from '../../src/core/EventBus';import {WeaponSystem} from '../../src/combat/WeaponSystem';import type {FacefallEvents} from '../../src/combat/types';import {WaveDirector} from '../../src/waves/WaveDirector';
+test('weapons start locked and unlock through shop state',()=>{const w=new WeaponSystem(new EventBus<FacefallEvents>());assert.equal(w.isUnlocked('pistol'),true);assert.equal(w.isUnlocked('shotgun'),false);assert.equal(w.select('shotgun'),false);w.unlock('shotgun');assert.equal(w.select('shotgun'),true);});
+test('family hero count increases wave pressure',()=>{const d:any=new WaveDirector();const one=d['buildComposition'](7,1).length;const three=d['buildComposition'](7,3).length;assert.ok(three>one);assert.ok(one> d['buildComposition'](2,1).length);});
+''')
+          write('tests/smoke/super-makar-family.spec.ts', r'''import{expect,test}from'@playwright/test';test.use({viewport:{width:412,height:915},hasTouch:true,isMobile:true});test('Super Makar family unlocks and shop economy is wired',async({page})=>{await page.goto('/engine-lab.html',{waitUntil:'domcontentloaded'});await expect(page.locator('body')).toContainText('СУПЕР МАКАР');await page.locator('#startGame').click();await expect(page.locator('#status')).toContainText('state=playing',{timeout:20000});const state=await page.evaluate(async()=>{const app=(window as any).__facefallApp;await app.family.syncWave(4);await app.family.syncWave(7);app.coins=35;app.refreshStatus();return{roles:app.family.activeRoles,head:app.player.root.getObjectByName('uploaded-face-shell-rear')?.name??null};});expect(state.roles).toEqual(['mama','papa']);expect(page.locator('#coinCount')).toHaveText('35');await page.locator('#buyShotgun').click();await expect(page.locator('#buyShotgun')).toContainText('✓');await page.screenshot({path:'test-artifacts/mobile-super-makar-family.png',fullPage:true});});
+''')
+          PY
+          npm ci
+          npm run typecheck
+          npm run test:unit
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/build-012-super-makar.yml
+          git add src/family/FamilyCompanionSystem.ts src/economy/CoinSystem.ts src/persistence/FaceStore.ts src/combat/WeaponSystem.ts src/waves/WaveDirector.ts src/enemies/EnemySystem.ts src/combat/types.ts src/presentation/audio/AudioSystem.ts src/characters/CharacterModel.ts src/app/ProductShell.ts src/app/GameApp.ts src/app/Bootstrap.ts engine-lab.html package.json package-lock.json tests/unit/family-wave-economy.test.ts tests/smoke/super-makar-family.spec.ts
+          git commit -m '0.12.0: add Super Makar family survival gameplay'
+          git push origin HEAD:feature/0.12.0-super-makar-family
