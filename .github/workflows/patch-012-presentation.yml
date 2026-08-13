@@ -1,0 +1,35 @@
+name: Patch 012 Presentation
+on:
+  push:
+    branches:
+      - 'feature/0.12.0-super-makar-family'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch character presentation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/characters/CharacterModel.ts')
+          s=p.read_text()
+          s=s.replace('  private faceShell: THREE.Mesh | null = null;', '  private faceShell: THREE.Mesh | null = null;\n  private rearFaceShell: THREE.Mesh | null = null;')
+          s=s.replace("    this.headBone = this.findBone(instance, 'Head');", "    this.headBone = this.findBone(instance, 'Head');\n    if (this.headBone) this.headBone.scale.multiplyScalar(1.18);")
+          s=s.replace('Math.max(eyeSize.x, eyeSize.z) * 1.75, 0.19, 0.27', 'Math.max(eyeSize.x, eyeSize.z) * 2.05, 0.23, 0.32')
+          anchor='    this.faceShell = shell;\n  }'
+          replacement="    this.faceShell = shell;\n    const rear = new THREE.Mesh(geometry.clone(), material.clone());\n    rear.name = 'uploaded-face-shell-rear';\n    rear.position.copy(placement.position);\n    rear.position.z *= -1;\n    rear.quaternion.copy(placement.quaternion).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI));\n    rear.renderOrder = 3;\n    rear.castShadow = false;\n    rear.receiveShadow = false;\n    this.headBone.add(rear);\n    this.rearFaceShell = rear;\n  }"
+          s=s.replace(anchor,replacement)
+          clear='    this.faceShell = null;\n    this.faceMaterial = null;'
+          clear_repl="    this.faceShell = null;\n    if (this.rearFaceShell) {\n      this.rearFaceShell.removeFromParent();\n      this.rearFaceShell.geometry.dispose();\n      const material = this.rearFaceShell.material;\n      if (Array.isArray(material)) { for (const item of material) item.dispose(); } else material.dispose();\n      this.rearFaceShell = null;\n    }\n    this.faceMaterial = null;"
+          s=s.replace(clear,clear_repl)
+          p.write_text(s)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/patch-012-presentation.yml
+          git add src/characters/CharacterModel.ts
+          git commit -m 'feat: improve family character identification'
+          git push origin HEAD:feature/0.12.0-super-makar-family
