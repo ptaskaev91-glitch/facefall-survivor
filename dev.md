@@ -570,3 +570,15 @@ After every major block:
 - update `structure.md` whenever ownership/file boundaries change;
 - inspect CI screenshots on important visual/architecture changes;
 - never claim Vercel/device verification without actual evidence.
+
+
+## 0.11.0 Abandoned Outskirts
+
+- [x] authored `level.glb` loaded by `WorldRuntime`;
+- [x] road / gate / garage / house / abandoned car / trees / puddles / warehouse composition;
+- [x] collision built from authored structural meshes, decorative meshes excluded;
+- [x] manifest remains source of spawn / loot / light markers;
+- [x] procedural world retained only as load-failure fallback;
+- [x] mobile authored-level screenshot gate.
+
+Next: offline Recast navigation over the authored level, then realistic art replacement / Face System 2.0 / final HUD.

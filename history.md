@@ -517,3 +517,10 @@ Implemented:
 - byte-budget unit tests and expanded Playwright production visual gates.
 
 Design rule reinforced: prefer shared assets + archetype presentation profiles over duplicated binaries, and extract runtimes only when they reduce actual coupling.
+
+
+---
+
+# 0.11.0 — Abandoned Outskirts authored level
+
+PR #28 replaces the active procedural environment with an authored GLB level while retaining fallback safety. `LevelLoader` separates decorative `decor-*` meshes from collision, and the manifest remains the gameplay marker source. Visual CI adds a dedicated authored-level checkpoint.
