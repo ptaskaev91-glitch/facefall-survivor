@@ -34,6 +34,7 @@ test('bow visual follows combat release and reload lifecycle', async ({ page }) 
   await expect(page.locator('#status')).toContainText('state=playing', { timeout: 20_000 });
   await page.waitForTimeout(1200);
 
+  await page.evaluate(() => { const app=(window as any).__facefallApp; app.weaponSystem.unlock('shotgun'); app.weaponSystem.unlock('bow'); });
   const weapon = page.locator('#touchWeapon');
   for (const pointerId of [71, 72]) {
     await weapon.dispatchEvent('pointerdown', pointerDown(pointerId));
