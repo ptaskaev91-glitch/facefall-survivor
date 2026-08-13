@@ -12,6 +12,12 @@ interface ProductShellDom {
   facePreview: HTMLImageElement;
   faceEmpty: HTMLElement;
   removeFace: HTMLButtonElement;
+  mamaInput: HTMLInputElement;
+  mamaPreview: HTMLImageElement;
+  mamaEmpty: HTMLElement;
+  papaInput: HTMLInputElement;
+  papaPreview: HTMLImageElement;
+  papaEmpty: HTMLElement;
   cameraTop: HTMLButtonElement;
   cameraThird: HTMLButtonElement;
   sensitivity: HTMLInputElement;
@@ -26,28 +32,33 @@ interface ProductShellDom {
   error: HTMLElement;
 }
 
+const MAMA_KEY = 'super-makar-face-mama';
+const PAPA_KEY = 'super-makar-face-papa';
+
 export class ProductShell {
   private readonly faceStore = new FaceStore();
   private readonly settingsStore = new SettingsStore();
   private faceDataUrl: string | null = null;
+  private mamaDataUrl: string | null = null;
+  private papaDataUrl: string | null = null;
   private cameraMode: CameraMode = 'top';
   private settings: FacefallSettings = this.settingsStore.defaults();
   private busy = false;
 
-  constructor(
-    private readonly app: GameApp,
-    private readonly dom: ProductShellDom,
-    private readonly audio: AudioSystem
-  ) {}
+  constructor(private readonly app: GameApp, private readonly dom: ProductShellDom, private readonly audio: AudioSystem) {}
 
   attach(): void {
     this.faceDataUrl = this.faceStore.load();
+    this.mamaDataUrl = localStorage.getItem(MAMA_KEY);
+    this.papaDataUrl = localStorage.getItem(PAPA_KEY);
     this.settings = this.settingsStore.load();
     this.applySettings();
-    this.refreshFace();
+    this.refreshFaces();
     this.refreshCamera();
     this.refreshSettings();
     this.dom.faceInput.addEventListener('change', this.onFaceChange);
+    this.dom.mamaInput.addEventListener('change', this.onMamaChange);
+    this.dom.papaInput.addEventListener('change', this.onPapaChange);
     this.dom.removeFace.addEventListener('click', this.onRemoveFace);
     this.dom.cameraTop.addEventListener('click', this.onTop);
     this.dom.cameraThird.addEventListener('click', this.onThird);
@@ -61,6 +72,8 @@ export class ProductShell {
 
   detach(): void {
     this.dom.faceInput.removeEventListener('change', this.onFaceChange);
+    this.dom.mamaInput.removeEventListener('change', this.onMamaChange);
+    this.dom.papaInput.removeEventListener('change', this.onPapaChange);
     this.dom.removeFace.removeEventListener('click', this.onRemoveFace);
     this.dom.cameraTop.removeEventListener('click', this.onTop);
     this.dom.cameraThird.removeEventListener('click', this.onThird);
@@ -79,44 +92,37 @@ export class ProductShell {
   }
 
   private onFaceChange = async (): Promise<void> => {
-    const file = this.dom.faceInput.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      this.dom.error.textContent = 'Нужен файл изображения.';
-      return;
-    }
-    if (file.size > 12 * 1024 * 1024) {
-      this.dom.error.textContent = 'Фото слишком большое. Максимум 12 МБ.';
-      return;
-    }
+    const value = await this.readSelected(this.dom.faceInput);
+    if (value === undefined) return;
+    this.faceDataUrl = value;
+    this.faceStore.save(value);
+    this.refreshFaces();
+  };
 
-    try {
-      this.faceDataUrl = await this.readFile(file);
-      this.faceStore.save(this.faceDataUrl);
-      this.dom.error.textContent = '';
-      this.refreshFace();
-    } catch {
-      this.dom.error.textContent = 'Не удалось прочитать фотографию.';
-    } finally {
-      this.dom.faceInput.value = '';
-    }
+  private onMamaChange = async (): Promise<void> => {
+    const value = await this.readSelected(this.dom.mamaInput);
+    if (value === undefined) return;
+    this.mamaDataUrl = value;
+    localStorage.setItem(MAMA_KEY, value);
+    this.refreshFaces();
+  };
+
+  private onPapaChange = async (): Promise<void> => {
+    const value = await this.readSelected(this.dom.papaInput);
+    if (value === undefined) return;
+    this.papaDataUrl = value;
+    localStorage.setItem(PAPA_KEY, value);
+    this.refreshFaces();
   };
 
   private onRemoveFace = (): void => {
     this.faceDataUrl = null;
     this.faceStore.remove();
-    this.refreshFace();
+    this.refreshFaces();
   };
 
-  private onTop = (): void => {
-    this.cameraMode = 'top';
-    this.refreshCamera();
-  };
-
-  private onThird = (): void => {
-    this.cameraMode = 'third';
-    this.refreshCamera();
-  };
+  private onTop = (): void => { this.cameraMode = 'top'; this.refreshCamera(); };
+  private onThird = (): void => { this.cameraMode = 'third'; this.refreshCamera(); };
 
   private onSettingsInput = (): void => {
     this.settings = {
@@ -135,11 +141,15 @@ export class ProductShell {
     this.busy = true;
     this.dom.start.disabled = true;
     this.dom.error.textContent = '';
-    this.dom.loading.textContent = 'ЗАГРУЖАЕМ УРОВЕНЬ…';
+    this.dom.loading.textContent = 'ЗАГРУЖАЕМ «СУПЕР МАКАР»…';
 
     try {
       await this.audio.resume();
-      await this.app.start({ cameraMode: this.cameraMode, faceDataUrl: this.faceDataUrl });
+      await this.app.start({
+        cameraMode: this.cameraMode,
+        faceDataUrl: this.faceDataUrl,
+        allyFaces: { supermama: this.mamaDataUrl, superpapa: this.papaDataUrl }
+      });
       this.dom.overlay.dataset.visible = 'false';
       this.dom.loading.textContent = '';
     } catch (error) {
@@ -154,12 +164,7 @@ export class ProductShell {
   };
 
   private applySettings(): void {
-    aimController.configure({
-      sensitivity: this.settings.aimSensitivity,
-      deadzone: this.settings.aimDeadzone
-    });
-    // Mobile control scheme always keeps auto-aim active. The saved value tunes strength,
-    // but even an old stored 0 cannot disable the survivor-style targeting entirely.
+    aimController.configure({ sensitivity: this.settings.aimSensitivity, deadzone: this.settings.aimDeadzone });
     this.app.configureAimAssist(Math.max(0.01, this.settings.aimAssist));
     this.audio.setVolume(this.settings.masterVolume);
   }
@@ -175,23 +180,44 @@ export class ProductShell {
     this.dom.volumeValue.textContent = `${Math.round(this.settings.masterVolume * 100)}%`;
   }
 
-  private refreshFace(): void {
-    if (this.faceDataUrl) {
-      this.dom.facePreview.src = this.faceDataUrl;
-      this.dom.facePreview.hidden = false;
-      this.dom.faceEmpty.hidden = true;
-      this.dom.removeFace.hidden = false;
+  private refreshFaces(): void {
+    this.refreshPreview(this.dom.facePreview, this.dom.faceEmpty, this.faceDataUrl);
+    this.refreshPreview(this.dom.mamaPreview, this.dom.mamaEmpty, this.mamaDataUrl);
+    this.refreshPreview(this.dom.papaPreview, this.dom.papaEmpty, this.papaDataUrl);
+    this.dom.removeFace.hidden = !this.faceDataUrl;
+  }
+
+  private refreshPreview(image: HTMLImageElement, empty: HTMLElement, dataUrl: string | null): void {
+    if (dataUrl) {
+      image.src = dataUrl;
+      image.hidden = false;
+      empty.hidden = true;
     } else {
-      this.dom.facePreview.removeAttribute('src');
-      this.dom.facePreview.hidden = true;
-      this.dom.faceEmpty.hidden = false;
-      this.dom.removeFace.hidden = true;
+      image.removeAttribute('src');
+      image.hidden = true;
+      empty.hidden = false;
     }
   }
 
   private refreshCamera(): void {
     this.dom.cameraTop.dataset.active = String(this.cameraMode === 'top');
     this.dom.cameraThird.dataset.active = String(this.cameraMode === 'third');
+  }
+
+  private async readSelected(input: HTMLInputElement): Promise<string | undefined> {
+    const file = input.files?.[0];
+    if (!file) return undefined;
+    input.value = '';
+    if (!file.type.startsWith('image/')) { this.dom.error.textContent = 'Нужен файл изображения.'; return undefined; }
+    if (file.size > 12 * 1024 * 1024) { this.dom.error.textContent = 'Фото слишком большое. Максимум 12 МБ.'; return undefined; }
+    try {
+      const value = await this.readFile(file);
+      this.dom.error.textContent = '';
+      return value;
+    } catch {
+      this.dom.error.textContent = 'Не удалось прочитать фотографию.';
+      return undefined;
+    }
   }
 
   private readFile(file: File): Promise<string> {
@@ -212,23 +238,15 @@ export function resolveProductShellDom(): ProductShellDom {
   };
 
   return {
-    overlay: required<HTMLElement>('productMenu'),
-    start: required<HTMLButtonElement>('startGame'),
-    faceInput: required<HTMLInputElement>('faceInput'),
-    facePreview: required<HTMLImageElement>('facePreview'),
-    faceEmpty: required<HTMLElement>('faceEmpty'),
-    removeFace: required<HTMLButtonElement>('removeFace'),
-    cameraTop: required<HTMLButtonElement>('menuCamTop'),
-    cameraThird: required<HTMLButtonElement>('menuCamThird'),
-    sensitivity: required<HTMLInputElement>('aimSensitivity'),
-    sensitivityValue: required<HTMLElement>('aimSensitivityValue'),
-    deadzone: required<HTMLInputElement>('aimDeadzone'),
-    deadzoneValue: required<HTMLElement>('aimDeadzoneValue'),
-    aimAssist: required<HTMLInputElement>('aimAssist'),
-    aimAssistValue: required<HTMLElement>('aimAssistValue'),
-    volume: required<HTMLInputElement>('masterVolume'),
-    volumeValue: required<HTMLElement>('masterVolumeValue'),
-    loading: required<HTMLElement>('menuLoading'),
-    error: required<HTMLElement>('menuError')
+    overlay: required<HTMLElement>('productMenu'), start: required<HTMLButtonElement>('startGame'),
+    faceInput: required<HTMLInputElement>('faceInput'), facePreview: required<HTMLImageElement>('facePreview'), faceEmpty: required<HTMLElement>('faceEmpty'), removeFace: required<HTMLButtonElement>('removeFace'),
+    mamaInput: required<HTMLInputElement>('mamaInput'), mamaPreview: required<HTMLImageElement>('mamaPreview'), mamaEmpty: required<HTMLElement>('mamaEmpty'),
+    papaInput: required<HTMLInputElement>('papaInput'), papaPreview: required<HTMLImageElement>('papaPreview'), papaEmpty: required<HTMLElement>('papaEmpty'),
+    cameraTop: required<HTMLButtonElement>('menuCamTop'), cameraThird: required<HTMLButtonElement>('menuCamThird'),
+    sensitivity: required<HTMLInputElement>('aimSensitivity'), sensitivityValue: required<HTMLElement>('aimSensitivityValue'),
+    deadzone: required<HTMLInputElement>('aimDeadzone'), deadzoneValue: required<HTMLElement>('aimDeadzoneValue'),
+    aimAssist: required<HTMLInputElement>('aimAssist'), aimAssistValue: required<HTMLElement>('aimAssistValue'),
+    volume: required<HTMLInputElement>('masterVolume'), volumeValue: required<HTMLElement>('masterVolumeValue'),
+    loading: required<HTMLElement>('menuLoading'), error: required<HTMLElement>('menuError')
   };
 }
