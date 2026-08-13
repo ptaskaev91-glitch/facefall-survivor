@@ -36,7 +36,7 @@ test('Walker hydrates into rigged animated presentation without changing enemy r
     const runtimeWindow = window as Window & { __facefallApp?: any; __walkerSmokeId?: string };
     const app = runtimeWindow.__facefallApp;
     const id = runtimeWindow.__walkerSmokeId;
-    return Boolean(app && id && app.enemySystem.rootFor(id)?.userData.riggedWalkerReady);
+    return Boolean(app && id && app.enemySystem.rootFor(id)?.userData.riggedInfectedReady);
   }, undefined, { timeout: 20_000 });
 
   const firstPose = await page.evaluate(() => {
@@ -53,18 +53,18 @@ test('Walker hydrates into rigged animated presentation without changing enemy r
     const id = runtimeWindow.__walkerSmokeId;
     const root = app.enemySystem.rootFor(id);
     if (!root) throw new Error('Walker root disappeared');
-    const rigged = root.getObjectByName('walker-rigged-visual');
+    const rigged = root.getObjectByName('infected-rigged-visual');
     const fallbackTorso = root.children.find((child: any) => child.name === 'torso');
     const thigh = root.getObjectByName('thigh_l');
     let skinnedMeshes = 0;
     let missingTargetIds = 0;
     rigged?.traverse((object: any) => {
       if (object.isSkinnedMesh) skinnedMeshes += 1;
-      if (object.isMesh && object.userData.damageTargetId !== id) missingTargetIds += 1;
+      if (object.userData.damageCollider && object.userData.damageTargetId !== id) missingTargetIds += 1;
     });
-    const runtime = root.userData.riggedWalkerRuntime;
+    const runtime = root.userData.riggedInfectedRuntime;
     return {
-      ready: Boolean(root.userData.riggedWalkerReady),
+      ready: Boolean(root.userData.riggedInfectedReady),
       riggedVisible: Boolean(rigged?.visible),
       fallbackVisible: fallbackTorso?.visible ?? true,
       skinnedMeshes,
