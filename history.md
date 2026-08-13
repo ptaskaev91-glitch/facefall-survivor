@@ -1,6 +1,6 @@
-# Facefall Survivor — History
+# Супер Макар — History
 
-Последняя актуализация: **2026-08-13**  
+Последняя актуализация: **2026-08-14**  
 Repository: `ptaskaev91-glitch/facefall-survivor`  
 Source of truth: `main`
 
@@ -16,7 +16,7 @@ Source of truth: `main`
 
 # 2. Исходная идея
 
-Facefall Survivor начался как browser survival shooter против заражённых.
+Проект начался как Facefall Survivor — browser survival shooter против заражённых; с checkpoint 0.12.0 продукт называется «Супер Макар».
 
 Ключевая продуктовая идея:
 

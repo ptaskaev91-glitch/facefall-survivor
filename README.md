@@ -1,8 +1,8 @@
-# Facefall Survivor
+# Супер Макар
 
-Mobile-first browser 3D survival shooter. The player can upload a photo and Facefall uses it locally as the hero's face.
+Mobile-first browser 3D family survival shooter. Супер Макар uses local photos for Макар, Супермама and Суперпапа.
 
-## Current generation — Engine Next 0.10.0
+## Current generation — Engine Next 0.12.0 · «Супер Макар»
 
 The active game is built with **TypeScript + Vite + npm Three.js** and targets both Android/mobile and desktop browsers.
 

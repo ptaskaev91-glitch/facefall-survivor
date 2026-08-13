@@ -1,13 +1,13 @@
-# Facefall Survivor — Development Plan
+# Супер Макар — Development Plan
 
-Последняя актуализация: **2026-08-13**  
+Последняя актуализация: **2026-08-14**  
 Repository: `ptaskaev91-glitch/facefall-survivor`  
-Source of truth: `milestone/0.10.0-production-core` until PR #27 merge, then `main`  
+Source of truth: `main` after PR #30 merge  
 Hosting: **Vercel only**  
-Primary URL: `https://facefall-survivor-pavels-projects-0b29bb12.vercel.app`
+Testing preview: `engine-next-preview` branch; permanent Vercel project must be reconnected separately if needed.
 
-Текущий стабильный architecture checkpoint: **0.10.0 PRODUCTION CORE — CombatRuntime + RunSession**.  
-Текущий активный visual checkpoint: **0.10.0 PRODUCTION CORE — hero combat poses + weapon GLBs + Walker/Runner/Brute production infected**.
+Текущий стабильный architecture checkpoint: **0.12.0 СУПЕР МАКАР — FAMILY SURVIVAL**.  
+Текущий активный visual checkpoint: **0.12.0 FAMILY — увеличенные фото-головы, Супермама/Суперпапа, монеты, магазин, zombie audio**.
 
 Этот файл отражает только фактическую реализацию. Prototype/fallback не считается final implementation.
 
@@ -15,7 +15,7 @@ Primary URL: `https://facefall-survivor-pavels-projects-0b29bb12.vercel.app`
 
 # 1. Product goal
 
-Facefall Survivor — mobile-first browser 3D action-survival против заражённых.
+Супер Макар — mobile-first browser 3D family action-survival против заражённых.
 
 Обязательная формула:
 

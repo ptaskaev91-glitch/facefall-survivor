@@ -1,6 +1,6 @@
-# Facefall Survivor — Structure
+# Супер Макар — Structure
 
-Последняя актуализация: **2026-08-13**  
+Последняя актуализация: **2026-08-14**  
 Repository: `ptaskaev91-glitch/facefall-survivor`  
 Source of truth: `main` after PR #30 merge  
 Architecture checkpoint: **0.12.0 СУПЕР МАКАР — FAMILY SURVIVAL**
@@ -9,7 +9,7 @@ Architecture checkpoint: **0.12.0 СУПЕР МАКАР — FAMILY SURVIVAL**
 
 # 1. Назначение
 
-`structure.md` — источник истины по текущей и целевой архитектуре Facefall Survivor.
+`structure.md` — источник истины по текущей и целевой архитектуре «Супер Макар».
 
 Он фиксирует:
 
