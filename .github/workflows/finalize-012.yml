@@ -1,0 +1,74 @@
+name: Finalize 012
+on:
+  push:
+    branches: [feature/0.12.0-super-makar-family]
+permissions:
+  contents: write
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Finalize version and project docs
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+
+          checkpoint = '''\n\n---\n\n## 0.12.0 — «Супер Макар» family survival checkpoint (2026-08-14)\n\n- Игра переименована в **«Супер Макар»**.\n- Три независимых локальных фото: Супер Макар, Супермама, Суперпапа.\n- Фото персонажа отображается на увеличенной голове спереди и сзади для быстрой идентификации в TOP/3RD.\n- Супермама присоединяется после завершения 3-й волны (активна с wave 4), Суперпапа — после завершения 6-й (активен с wave 7).\n- Союзники следуют за Макаром, автоматически выбирают заражённых и ведут огонь.\n- Супермама получила отдельный процедурный силуэт/причёску; Суперпапа — отличимый масштаб корпуса. Новых внешних character assets для этого не добавлено.\n- Сложность масштабируется по номеру волны и количеству активных героев.\n- Добавлены zombie groan / pain / death WebAudio-эффекты.\n- За убийства выпадают монеты; монеты подбираются игроком. Награда: walker 2, runner 3, brute 5.\n- Магазин оружия: дробовик 20 монет, лук 30; до покупки оружие заблокировано.\n- Добавлены `FamilyCompanionSystem`, `CoinSystem`, семейный HUD/menu и regression coverage.\n- Семейный Playwright smoke загружает три разные тестовые фотографии, проверяет unlock/markers/shop и создаёт `mobile-super-makar-family.png`.\n- Финальный релизный gate: TypeScript strict, unit tests, Playwright browser/visual smoke, deploy build и sole deployment-root assertion.\n- Canonical source после merge: `main`. Продолжение разработки планируется отдельным этапом/перепиской.\n'''
+
+          for name in ['README.md', 'dev.md', 'history.md', 'structure.md']:
+              p = Path(name)
+              text = p.read_text(encoding='utf-8')
+              marker = '## 0.12.0 — «Супер Макар» family survival checkpoint'
+              if marker not in text:
+                  p.write_text(text.rstrip() + checkpoint + '\n', encoding='utf-8')
+
+          # Bring stale structure header to the current checkpoint.
+          p = Path('structure.md')
+          text = p.read_text(encoding='utf-8')
+          text = text.replace('Source of truth: `visual/0.9.1-pistol-animation` until PR #21 merge, then `main`', 'Source of truth: `main` after PR #30 merge')
+          text = text.replace('Architecture checkpoint: **0.9.1 PISTOL COMBAT ANIMATION**', 'Architecture checkpoint: **0.12.0 СУПЕР МАКАР — FAMILY SURVIVAL**')
+          text = text.replace('├── pickups/\n│   │   └── PickupSystem.ts', '├── economy/\n│   │   └── CoinSystem.ts\n│   ├── family/\n│   │   └── FamilyCompanionSystem.ts\n│   ├── pickups/\n│   │   └── PickupSystem.ts')
+          p.write_text(text, encoding='utf-8')
+
+          # Third-party docs: explicit no-new-asset note for this checkpoint.
+          for name in ['THIRD_PARTY_NOTICES.md', 'public/assets/ATTRIBUTION.md']:
+              p = Path(name)
+              text = p.read_text(encoding='utf-8')
+              note = '\n\n## 0.12.0 family checkpoint\nNo new third-party media was introduced for the family feature. Supermama visual differentiation is procedural and reuses the already documented Quaternius character/animation assets. Uploaded family photographs remain local user content and are not repository assets.\n'
+              if '## 0.12.0 family checkpoint' not in text:
+                  p.write_text(text.rstrip() + note, encoding='utf-8')
+
+          # Final stable package version.
+          p = Path('package.json')
+          data = json.loads(p.read_text(encoding='utf-8'))
+          data['version'] = '0.12.0'
+          p.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          p = Path('package-lock.json')
+          lock = json.loads(p.read_text(encoding='utf-8'))
+          lock['version'] = '0.12.0'
+          if isinstance(lock.get('packages'), dict) and '' in lock['packages']:
+              lock['packages']['']['version'] = '0.12.0'
+          p.write_text(json.dumps(lock, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          # Source HTML should agree with Bootstrap even before JS executes.
+          p = Path('engine-lab.html')
+          text = p.read_text(encoding='utf-8')
+          text = text.replace('FACEFALL // 0.11.0 ABANDONED OUTSKIRTS', 'СУПЕР МАКАР // 0.12.0 FAMILY SURVIVAL')
+          text = text.replace('FACEFALL SURVIVOR · ENGINE NEXT 0.11.0', 'СУПЕР МАКАР · ENGINE NEXT 0.12.0')
+          p.write_text(text, encoding='utf-8')
+
+          # Remove this temporary workflow from the final tree.
+          Path('.github/workflows/finalize-012.yml').unlink(missing_ok=True)
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "docs: finalize Super Makar 0.12.0 checkpoint"
+          git push
