@@ -4,7 +4,8 @@ import type { CameraMode } from '../camera/CameraDirector';
 /**
  * Shared aim state.
  * TOP: free/internal aim point represented by a very faint laser; mobile can fully auto-steer it.
- * 3RD: crosshair is fixed in the exact screen center; swipe and auto-aim rotate yaw only.
+ * 3RD: crosshair is a real screen-space aim point; swipe rotates camera while auto-aim can pull
+ * the crosshair over a visible target on both X and Y. The shot ray always uses that same point.
  */
 export class AimController {
   private readonly ndc = new Vector2(0, 0);
@@ -59,11 +60,7 @@ export class AimController {
   }
 
   setPointerNdc(x: number, y: number): void {
-    if (this.mode === 'third') {
-      this.ndc.set(0, 0);
-      this.renderAimUi();
-      return;
-    }
+    if (this.mode === 'third') return;
     this.ndc.set(x, y);
     this.clamp();
     this.renderAimUi();
@@ -76,7 +73,9 @@ export class AimController {
     if (this.mode === 'third') {
       this.thirdTurnDelta += (dx / width) * this.touchSensitivity * 1.8;
       this.thirdTurnDelta = Math.max(-0.36, Math.min(0.36, this.thirdTurnDelta));
-      this.ndc.set(0, 0);
+      // Manual camera look should not leave a stale lock glued to the previous screen point.
+      const recenter = Math.min(0.72, Math.abs(dx) / width * 5 + Math.abs(dy) / height * 3);
+      this.ndc.multiplyScalar(1 - recenter);
       this.renderAimUi();
       return;
     }
@@ -94,19 +93,27 @@ export class AimController {
     this.thirdTurnDelta = Math.max(-0.36, Math.min(0.36, this.thirdTurnDelta));
   }
 
-  /** Mobile aim-assist correction. TOP moves its internal aim point; 3RD converts X correction to yaw. */
+  /** Mobile aim-assist correction. TOP and 3RD both move the actual shot reticle. */
   nudgeNdc(delta: Vector2): void {
-    if (this.mode === 'third') {
-      this.thirdTurnDelta += delta.x * 1.75;
-      this.thirdTurnDelta = Math.max(-0.24, Math.min(0.24, this.thirdTurnDelta));
-      return;
-    }
     this.ndc.add(delta);
+    if (this.mode === 'third') {
+      // Keep some body/camera follow so the weapon gradually turns toward the lock as well.
+      this.thirdTurnDelta += delta.x * 0.34;
+      this.thirdTurnDelta = Math.max(-0.12, Math.min(0.12, this.thirdTurnDelta));
+    }
     this.clamp();
     this.renderAimUi();
   }
 
-  /** TOP recoil can move the internal aim point. 3RD keeps the crosshair fixed. */
+  recenterThirdReticle(dt: number): void {
+    if (this.mode !== 'third') return;
+    const factor = Math.exp(-Math.max(0, dt) * 7.5);
+    this.ndc.multiplyScalar(factor);
+    if (this.ndc.lengthSq() < 1e-6) this.ndc.set(0, 0);
+    this.renderAimUi();
+  }
+
+  /** TOP recoil can move the internal aim point. 3RD keeps assisted aim stable. */
   applyRecoil(yawDegrees: number, pitchDegrees: number): void {
     if (this.mode === 'third') return;
     this.ndc.x += yawDegrees * 0.0065;
@@ -124,7 +131,6 @@ export class AimController {
   }
 
   updateWorldAim(camera: PerspectiveCamera, playerPosition: Vector3): void {
-    if (this.mode === 'third') this.ndc.set(0, 0);
     this.raycaster.setFromCamera(this.ndc, camera);
 
     if (this.mode === 'top') {
@@ -164,7 +170,8 @@ export class AimController {
       this.ndc.y = Math.max(-0.58, Math.min(0.70, this.ndc.y));
       return;
     }
-    this.ndc.set(0, 0);
+    this.ndc.x = Math.max(-0.68, Math.min(0.68, this.ndc.x));
+    this.ndc.y = Math.max(-0.52, Math.min(0.52, this.ndc.y));
   }
 
   private ensureLaser(): void {
@@ -211,8 +218,8 @@ export class AimController {
   private renderAimUi(): void {
     if (this.reticle) {
       if (this.mode === 'third') {
-        this.reticle.style.left = '50%';
-        this.reticle.style.top = '50%';
+        this.reticle.style.left = `${50 + this.ndc.x * 50}%`;
+        this.reticle.style.top = `${50 - this.ndc.y * 50}%`;
         this.reticle.style.opacity = '0.92';
       } else {
         this.reticle.style.opacity = '0';
