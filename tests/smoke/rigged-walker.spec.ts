@@ -39,7 +39,14 @@ test('Walker hydrates into rigged animated presentation without changing enemy r
     return Boolean(app && id && app.enemySystem.rootFor(id)?.userData.riggedWalkerReady);
   }, undefined, { timeout: 20_000 });
 
+  const firstPose = await page.evaluate(() => {
+    const runtimeWindow = window as Window & { __facefallApp?: any; __walkerSmokeId?: string };
+    const root = runtimeWindow.__facefallApp?.enemySystem.rootFor(runtimeWindow.__walkerSmokeId);
+    const thigh = root?.getObjectByName('thigh_l');
+    return thigh ? thigh.quaternion.toArray() : null;
+  });
   await page.waitForTimeout(650);
+
   const state = await page.evaluate(() => {
     const runtimeWindow = window as Window & { __facefallApp?: any; __walkerSmokeId?: string };
     const app = runtimeWindow.__facefallApp;
@@ -48,6 +55,7 @@ test('Walker hydrates into rigged animated presentation without changing enemy r
     if (!root) throw new Error('Walker root disappeared');
     const rigged = root.getObjectByName('walker-rigged-visual');
     const fallbackTorso = root.children.find((child: any) => child.name === 'torso');
+    const thigh = root.getObjectByName('thigh_l');
     let skinnedMeshes = 0;
     let missingTargetIds = 0;
     rigged?.traverse((object: any) => {
@@ -61,8 +69,9 @@ test('Walker hydrates into rigged animated presentation without changing enemy r
       fallbackVisible: fallbackTorso?.visible ?? true,
       skinnedMeshes,
       missingTargetIds,
-      animationTime: runtime?.mixer?.time ?? 0,
-      motion: runtime?.active ?? null
+      animationClock: runtime?.clock ?? 0,
+      motion: runtime?.active ?? null,
+      thighPose: thigh?.quaternion.toArray() ?? null
     };
   });
 
@@ -71,8 +80,9 @@ test('Walker hydrates into rigged animated presentation without changing enemy r
   expect(state.fallbackVisible).toBe(false);
   expect(state.skinnedMeshes).toBeGreaterThan(0);
   expect(state.missingTargetIds).toBe(0);
-  expect(state.animationTime).toBeGreaterThan(0);
+  expect(state.animationClock).toBeGreaterThan(0);
   expect(['idle', 'walk']).toContain(state.motion);
+  expect(state.thighPose).not.toEqual(firstPose);
 
   await page.evaluate(() => {
     const runtimeWindow = window as Window & { __facefallApp?: any; __walkerSmokeId?: string };
