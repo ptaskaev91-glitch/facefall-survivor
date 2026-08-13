@@ -180,6 +180,10 @@ export class CharacterModel {
     return this.playOverride(clip, Math.min(0.56, Math.max(0.16, clip.duration)), 0.045);
   }
 
+  playHit(): boolean { const clip = this.findClip(['Hit', 'Hit_Reaction', 'Damage'], [/hit/i, /damage/i, /impact/i]); return clip ? this.playOverride(clip, Math.min(0.55, Math.max(0.2, clip.duration)), 0.04) : false; }
+
+  playDeath(): boolean { const clip = this.findClip(['Death', 'Die', 'Death_01'], [/death/i, /die/i, /dying/i]); return clip ? this.playOverride(clip, Math.max(0.8, clip.duration), 0.08) : false; }
+
   playShotgunReload(): boolean {
     const clip = this.findClip(
       ['Shotgun_Reload', 'Reload_Shotgun', 'Rifle_Reload', 'Reload_Rifle'],

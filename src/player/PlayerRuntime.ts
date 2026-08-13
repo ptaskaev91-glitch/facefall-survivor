@@ -118,6 +118,10 @@ export class PlayerRuntime {
     return false;
   }
 
+  playHit(): boolean { return this.productionVisualActive && this.characterModel.playHit(); }
+
+  playDeath(): boolean { return this.productionVisualActive && this.characterModel.playDeath(); }
+
   playWeaponReload(weaponId: WeaponId): boolean {
     if (!this.productionVisualActive) return false;
     if (weaponId === 'pistol') return this.characterModel.playPistolReload();
