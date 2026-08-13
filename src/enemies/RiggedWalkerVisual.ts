@@ -19,6 +19,12 @@ interface WalkerRuntime {
   idle: THREE.AnimationAction | null;
   walk: THREE.AnimationAction | null;
   active: 'idle' | 'walk' | null;
+  head: THREE.Bone | null;
+  spine: THREE.Bone | null;
+  clavicleL: THREE.Bone | null;
+  clavicleR: THREE.Bone | null;
+  upperArmL: THREE.Bone | null;
+  upperArmR: THREE.Bone | null;
 }
 
 const loader = new GLTFLoader();
@@ -97,11 +103,22 @@ function groundFromFeet(root: THREE.Object3D): void {
 function infectedMaterial(source: THREE.Material): THREE.Material {
   const material = source.clone();
   if (material instanceof THREE.MeshStandardMaterial) {
-    material.color.multiply(new THREE.Color(0x83927d));
-    material.roughness = Math.max(0.72, material.roughness);
-    material.metalness *= 0.2;
-    material.emissive.set(0x130707);
-    material.emissiveIntensity = 0.08;
+    const lowerName = material.name.toLowerCase();
+    if (lowerName.includes('superhero')) {
+      // The current source body texture is healthy and dark. Keep its normal map but replace
+      // albedo so the silhouette reads as dead/grey-green even under the very dark night rig.
+      material.map = null;
+      material.color.set(0x74816f);
+      material.roughness = 0.92;
+    } else if (lowerName.includes('eyes')) {
+      material.color.set(0xc4d09a);
+      material.emissive.set(0x4b5627);
+      material.emissiveIntensity = 0.34;
+    } else {
+      material.color.multiply(new THREE.Color(0x4f554c));
+      material.roughness = Math.max(0.82, material.roughness);
+    }
+    material.metalness = 0;
   }
   return material;
 }
@@ -120,8 +137,6 @@ function prepareModel(model: THREE.Object3D, damageTargetId: string, shadows: bo
     object.castShadow = shadows;
     object.receiveShadow = true;
     object.frustumCulled = true;
-    // SkeletonUtils clones the hierarchy/skeleton but shares render resources. Give every
-    // infected its own geometry/material instances so EnemySystem reset can dispose safely.
     object.geometry = object.geometry.clone();
     object.userData.hitZone = inferHitZone(object.name);
     if (Array.isArray(object.material)) object.material = object.material.map(infectedMaterial);
@@ -130,26 +145,27 @@ function prepareModel(model: THREE.Object3D, damageTargetId: string, shadows: bo
 }
 
 function addInfectionDetails(wrapper: THREE.Group, damageTargetId: string, shadows: boolean): void {
-  const woundMaterial = new THREE.MeshStandardMaterial({ color: 0x4d0e0c, roughness: 0.93, metalness: 0 });
-  const driedBlood = new THREE.MeshStandardMaterial({ color: 0x2b0a08, roughness: 1, metalness: 0 });
+  const woundMaterial = new THREE.MeshStandardMaterial({ color: 0x5e0b08, roughness: 0.96, metalness: 0 });
+  const driedBlood = new THREE.MeshStandardMaterial({ color: 0x260504, roughness: 1, metalness: 0 });
 
-  const chest = new THREE.Mesh(new THREE.CircleGeometry(0.14, 12), woundMaterial);
+  const chest = new THREE.Mesh(new THREE.CircleGeometry(0.22, 14), woundMaterial);
   chest.name = 'walker-chest-wound';
-  chest.position.set(0.16, 1.18, -0.235);
+  chest.position.set(0.14, 1.18, -0.245);
   chest.rotation.y = Math.PI;
-  chest.rotation.z = -0.28;
+  chest.rotation.z = -0.32;
+  chest.scale.set(1.35, 0.62, 1);
   chest.userData.hitZone = 'torso';
 
-  const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), driedBlood);
+  const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.105, 10, 8), driedBlood);
   shoulder.name = 'walker-shoulder-wound';
-  shoulder.position.set(-0.30, 1.42, -0.12);
-  shoulder.scale.set(1.3, 0.65, 0.42);
+  shoulder.position.set(-0.31, 1.42, -0.14);
+  shoulder.scale.set(1.55, 0.72, 0.48);
   shoulder.userData.hitZone = 'limb';
 
-  const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.05, 0.025), woundMaterial);
+  const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.065, 0.03), woundMaterial);
   jaw.name = 'walker-jaw-wound';
-  jaw.position.set(0.06, 1.68, -0.19);
-  jaw.rotation.z = -0.17;
+  jaw.position.set(0.06, 1.68, -0.205);
+  jaw.rotation.z = -0.23;
   jaw.userData.hitZone = 'head';
 
   for (const detail of [chest, shoulder, jaw]) {
@@ -172,10 +188,6 @@ function bindAction(mixer: THREE.AnimationMixer, clips: THREE.AnimationClip[], p
   return clip ? mixer.clipAction(clip) : null;
 }
 
-/**
- * Hydrates a procedural Walker root with a cached rigged humanoid presentation.
- * Gameplay keeps owning the stable root; failed loading simply leaves the fallback visible.
- */
 export async function hydrateRiggedWalker(root: THREE.Group, shadows: boolean): Promise<boolean> {
   if (root.userData.riggedWalkerReady || root.userData.riggedWalkerLoading) return Boolean(root.userData.riggedWalkerReady);
   root.userData.riggedWalkerLoading = true;
@@ -195,9 +207,8 @@ export async function hydrateRiggedWalker(root: THREE.Group, shadows: boolean): 
 
     const wrapper = new THREE.Group();
     wrapper.name = 'walker-rigged-visual';
-    // Quaternius source faces +Z; Facefall actors move/fight toward local -Z.
     wrapper.rotation.y = Math.PI;
-    wrapper.rotation.z = 0.025;
+    wrapper.rotation.z = 0.055;
     wrapper.add(model);
     addInfectionDetails(wrapper, damageTargetId, shadows);
     root.add(wrapper);
@@ -205,7 +216,19 @@ export async function hydrateRiggedWalker(root: THREE.Group, shadows: boolean): 
     const mixer = new THREE.AnimationMixer(model);
     const idle = bindAction(mixer, source.clips, [/idle.*loop/i, /idle/i]);
     const walk = bindAction(mixer, source.clips, [/walk.*loop/i, /jog.*fwd/i, /walk/i]);
-    const runtime: WalkerRuntime = { wrapper, mixer, idle, walk, active: null };
+    const runtime: WalkerRuntime = {
+      wrapper,
+      mixer,
+      idle,
+      walk,
+      active: null,
+      head: findBone(model, 'Head'),
+      spine: findBone(model, 'spine_03'),
+      clavicleL: findBone(model, 'clavicle_l'),
+      clavicleR: findBone(model, 'clavicle_r'),
+      upperArmL: findBone(model, 'upperarm_l'),
+      upperArmR: findBone(model, 'upperarm_r')
+    };
     root.userData.riggedWalkerRuntime = runtime;
     root.userData.riggedWalkerReady = true;
     root.userData.riggedWalkerLoading = false;
@@ -234,13 +257,29 @@ export function setRiggedWalkerMotion(root: THREE.Group, speed: number): boolean
   return true;
 }
 
+function applyInfectedPose(runtime: WalkerRuntime, phase: number): void {
+  // Mixer writes the authored pose first; these local offsets are applied afterwards and are
+  // therefore refreshed every frame instead of accumulating. The asymmetry is intentional.
+  runtime.spine?.rotateX(-0.20);
+  runtime.spine?.rotateZ(0.06 + Math.sin(phase * 0.55) * 0.035);
+  runtime.head?.rotateX(0.13);
+  runtime.head?.rotateZ(-0.24 + Math.sin(phase * 0.72) * 0.035);
+  runtime.clavicleL?.rotateZ(-0.18);
+  runtime.clavicleR?.rotateZ(0.10);
+  runtime.upperArmL?.rotateX(-0.34);
+  runtime.upperArmR?.rotateX(-0.16);
+  runtime.upperArmR?.rotateZ(0.12);
+}
+
 export function updateRiggedWalker(root: THREE.Group, speed: number, dt: number): boolean {
   const runtime = root.userData.riggedWalkerRuntime as WalkerRuntime | undefined;
   if (!runtime) return false;
   setRiggedWalkerMotion(root, speed);
-  runtime.mixer.update(Math.max(0, dt) * Math.max(0.68, Math.min(1.25, 0.55 + speed * 0.16)));
   const phase = ((root.userData.riggedWalkerLeanPhase as number | undefined) ?? Math.random() * Math.PI * 2) + dt * 1.7;
   root.userData.riggedWalkerLeanPhase = phase;
-  runtime.wrapper.rotation.z = 0.025 + Math.sin(phase) * 0.018;
+  runtime.mixer.update(Math.max(0, dt) * Math.max(0.58, Math.min(1.05, 0.46 + speed * 0.13)));
+  applyInfectedPose(runtime, phase);
+  runtime.wrapper.rotation.z = 0.055 + Math.sin(phase) * 0.028;
+  runtime.wrapper.rotation.x = 0.035 + Math.sin(phase * 0.43) * 0.012;
   return true;
 }
