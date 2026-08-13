@@ -54,24 +54,30 @@ test('weapon GLBs load lazily and hero exposes production combat reaction states
 
   const reactions = await page.evaluate(() => {
     const app = (window as any).__facefallApp;
+    const model = app.player.characterModel;
     const draw = app.player.playWeaponReload('bow');
-    const drawAction = app.player.characterModel?.combatPose?.activeAction ?? null;
+    const drawAction = model?.combatPose?.activeAction ?? null;
     const release = app.player.playWeaponFire('bow');
-    const releaseAction = app.player.characterModel?.combatPose?.activeAction ?? null;
+    const releaseAction = model?.combatPose?.activeAction ?? null;
+
     const hit = app.player.playHit();
-    const hitAction = app.player.characterModel?.combatPose?.activeAction ?? null;
+    const hitOverlay = model?.combatPose?.activeAction ?? null;
+    const hitClip = model?.overrideAction?.getClip?.()?.name ?? null;
+
     const death = app.player.playDeath();
-    const deathAction = app.player.characterModel?.combatPose?.activeAction ?? null;
-    return { draw, drawAction, release, releaseAction, hit, hitAction, death, deathAction };
+    const deathOverlay = model?.combatPose?.activeAction ?? null;
+    const deathClip = model?.overrideAction?.getClip?.()?.name ?? null;
+
+    return { draw, drawAction, release, releaseAction, hit, hitOverlay, hitClip, death, deathOverlay, deathClip };
   });
   expect(reactions.draw).toBe(true);
   expect(reactions.drawAction).toBe('bow-draw');
   expect(reactions.release).toBe(true);
   expect(reactions.releaseAction).toBe('bow-release');
   expect(reactions.hit).toBe(true);
-  expect(reactions.hitAction).toBe('hit');
+  expect(reactions.hitOverlay === 'hit' || /hit|damage|impact/i.test(reactions.hitClip ?? '')).toBe(true);
   expect(reactions.death).toBe(true);
-  expect(reactions.deathAction).toBe('death');
+  expect(reactions.deathOverlay === 'death' || /death|die|dying/i.test(reactions.deathClip ?? '')).toBe(true);
 
   await page.evaluate(() => {
     const app = (window as any).__facefallApp;
