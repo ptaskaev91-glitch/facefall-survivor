@@ -1,0 +1,58 @@
+name: Finalize 012 Doc Headers
+on:
+  push:
+    branches: [feature/0.12.0-super-makar-family]
+permissions:
+  contents: write
+jobs:
+  finalize-docs:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Normalize project document headers
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+            'README.md': [
+              ('# Facefall Survivor', '# Супер Макар'),
+              ('Mobile-first browser 3D survival shooter. The player can upload a photo and Facefall uses it locally as the hero\'s face.', 'Mobile-first browser 3D family survival shooter. Супер Макар uses local photos for Макар, Супермама and Суперпапа.'),
+              ('## Current generation — Engine Next 0.10.0', '## Current generation — Engine Next 0.12.0 · «Супер Макар»')
+            ],
+            'dev.md': [
+              ('# Facefall Survivor — Development Plan', '# Супер Макар — Development Plan'),
+              ('Последняя актуализация: **2026-08-13**', 'Последняя актуализация: **2026-08-14**'),
+              ('Source of truth: `milestone/0.10.0-production-core` until PR #27 merge, then `main`', 'Source of truth: `main` after PR #30 merge'),
+              ('Primary URL: `https://facefall-survivor-pavels-projects-0b29bb12.vercel.app`', 'Testing preview: `engine-next-preview` branch; permanent Vercel project must be reconnected separately if needed.'),
+              ('Текущий стабильный architecture checkpoint: **0.10.0 PRODUCTION CORE — CombatRuntime + RunSession**.', 'Текущий стабильный architecture checkpoint: **0.12.0 СУПЕР МАКАР — FAMILY SURVIVAL**.'),
+              ('Текущий активный visual checkpoint: **0.10.0 PRODUCTION CORE — hero combat poses + weapon GLBs + Walker/Runner/Brute production infected**.', 'Текущий активный visual checkpoint: **0.12.0 FAMILY — увеличенные фото-головы, Супермама/Суперпапа, монеты, магазин, zombie audio**.'),
+              ('Facefall Survivor — mobile-first browser 3D action-survival против заражённых.', 'Супер Макар — mobile-first browser 3D family action-survival против заражённых.')
+            ],
+            'history.md': [
+              ('# Facefall Survivor — History', '# Супер Макар — History'),
+              ('Последняя актуализация: **2026-08-13**', 'Последняя актуализация: **2026-08-14**'),
+              ('Facefall Survivor начался как browser survival shooter против заражённых.', 'Проект начался как Facefall Survivor — browser survival shooter против заражённых; с checkpoint 0.12.0 продукт называется «Супер Макар».')
+            ],
+            'structure.md': [
+              ('# Facefall Survivor — Structure', '# Супер Макар — Structure'),
+              ('Последняя актуализация: **2026-08-13**', 'Последняя актуализация: **2026-08-14**'),
+              ('`structure.md` — источник истины по текущей и целевой архитектуре Facefall Survivor.', '`structure.md` — источник истины по текущей и целевой архитектуре «Супер Макар».')
+            ]
+          }
+          for name, pairs in replacements.items():
+              p = Path(name)
+              text = p.read_text(encoding='utf-8')
+              for old, new in pairs:
+                  text = text.replace(old, new)
+              p.write_text(text, encoding='utf-8')
+
+          Path('.github/workflows/finalize-012-doc-headers.yml').unlink(missing_ok=True)
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "docs: normalize Super Makar 0.12.0 source of truth"
+          git push
