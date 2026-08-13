@@ -8,6 +8,9 @@ import { Vector2, Vector3, type Object3D, type PerspectiveCamera } from 'three';
  */
 export class AimAssist {
   private readonly projected = new Vector3();
+  private readonly targetWorld = new Vector3();
+  private readonly cameraForward = new Vector3();
+  private readonly toTarget = new Vector3();
   private readonly targetNdc = new Vector2();
   private foundTarget = false;
 
@@ -28,14 +31,22 @@ export class AimAssist {
     const effectiveStrength = Math.max(0.2, Math.min(1, strength));
     const maxX = mode === 'top' ? 0.92 : 0.82;
     const maxY = mode === 'top' ? 0.86 : 0.78;
+    camera.getWorldDirection(this.cameraForward);
     let bestScore = Number.POSITIVE_INFINITY;
 
     for (const target of targets) {
       if (!target.visible) continue;
-      this.projected.copy(target.position);
-      this.projected.y += mode === 'third' ? 1.12 : 0.8;
-      this.projected.project(camera);
-      if (this.projected.z < -1 || this.projected.z > 1) continue;
+
+      // Use a world-space target point. The camera projection matrix is updated on the
+      // render tick, while aim assist runs on the fixed tick, so projected.z can briefly
+      // sit slightly outside [-1, 1] even for a target that is visibly in front of the camera.
+      // A forward-vector test is the stable criterion for rejecting targets behind us.
+      target.getWorldPosition(this.targetWorld);
+      this.targetWorld.y += mode === 'third' ? 1.12 : 0.8;
+      this.toTarget.copy(this.targetWorld).sub(camera.position);
+      if (this.toTarget.dot(this.cameraForward) <= 0) continue;
+
+      this.projected.copy(this.targetWorld).project(camera);
       if (Math.abs(this.projected.x) > maxX || Math.abs(this.projected.y) > maxY) continue;
 
       const dx = this.projected.x - reticleNdc.x;
