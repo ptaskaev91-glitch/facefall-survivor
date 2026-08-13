@@ -24,6 +24,8 @@ import { CollisionNavigationQuery } from '../navigation/CollisionNavigationQuery
 import { PickupSystem } from '../pickups/PickupSystem';
 import { PlayerRuntime } from '../player/PlayerRuntime';
 import { WaveDirector } from '../waves/WaveDirector';
+import { FamilyCompanionSystem } from '../family/FamilyCompanionSystem';
+import { CoinSystem } from '../economy/CoinSystem';
 import type { LevelManifest } from '../world/LevelManifest';
 import { WorldRuntime } from '../world/WorldRuntime';
 import { CombatRuntime } from './CombatRuntime';
@@ -49,11 +51,16 @@ export interface GameAppDom {
   touchReload?: HTMLElement;
   touchWeapon?: HTMLElement;
   touchCamera?: HTMLElement;
+  coins?: HTMLElement;
+  buyShotgun?: HTMLButtonElement;
+  buyBow?: HTMLButtonElement;
 }
 
 export interface StartRunOptions {
   cameraMode?: CameraMode;
   faceDataUrl?: string | null;
+  mamaFaceDataUrl?: string | null;
+  papaFaceDataUrl?: string | null;
 }
 
 /** Top-level gameplay orchestrator; dedicated runtimes own combat/session/world/player detail. */
@@ -84,6 +91,9 @@ export class GameApp {
   private readonly enemySystem: EnemySystem;
   private readonly pickups: PickupSystem;
   private readonly waveDirector = new WaveDirector();
+  private readonly family: FamilyCompanionSystem;
+  private readonly coinSystem: CoinSystem;
+  private coins = 0;
   private readonly aimAssist = new AimAssist();
   private readonly maxActiveEnemies: number;
   private readonly unregisterPlayerDamage: () => void;
@@ -126,7 +136,9 @@ export class GameApp {
 
     this.projectileSystem = new ProjectileSystem(this.damageSystem, (from, to) => this.queryProjectileCollision(from, to), this.quality.id === 'mobile-low' ? 32 : 48);
     this.projectileVisuals = new ProjectileVisuals(this.world.scene, this.quality.id === 'mobile-low' ? 32 : 48);
-    this.enemySystem = new EnemySystem(this.world.scene, this.damageSystem, { shadows: this.quality.shadows, maxActive: this.maxActiveEnemies });
+    this.enemySystem = new EnemySystem(this.world.scene, this.damageSystem, { shadows: this.quality.shadows, maxActive: this.maxActiveEnemies, onGroan: (actor) => this.events.emit('enemyGroan', { position: actor.root.position.clone(), kind: actor.archetype.id }) });
+    this.family = new FamilyCompanionSystem(this.world.scene, this.quality, this.enemySystem, this.damageSystem);
+    this.coinSystem = new CoinSystem(this.world.scene, (amount) => { this.coins += amount; this.hud.setLastEvent(`МОНЕТЫ +${amount}`); this.refreshStatus(); });
     this.pickups = new PickupSystem(this.world.scene, {
       heal: (amount) => this.playerHealth.heal(amount) > 0,
       ammo: (amount) => this.weaponSystem.addReserve(amount),
@@ -151,6 +163,7 @@ export class GameApp {
       refreshStatus: () => this.refreshStatus(),
       endRun: () => this.endRun()
     });
+    this.unsubscribeEvents.push(this.events.on('kill', (hit) => { if (hit.targetId === 'player') return; const amount = hit.targetId.includes('-brute-') ? 5 : hit.targetId.includes('-runner-') ? 3 : 2; this.coinSystem.spawn(hit.hitPoint, amount); }));
     this.bindUi();
 
     this.loop = new GameLoop({ fixedUpdate: (dt) => this.fixedUpdate(dt), render: (_alpha, frameDt) => this.render(frameDt) }, { fixedStep: 1 / 60, maxFrameDelta: 0.1, maxSubSteps: 5 });
@@ -174,6 +187,7 @@ export class GameApp {
     try {
       if (!this.manifest) await this.loadLevelManifest();
       await this.player.setFaceDataUrl(options.faceDataUrl ?? null);
+      this.family.configureFaces({ mamaFaceDataUrl: options.mamaFaceDataUrl, papaFaceDataUrl: options.papaFaceDataUrl });
       this.attachRuntimeInput(); this.resetRun(); this.setCameraMode(options.cameraMode ?? 'top'); this.state.transition('playing'); this.loop.start(); this.refreshStatus();
     } catch (error) { this.state.transition('error'); throw error; }
   }
