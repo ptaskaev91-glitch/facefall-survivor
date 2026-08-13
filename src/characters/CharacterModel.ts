@@ -39,6 +39,7 @@ export class CharacterModel {
   private headBone: THREE.Bone | null = null;
   private eyes: THREE.Object3D | null = null;
   private faceShell: THREE.Mesh | null = null;
+  private rearFaceShell: THREE.Mesh | null = null;
   private faceTexture: THREE.Texture | null = null;
   private faceMaterial: THREE.MeshStandardMaterial | null = null;
   private faceDataUrl: string | null = null;
@@ -80,6 +81,7 @@ export class CharacterModel {
     this.root.updateMatrixWorld(true);
     this.mixer = new THREE.AnimationMixer(instance);
     this.headBone = this.findBone(instance, 'Head');
+    if (this.headBone) this.headBone.scale.multiplyScalar(1.18);
     this.eyes = instance.getObjectByName('Eyes') ?? null;
     this.combatPose.bind(instance);
     this.loaded = true;
@@ -385,6 +387,16 @@ export class CharacterModel {
     this.faceTexture = texture;
     this.faceMaterial = material;
     this.faceShell = shell;
+    const rear = new THREE.Mesh(geometry.clone(), material.clone());
+    rear.name = 'uploaded-face-shell-rear';
+    rear.position.copy(placement.position);
+    rear.position.z *= -1;
+    rear.quaternion.copy(placement.quaternion).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI));
+    rear.renderOrder = 3;
+    rear.castShadow = false;
+    rear.receiveShadow = false;
+    this.headBone.add(rear);
+    this.rearFaceShell = rear;
   }
 
   private resolveFacePlacement(head: THREE.Bone, eyes: THREE.Object3D | null): {
@@ -419,7 +431,7 @@ export class CharacterModel {
     right.normalize();
     const up = new THREE.Vector3().crossVectors(forward, right).normalize();
 
-    const worldWidth = THREE.MathUtils.clamp(Math.max(eyeSize.x, eyeSize.z) * 1.75, 0.19, 0.27);
+    const worldWidth = THREE.MathUtils.clamp(Math.max(eyeSize.x, eyeSize.z) * 2.05, 0.23, 0.32);
     const worldHeight = THREE.MathUtils.clamp(worldWidth * 1.24, 0.24, 0.34);
     const faceCenterWorld = eyeCenter.clone()
       .addScaledVector(forward, 0.014)
@@ -533,6 +545,13 @@ export class CharacterModel {
     this.faceMaterial?.dispose();
     this.faceTexture?.dispose();
     this.faceShell = null;
+    if (this.rearFaceShell) {
+      this.rearFaceShell.removeFromParent();
+      this.rearFaceShell.geometry.dispose();
+      const material = this.rearFaceShell.material;
+      if (Array.isArray(material)) { for (const item of material) item.dispose(); } else material.dispose();
+      this.rearFaceShell = null;
+    }
     this.faceMaterial = null;
     this.faceTexture = null;
   }
