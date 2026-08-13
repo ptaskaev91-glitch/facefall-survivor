@@ -17,10 +17,10 @@ function markBuildUi(): void {
   const badge = document.querySelector<HTMLElement>('.lab-badge');
   const kicker = document.querySelector<HTMLElement>('.menu-kicker');
   const notes = [...document.querySelectorAll<HTMLElement>('.menu-note')];
-  if (badge) badge.textContent = 'FACEFALL // 0.11.0 ABANDONED OUTSKIRTS';
-  if (kicker) kicker.textContent = 'FACEFALL SURVIVOR · ENGINE NEXT 0.11.0';
+  if (badge) badge.textContent = 'СУПЕР МАКАР // 0.12.0 FAMILY SURVIVAL';
+  if (kicker) kicker.textContent = 'СУПЕР МАКАР · ENGINE NEXT 0.12.0';
   if (notes[0]) {
-    notes[0].textContent = 'TOP: герой автоматически выбирает цель. 3RD: мобильный aim-assist двигает крестик по X/Y к видимому заражённому, и выстрел идёт через ту же точку. WEAP переключает pistol / shotgun / bow; shotgun и bow GLB загружаются лениво при первом выборе. Мир загружается из authored Abandoned Outskirts GLB: мокрая дорога, ворота, постройки, брошенная машина и окружение; процедурная сцена остаётся аварийным fallback.';
+    notes[0].textContent = 'Супер Макар начинает один. После 3-й волны присоединяется Супермама, после 6-й — Суперпапа. Загруженные фотографии остаются только в браузере и отображаются спереди и сзади увеличенной головы. За заражённых выпадают монеты: на них можно купить дробовик и лук.';
   }
 }
 
@@ -42,7 +42,10 @@ export function resolveGameAppDom(): GameAppDom {
     touchFire: optional<HTMLElement>('#touchFire'),
     touchReload: optional<HTMLElement>('#touchReload'),
     touchWeapon: optional<HTMLElement>('#touchWeapon'),
-    touchCamera: optional<HTMLElement>('#touchCamera')
+    touchCamera: optional<HTMLElement>('#touchCamera'),
+    coins: optional<HTMLElement>('#coinCount'),
+    buyShotgun: optional<HTMLButtonElement>('#buyShotgun'),
+    buyBow: optional<HTMLButtonElement>('#buyBow')
   };
 }
 
@@ -80,7 +83,7 @@ export async function bootstrapEngineNext(): Promise<GameApp | null> {
       dom.status.textContent = `ENGINE NEXT ERROR · ${message}`;
       dom.status.dataset.error = 'true';
     }
-    console.error('[Facefall] engine-next bootstrap failed', error);
+    console.error('[Super Makar] engine-next bootstrap failed', error);
     app?.dispose();
     return null;
   }

@@ -42,12 +42,12 @@ test('capture mobile TOP, 3RD, pistol fire/reload and uploaded-face checkpoints'
   page.on('pageerror', (error) => errors.push(error.message));
 
   await page.goto('/engine-lab.html', { waitUntil: 'domcontentloaded' });
-  await page.locator('#faceInput').setInputFiles({
+  await page.locator('#makarFaceInput').setInputFiles({
     name: 'visual-smoke-face.svg',
     mimeType: 'image/svg+xml',
     buffer: Buffer.from(testFaceSvg)
   });
-  await expect(page.locator('#facePreview')).toBeVisible();
+  await expect(page.locator('#makarFacePreview')).toBeVisible();
 
   await page.locator('#menuCamTop').click();
   await page.locator('#startGame').click();
@@ -149,6 +149,7 @@ test('capture mobile shotgun fire and reload production checkpoints', async ({ p
   await expect(page.locator('#status')).toContainText('state=playing', { timeout: 20_000 });
   await page.waitForTimeout(1200);
 
+  await page.evaluate(() => (window as any).__facefallApp.weaponSystem.unlock('shotgun'));
   const weapon = page.locator('#touchWeapon');
   await weapon.dispatchEvent('pointerdown', pointerDown(61));
   await page.waitForTimeout(45);

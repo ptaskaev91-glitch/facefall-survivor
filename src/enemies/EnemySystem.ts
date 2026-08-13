@@ -20,6 +20,7 @@ export interface EnemyActor {
   alertTimer: number;
   wanderTimer: number;
   deathTimer: number;
+  groanTimer: number;
   lastKnownTarget: THREE.Vector3;
   wanderTarget: THREE.Vector3;
   alive: boolean;
@@ -32,6 +33,7 @@ export interface EnemySystemOptions {
   maxActive: number;
   spatialCellSize?: number;
   canSeeTarget?: (from: THREE.Vector3, to: THREE.Vector3) => boolean;
+  onGroan?: (actor: EnemyActor) => void;
 }
 
 export class EnemySystem {
@@ -73,7 +75,7 @@ export class EnemySystem {
     const spatial: EnemySpatialItem = { id, position: root.position, root };
     const actor: EnemyActor = {
       id, archetype, root, velocity: new THREE.Vector3(), attackTimer: 0, staggerTimer: 0, alertTimer: 1.4,
-      wanderTimer: 0, deathTimer: 0, lastKnownTarget: position.clone(), wanderTarget: position.clone(), alive: true,
+      wanderTimer: 0, deathTimer: 0, groanTimer: 1.5 + Math.random() * 3.5, lastKnownTarget: position.clone(), wanderTarget: position.clone(), alive: true,
       unregisterDamage, spatial
     };
     this.actors.set(id, actor);
@@ -95,6 +97,8 @@ export class EnemySystem {
       actor.staggerTimer = Math.max(0, actor.staggerTimer - dt);
       actor.alertTimer = Math.max(0, actor.alertTimer - dt);
       actor.wanderTimer = Math.max(0, actor.wanderTimer - dt);
+      actor.groanTimer = Math.max(0, actor.groanTimer - dt);
+      if (actor.groanTimer <= 0) { actor.groanTimer = 3.4 + Math.random() * 5.2; this.options.onGroan?.(actor); }
       animateEnemyVisual(actor.root, actor.velocity.length(), dt);
 
       this.offset.copy(playerPosition).sub(actor.root.position).setY(0);

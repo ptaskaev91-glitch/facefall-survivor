@@ -1,6 +1,6 @@
-# Facefall Survivor — History
+# Супер Макар — History
 
-Последняя актуализация: **2026-08-13**  
+Последняя актуализация: **2026-08-14**  
 Repository: `ptaskaev91-glitch/facefall-survivor`  
 Source of truth: `main`
 
@@ -16,7 +16,7 @@ Source of truth: `main`
 
 # 2. Исходная идея
 
-Facefall Survivor начался как browser survival shooter против заражённых.
+Проект начался как Facefall Survivor — browser survival shooter против заражённых; с checkpoint 0.12.0 продукт называется «Супер Макар».
 
 Ключевая продуктовая идея:
 
@@ -524,3 +524,23 @@ Design rule reinforced: prefer shared assets + archetype presentation profiles o
 # 0.11.0 — Abandoned Outskirts authored level
 
 PR #28 replaces the active procedural environment with an authored GLB level while retaining fallback safety. `LevelLoader` separates decorative `decor-*` meshes from collision, and the manifest remains the gameplay marker source. Visual CI adds a dedicated authored-level checkpoint.
+
+---
+
+## 0.12.0 — «Супер Макар» family survival checkpoint (2026-08-14)
+
+- Игра переименована в **«Супер Макар»**.
+- Три независимых локальных фото: Супер Макар, Супермама, Суперпапа.
+- Фото персонажа отображается на увеличенной голове спереди и сзади для быстрой идентификации в TOP/3RD.
+- Супермама присоединяется после завершения 3-й волны (активна с wave 4), Суперпапа — после завершения 6-й (активен с wave 7).
+- Союзники следуют за Макаром, автоматически выбирают заражённых и ведут огонь.
+- Супермама получила отдельный процедурный силуэт/причёску; Суперпапа — отличимый масштаб корпуса. Новых внешних character assets для этого не добавлено.
+- Сложность масштабируется по номеру волны и количеству активных героев.
+- Добавлены zombie groan / pain / death WebAudio-эффекты.
+- За убийства выпадают монеты; монеты подбираются игроком. Награда: walker 2, runner 3, brute 5.
+- Магазин оружия: дробовик 20 монет, лук 30; до покупки оружие заблокировано.
+- Добавлены `FamilyCompanionSystem`, `CoinSystem`, семейный HUD/menu и regression coverage.
+- Семейный Playwright smoke загружает три разные тестовые фотографии, проверяет unlock/markers/shop и создаёт `mobile-super-makar-family.png`.
+- Финальный релизный gate: TypeScript strict, unit tests, Playwright browser/visual smoke, deploy build и sole deployment-root assertion.
+- Canonical source после merge: `main`. Продолжение разработки планируется отдельным этапом/перепиской.
+

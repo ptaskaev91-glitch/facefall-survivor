@@ -24,6 +24,8 @@ import { CollisionNavigationQuery } from '../navigation/CollisionNavigationQuery
 import { PickupSystem } from '../pickups/PickupSystem';
 import { PlayerRuntime } from '../player/PlayerRuntime';
 import { WaveDirector } from '../waves/WaveDirector';
+import { FamilyCompanionSystem } from '../family/FamilyCompanionSystem';
+import { CoinSystem } from '../economy/CoinSystem';
 import type { LevelManifest } from '../world/LevelManifest';
 import { WorldRuntime } from '../world/WorldRuntime';
 import { CombatRuntime } from './CombatRuntime';
@@ -49,11 +51,16 @@ export interface GameAppDom {
   touchReload?: HTMLElement;
   touchWeapon?: HTMLElement;
   touchCamera?: HTMLElement;
+  coins?: HTMLElement;
+  buyShotgun?: HTMLButtonElement;
+  buyBow?: HTMLButtonElement;
 }
 
 export interface StartRunOptions {
   cameraMode?: CameraMode;
   faceDataUrl?: string | null;
+  mamaFaceDataUrl?: string | null;
+  papaFaceDataUrl?: string | null;
 }
 
 /** Top-level gameplay orchestrator; dedicated runtimes own combat/session/world/player detail. */
@@ -84,6 +91,9 @@ export class GameApp {
   private readonly enemySystem: EnemySystem;
   private readonly pickups: PickupSystem;
   private readonly waveDirector = new WaveDirector();
+  private readonly family: FamilyCompanionSystem;
+  private readonly coinSystem: CoinSystem;
+  private coins = 0;
   private readonly aimAssist = new AimAssist();
   private readonly maxActiveEnemies: number;
   private readonly unregisterPlayerDamage: () => void;
@@ -126,7 +136,9 @@ export class GameApp {
 
     this.projectileSystem = new ProjectileSystem(this.damageSystem, (from, to) => this.queryProjectileCollision(from, to), this.quality.id === 'mobile-low' ? 32 : 48);
     this.projectileVisuals = new ProjectileVisuals(this.world.scene, this.quality.id === 'mobile-low' ? 32 : 48);
-    this.enemySystem = new EnemySystem(this.world.scene, this.damageSystem, { shadows: this.quality.shadows, maxActive: this.maxActiveEnemies });
+    this.enemySystem = new EnemySystem(this.world.scene, this.damageSystem, { shadows: this.quality.shadows, maxActive: this.maxActiveEnemies, onGroan: (actor) => this.events.emit('enemyGroan', { position: actor.root.position.clone(), kind: actor.archetype.id }) });
+    this.family = new FamilyCompanionSystem(this.world.scene, this.quality, this.enemySystem, this.damageSystem);
+    this.coinSystem = new CoinSystem(this.world.scene, (amount) => { this.coins += amount; this.hud.setLastEvent(`МОНЕТЫ +${amount}`); this.refreshStatus(); });
     this.pickups = new PickupSystem(this.world.scene, {
       heal: (amount) => this.playerHealth.heal(amount) > 0,
       ammo: (amount) => this.weaponSystem.addReserve(amount),
@@ -151,6 +163,7 @@ export class GameApp {
       refreshStatus: () => this.refreshStatus(),
       endRun: () => this.endRun()
     });
+    this.unsubscribeEvents.push(this.events.on('kill', (hit) => { if (hit.targetId === 'player') return; const amount = hit.targetId.includes('-brute-') ? 5 : hit.targetId.includes('-runner-') ? 3 : 2; this.coinSystem.spawn(hit.hitPoint, amount); }));
     this.bindUi();
 
     this.loop = new GameLoop({ fixedUpdate: (dt) => this.fixedUpdate(dt), render: (_alpha, frameDt) => this.render(frameDt) }, { fixedStep: 1 / 60, maxFrameDelta: 0.1, maxSubSteps: 5 });
@@ -174,6 +187,7 @@ export class GameApp {
     try {
       if (!this.manifest) await this.loadLevelManifest();
       await this.player.setFaceDataUrl(options.faceDataUrl ?? null);
+      this.family.configureFaces({ mamaFaceDataUrl: options.mamaFaceDataUrl, papaFaceDataUrl: options.papaFaceDataUrl });
       this.attachRuntimeInput(); this.resetRun(); this.setCameraMode(options.cameraMode ?? 'top'); this.state.transition('playing'); this.loop.start(); this.refreshStatus();
     } catch (error) { this.state.transition('error'); throw error; }
   }
@@ -190,7 +204,7 @@ export class GameApp {
     this.disposed = true; this.loop.stop(); this.keyboard.detach(); this.touch?.detach(); this.touch = null;
     window.removeEventListener('resize', this.onResize); document.removeEventListener('visibilitychange', this.onVisibilityChange);
     for (const unsubscribe of this.unsubscribeEvents.splice(0)) unsubscribe();
-    this.combat.dispose(); this.unregisterPlayerDamage(); this.waveDirector.stop(); this.enemySystem.reset(); this.pickups.dispose();
+    this.combat.dispose(); this.unregisterPlayerDamage(); this.waveDirector.stop(); this.family.dispose(); this.coinSystem.dispose(); this.enemySystem.reset(); this.pickups.dispose();
     this.projectileVisuals.dispose(); this.runtimeFx.dispose(); this.lightPool.dispose(); this.player.dispose(); this.world.dispose(); this.events.clear();
     this.dom.app.replaceChildren(); if (!this.state.is('disposed')) this.state.transition('disposed');
   }
@@ -205,6 +219,8 @@ export class GameApp {
     this.dom.topButton.addEventListener('click', this.onTopCamera);
     this.dom.thirdButton.addEventListener('click', this.onThirdCamera);
     this.dom.restart?.addEventListener('click', this.onRestart);
+    this.dom.buyShotgun?.addEventListener('click', () => this.buyWeapon('shotgun', 20));
+    this.dom.buyBow?.addEventListener('click', () => this.buyWeapon('bow', 30));
   }
 
   private attachTouchInput(): void {
@@ -222,7 +238,11 @@ export class GameApp {
     this.updateFootsteps(dt, movement.targetSpeed, controls.sprint);
     this.weaponSystem.update(dt); this.projectileSystem.update(dt); this.enemySystem.update(dt, this.player.position, (actor) => this.applyEnemyAttack(actor));
     this.pickups.update(dt, this.player.position);
-    for (const request of this.waveDirector.update(dt, this.enemySystem.activeCount, this.maxActiveEnemies)) this.enemySystem.spawn(request.type, request.position);
+    this.coinSystem.update(dt, this.player.position);
+    const effectiveMax = this.maxActiveEnemies + (this.family.heroCount - 1) * 6;
+    for (const request of this.waveDirector.update(dt, this.enemySystem.activeCount, effectiveMax, this.family.heroCount)) this.enemySystem.spawn(request.type, request.position);
+    void this.family.syncWave(this.waveDirector.wave);
+    this.family.update(dt, this.player.position, this.player.facing);
     this.effects.update(dt); this.runtimeFx.update(dt); this.lightPool.update(dt); this.world.updateSimulation(dt);
     if (this.input.consumePressed('toggleCamera')) this.setCameraMode(this.cameraMode === 'top' ? 'third' : 'top');
     if (this.input.consumePressed('switchWeapon')) this.player.setActiveWeapon(this.weaponSystem.cycle());
@@ -275,7 +295,7 @@ export class GameApp {
   }
 
   private resetRun(): void {
-    this.enemySystem.reset(); this.weaponSystem.reset(); this.player.setActiveWeapon(this.weaponSystem.selected); this.projectileSystem.reset();
+    this.enemySystem.reset(); this.family.reset(); this.coinSystem.reset(); this.coins = 0; this.weaponSystem.reset(); this.player.setActiveWeapon(this.weaponSystem.selected); this.projectileSystem.reset();
     this.playerHealth.reset(); this.pickups.reset(); this.session.reset(); this.footstepTimer = 0; this.movementSpreadMultiplier = 1;
     this.hud.clearLastEvent(); this.waveDirector.reset(); this.hud.hideGameOver();
     const playerSpawn = this.manifest?.markers.find((marker) => marker.kind === 'player-spawn');
@@ -319,7 +339,17 @@ export class GameApp {
     const result = base.clone(); result.x += (Math.random() - 0.5) * spread; result.y += (Math.random() - 0.5) * spread * 0.45; result.z += (Math.random() - 0.5) * spread; return result.normalize();
   }
 
+  private buyWeapon(id: 'shotgun' | 'bow', price: number): void {
+    if (this.weaponSystem.isUnlocked(id)) { this.weaponSystem.select(id); this.player.setActiveWeapon(id); return; }
+    if (this.coins < price) { this.hud.setLastEvent(`НУЖНО ${price} МОНЕТ`); return; }
+    this.coins -= price; this.weaponSystem.unlock(id); this.weaponSystem.select(id); this.player.setActiveWeapon(id);
+    this.hud.setLastEvent(id === 'shotgun' ? 'ДРОБОВИК КУПЛЕН' : 'ЛУК КУПЛЕН'); this.refreshStatus();
+  }
+
   private refreshStatus(): void {
+    if (this.dom.coins) this.dom.coins.textContent = String(this.coins);
+    if (this.dom.buyShotgun) { this.dom.buyShotgun.textContent = this.weaponSystem.isUnlocked('shotgun') ? 'ДРОБОВИК ✓' : 'ДРОБОВИК · 20'; this.dom.buyShotgun.disabled = !this.weaponSystem.isUnlocked('shotgun') && this.coins < 20; }
+    if (this.dom.buyBow) { this.dom.buyBow.textContent = this.weaponSystem.isUnlocked('bow') ? 'ЛУК ✓' : 'ЛУК · 30'; this.dom.buyBow.disabled = !this.weaponSystem.isUnlocked('bow') && this.coins < 30; }
     const runtime = this.weaponSystem.runtime();
     this.hud.refresh({ state: this.state.current, levelId: this.levelId, hp: this.playerHealth.value, wave: this.waveDirector.wave, kills: this.session.kills, score: this.session.score,
       qualityId: this.quality.id, cameraMode: this.cameraMode, weaponLabel: WEAPONS[this.weaponSystem.selected].label, magazine: runtime.magazine, reserve: runtime.reserve,

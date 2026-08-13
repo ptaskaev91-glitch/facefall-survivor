@@ -1,9 +1,13 @@
-const FACE_KEY = 'facefall.face.v1';
+export type FaceSlot = 'makar' | 'mama' | 'papa';
 
 export class FaceStore {
+  constructor(private readonly slot: FaceSlot = 'makar') {}
+
+  private get key(): string { return `super-makar.face.${this.slot}.v1`; }
+
   load(): string | null {
     try {
-      return localStorage.getItem(FACE_KEY);
+      return localStorage.getItem(this.key) ?? (this.slot === 'makar' ? localStorage.getItem('facefall.face.v1') : null);
     } catch {
       return null;
     }
@@ -11,17 +15,13 @@ export class FaceStore {
 
   save(dataUrl: string): void {
     try {
-      localStorage.setItem(FACE_KEY, dataUrl);
+      localStorage.setItem(this.key, dataUrl);
     } catch (error) {
-      console.warn('[Facefall] could not persist face locally', error);
+      console.warn('[Super Makar] could not persist face locally', error);
     }
   }
 
   remove(): void {
-    try {
-      localStorage.removeItem(FACE_KEY);
-    } catch {
-      // Storage is optional; removing a face must never block the game.
-    }
+    try { localStorage.removeItem(this.key); } catch { /* local storage is optional */ }
   }
 }

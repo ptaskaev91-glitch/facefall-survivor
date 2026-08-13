@@ -1,8 +1,8 @@
-# Facefall Survivor
+# Супер Макар
 
-Mobile-first browser 3D survival shooter. The player can upload a photo and Facefall uses it locally as the hero's face.
+Mobile-first browser 3D family survival shooter. Супер Макар uses local photos for Макар, Супермама and Суперпапа.
 
-## Current generation — Engine Next 0.10.0
+## Current generation — Engine Next 0.12.0 · «Супер Макар»
 
 The active game is built with **TypeScript + Vite + npm Three.js** and targets both Android/mobile and desktop browsers.
 
@@ -82,3 +82,23 @@ With the production-core checklist closed, the next major visual gain is the aut
 Third-party code and vendored asset notices are tracked in `THIRD_PARTY_NOTICES.md`. Quaternius and Mesh2Motion asset folders retain provenance/license information; the shared Mesh2Motion zombie art source is CC0.
 
 The Facefall repository itself currently has no explicit public reuse license; selecting the project license remains an intentional pending decision rather than something inferred from third-party dependencies.
+
+---
+
+## 0.12.0 — «Супер Макар» family survival checkpoint (2026-08-14)
+
+- Игра переименована в **«Супер Макар»**.
+- Три независимых локальных фото: Супер Макар, Супермама, Суперпапа.
+- Фото персонажа отображается на увеличенной голове спереди и сзади для быстрой идентификации в TOP/3RD.
+- Супермама присоединяется после завершения 3-й волны (активна с wave 4), Суперпапа — после завершения 6-й (активен с wave 7).
+- Союзники следуют за Макаром, автоматически выбирают заражённых и ведут огонь.
+- Супермама получила отдельный процедурный силуэт/причёску; Суперпапа — отличимый масштаб корпуса. Новых внешних character assets для этого не добавлено.
+- Сложность масштабируется по номеру волны и количеству активных героев.
+- Добавлены zombie groan / pain / death WebAudio-эффекты.
+- За убийства выпадают монеты; монеты подбираются игроком. Награда: walker 2, runner 3, brute 5.
+- Магазин оружия: дробовик 20 монет, лук 30; до покупки оружие заблокировано.
+- Добавлены `FamilyCompanionSystem`, `CoinSystem`, семейный HUD/menu и regression coverage.
+- Семейный Playwright smoke загружает три разные тестовые фотографии, проверяет unlock/markers/shop и создаёт `mobile-super-makar-family.png`.
+- Финальный релизный gate: TypeScript strict, unit tests, Playwright browser/visual smoke, deploy build и sole deployment-root assertion.
+- Canonical source после merge: `main`. Продолжение разработки планируется отдельным этапом/перепиской.
+

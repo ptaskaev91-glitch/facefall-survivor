@@ -21,9 +21,10 @@ export class AudioSystem {
     this.cleanups.push(events.on('weaponReload', (event) => this.onReload(event.weaponId)));
     this.cleanups.push(events.on('hit', (event) => {
       if (event.targetId === 'player') this.pulse(88, 0.12, 0.06, 'sawtooth');
-      else this.noiseBurst(event.critical ? 0.11 : 0.06, event.critical ? 0.10 : 0.055, 1300);
+      else { this.noiseBurst(event.critical ? 0.11 : 0.06, event.critical ? 0.10 : 0.055, 1300); this.zombieVoice(event.critical ? 118 : 92, event.lethal ? 0.48 : 0.24, event.lethal ? 0.09 : 0.045); }
     }));
-    this.cleanups.push(events.on('kill', () => this.pulse(180, 0.08, 0.035, 'triangle')));
+    this.cleanups.push(events.on('kill', (event) => { if (event.targetId !== 'player') this.zombieVoice(70, 0.62, 0.11); this.pulse(180, 0.08, 0.035, 'triangle'); }));
+    this.cleanups.push(events.on('enemyGroan', (event) => { const base = event.kind === 'brute' ? 52 : event.kind === 'runner' ? 104 : 72; this.zombieVoice(base, event.kind === 'brute' ? 0.62 : 0.42, event.kind === 'brute' ? 0.055 : 0.035); }));
     this.cleanups.push(events.on('enemyAttack', (event) => {
       const base = event.kind === 'brute' ? 58 : event.kind === 'runner' ? 118 : 84;
       this.pulse(base, event.kind === 'brute' ? 0.19 : 0.11, event.kind === 'brute' ? 0.08 : 0.045, 'sawtooth');
@@ -145,6 +146,14 @@ export class AudioSystem {
     const strength = Math.max(0.25, Math.min(1, intensity));
     this.noiseBurst(0.72, 0.12 * strength, 240);
     this.pulse(42, 0.55, 0.09 * strength, 'sawtooth');
+  }
+
+  private zombieVoice(base: number, duration: number, gainValue: number): void {
+    const context = this.context; const master = this.master; if (!context || !master || context.state !== 'running') return;
+    const oscillator = context.createOscillator(); const gain = context.createGain(); const filter = context.createBiquadFilter(); const now = context.currentTime;
+    oscillator.type = 'sawtooth'; oscillator.frequency.setValueAtTime(base, now); oscillator.frequency.linearRampToValueAtTime(base * 0.72, now + duration * 0.55); oscillator.frequency.linearRampToValueAtTime(base * 0.9, now + duration);
+    filter.type = 'lowpass'; filter.frequency.value = 620; gain.gain.setValueAtTime(0.0001, now); gain.gain.exponentialRampToValueAtTime(gainValue, now + 0.035); gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    oscillator.connect(filter).connect(gain).connect(master); oscillator.start(now); oscillator.stop(now + duration + 0.02);
   }
 
   private pulse(frequency: number, duration: number, gainValue: number, type: OscillatorType): void {

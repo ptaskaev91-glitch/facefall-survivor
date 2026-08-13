@@ -18,6 +18,7 @@ test('weapon GLBs load lazily and hero exposes production combat reaction states
   await expect(page.locator('#status')).toContainText('state=playing', { timeout: 20_000 });
   await page.waitForTimeout(350);
   expect(weaponRequests).toHaveLength(0);
+  await page.evaluate(() => { const app=(window as any).__facefallApp; app.weaponSystem.unlock('shotgun'); app.weaponSystem.unlock('bow'); });
 
   // First WEAP selects shotgun: only shotgun GLB should be requested.
   await page.locator('#touchWeapon').dispatchEvent('pointerdown', { pointerId: 41, pointerType: 'touch', isPrimary: true });
