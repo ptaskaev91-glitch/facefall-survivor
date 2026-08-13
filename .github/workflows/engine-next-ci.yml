@@ -1,6 +1,7 @@
 name: Engine Next CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -36,33 +37,30 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: engine-next-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: 20
+          cache: npm
           cache-dependency-path: package-lock.json
-
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
-
       - name: Typecheck
         run: npm run typecheck
-
       - name: Unit tests
         run: npm run test:unit
-
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-
       - name: Browser smoke and visual checkpoints
         run: npm run test:smoke
-
       - name: Upload visual smoke screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -71,39 +69,36 @@ jobs:
           path: test-artifacts
           if-no-files-found: ignore
           retention-days: 3
-
       - name: Build Vercel bundle
         run: npm run build:deploy
-
       - name: Verify engine-next is sole deployment root
         run: |
           test -f dist-next/index.html
           test -f dist-next/engine-lab.html
           cmp -s dist-next/index.html dist-next/engine-lab.html
           test ! -e dist-next/legacy
-
       - name: Upload deploy artifact
         uses: actions/upload-artifact@v4
         with:
-          name: facefall-dist-next
+          name: facefall-engine-next
           path: dist-next
           if-no-files-found: error
-          retention-days: 3
-
+          retention-days: 7
       - name: Publish engine-next preview branch
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          rm -rf .preview-publish
-          mkdir .preview-publish
-          cp -R dist-next/. .preview-publish/
-          cd .preview-publish
+          set -euo pipefail
+          rm -rf .engine-next-preview
+          mkdir -p .engine-next-preview
+          cp -a dist-next/. .engine-next-preview/
+          cd .engine-next-preview
           git init
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b engine-next-preview
-          git add .
-          git commit -m "Engine next preview ${GITHUB_SHA}"
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "Engine next preview $GITHUB_SHA"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push --force origin engine-next-preview
