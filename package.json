@@ -13,10 +13,12 @@
     "test:smoke": "playwright test tests/smoke"
   },
   "dependencies": {
+    "recast-navigation": "0.43.1",
     "three": "0.160.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.0",
+    "@recast-navigation/three": "0.43.1",
     "@types/node": "^22.0.0",
     "@types/three": "0.160.0",
     "typescript": "^5.5.4",
