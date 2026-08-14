@@ -1,4 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
+
+const { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string };
 
 test('engine-next boots menu and starts a run without fatal page errors', async ({ page }) => {
   const pageErrors: string[] = [];
@@ -10,6 +13,8 @@ test('engine-next boots menu and starts a run without fatal page errors', async 
   await expect(menu).toHaveAttribute('data-visible', 'true');
   await expect(page.locator('#startGame')).toBeVisible();
   await expect(page.locator('#menuCamTop')).toHaveAttribute('data-active', 'true');
+  await expect(page.locator('.lab-badge')).toContainText(version);
+  await expect(page.locator('.menu-kicker')).toContainText(`ENGINE NEXT ${version}`);
 
   await page.locator('#startGame').click();
 

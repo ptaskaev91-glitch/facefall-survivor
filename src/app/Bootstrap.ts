@@ -3,6 +3,8 @@ import { AudioSystem } from '../presentation/audio/AudioSystem';
 import { GameApp, type GameAppDom } from './GameApp';
 import { ProductShell, resolveProductShellDom } from './ProductShell';
 
+declare const __FACEFALL_VERSION__: string;
+
 function required<T extends HTMLElement>(selector: string): T {
   const element = document.querySelector<T>(selector);
   if (!element) throw new Error(`Missing required DOM element: ${selector}`);
@@ -17,8 +19,8 @@ function markBuildUi(): void {
   const badge = document.querySelector<HTMLElement>('.lab-badge');
   const kicker = document.querySelector<HTMLElement>('.menu-kicker');
   const notes = [...document.querySelectorAll<HTMLElement>('.menu-note')];
-  if (badge) badge.textContent = 'СУПЕР МАКАР // 0.12.0 FAMILY SURVIVAL';
-  if (kicker) kicker.textContent = 'СУПЕР МАКАР · ENGINE NEXT 0.12.0';
+  if (badge) badge.textContent = `СУПЕР МАКАР // ${__FACEFALL_VERSION__} FAMILY SURVIVAL`;
+  if (kicker) kicker.textContent = `СУПЕР МАКАР · ENGINE NEXT ${__FACEFALL_VERSION__}`;
   if (notes[0]) {
     notes[0].textContent = 'Супер Макар начинает один. После 3-й волны присоединяется Супермама, после 6-й — Суперпапа. Загруженные фотографии остаются только в браузере и отображаются спереди и сзади увеличенной головы. За заражённых выпадают монеты: на них можно купить дробовик и лук.';
   }
