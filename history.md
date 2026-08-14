@@ -544,3 +544,16 @@ PR #28 replaces the active procedural environment with an authored GLB level whi
 - Финальный релизный gate: TypeScript strict, unit tests, Playwright browser/visual smoke, deploy build и sole deployment-root assertion.
 - Canonical source после merge: `main`. Продолжение разработки планируется отдельным этапом/перепиской.
 
+## 0.13.0 — Offline Recast navigation (2026-08-14)
+
+- Continued from the stable 0.12.0 «Супер Макар» checkpoint on `main`.
+- Added `RecastNavigationQuery` as a mobile-safe adapter behind the existing navigation abstraction.
+- Added per-enemy path caching/repath throttling so Detour is not queried for every infected every frame.
+- Added Node/build-time navmesh baking from `public/assets/levels/abandoned-outskirts/level.glb`.
+- Browser runtime imports the baked binary and runs path queries only; navmesh generation never runs per phone.
+- Authored north/west enemy spawn → player-start traversability is validated during the bake.
+- `GameApp` switches infected navigation to Recast only after successful authored-level/navmesh load and otherwise preserves `CollisionNavigationQuery`.
+- HUD exposes `nav=recast` / `nav=collision` for smoke/debug verification.
+- Added unit and Playwright regression coverage; browser smoke has verified real Recast activation.
+- Added pinned `recast-navigation@0.43.1` and `@recast-navigation/three@0.43.1` plus MIT notice.
+- Development PR: #32.
