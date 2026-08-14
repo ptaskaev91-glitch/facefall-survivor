@@ -53,13 +53,24 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Refresh dependency lock
         run: npm install --package-lock-only --no-audit --no-fund
-      - name: Upload refreshed dependency lock
-        uses: actions/upload-artifact@v4
-        with:
-          name: refreshed-package-lock
-          path: package-lock.json
-          if-no-files-found: error
-          retention-days: 1
+      - name: Commit refreshed dependency lock to feature branch
+        if: github.event_name == 'pull_request' && github.head_ref == 'agent/0.13-recast-runtime'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cp package-lock.json /tmp/package-lock.json
+          git fetch origin "$GITHUB_HEAD_REF"
+          git checkout -B "$GITHUB_HEAD_REF" "origin/$GITHUB_HEAD_REF"
+          cp /tmp/package-lock.json package-lock.json
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "build: lock Recast dependencies"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+            git push origin "$GITHUB_HEAD_REF"
+          fi
       - name: Install refreshed locked dependencies
         run: npm ci --no-audit --no-fund
       - name: Typecheck
