@@ -46,11 +46,86 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: package-lock.json
+      - name: Finalize 0.13 docs and lock on feature branch
+        if: github.event_name == 'pull_request' && github.head_ref == 'agent/0.13-recast-runtime'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          npm install --package-lock-only --no-audit --no-fund
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          function appendOnce(path, marker, text) {
+            const current = readFileSync(path, 'utf8');
+            if (!current.includes(marker)) writeFileSync(path, `${current.trimEnd()}\n\n${text.trim()}\n`);
+          }
+          appendOnce('dev.md', '## 0.13.0 — Recast navigation checkpoint', `
+          ## 0.13.0 — Recast navigation checkpoint
+
+          > This checkpoint is authoritative and supersedes stale unchecked authored-level/Recast items earlier in this file.
+
+          - [x] Authored `Abandoned Outskirts` GLB is the active production level.
+          - [x] Offline Recast/Detour navmesh bake from the authored GLB.
+          - [x] Browser-compatible runtime import; no phone-side navmesh generation.
+          - [x] `RecastNavigationQuery` behind the existing `NavigationQuery` boundary.
+          - [x] Per-enemy path cache with bounded repath cadence and target-displacement invalidation.
+          - [x] Collision-navigation fallback when Recast/WASM/navmesh is unavailable.
+          - [x] Unit tests for cache/repath/fallback and Playwright smoke asserting `nav=recast`.
+          - [x] Recast dependency/license registration and reproducible npm lock.
+
+          Next ordered AI work:
+          - [ ] final LOS/perception policy;
+          - [ ] weapon/noise perception;
+          - [ ] target stickiness/hysteresis;
+          - [ ] AI/path update LOD;
+          - [ ] optional nav debug overlay for development only.
+          `);
+          appendOnce('history.md', '## 0.13.0 — Offline Recast navigation', `
+          ## 0.13.0 — Offline Recast navigation (2026-08-14)
+
+          - Continued from the stable 0.12.0 «Супер Макар» checkpoint on `main`.
+          - Added `RecastNavigationQuery` as a mobile-safe adapter behind the existing navigation abstraction.
+          - Added per-enemy path caching/repath throttling so Detour is not queried for every infected every frame.
+          - Added Node/build-time navmesh baking from `public/assets/levels/abandoned-outskirts/level.glb`.
+          - Browser runtime imports the baked binary and runs path queries only; navmesh generation never runs per phone.
+          - Authored north/west enemy spawn → player-start traversability is validated during the bake.
+          - `GameApp` switches infected navigation to Recast only after successful authored-level/navmesh load and otherwise preserves `CollisionNavigationQuery`.
+          - HUD exposes `nav=recast` / `nav=collision` for smoke/debug verification.
+          - Added unit and Playwright regression coverage; browser smoke has verified real Recast activation.
+          - Added pinned `recast-navigation@0.43.1` and `@recast-navigation/three@0.43.1` plus MIT notice.
+          - Development PR: #32.
+          `);
+          appendOnce('structure.md', '## Engine Next 0.13.0 current navigation structure', `
+          ## Engine Next 0.13.0 current navigation structure
+
+          The current navigation stack is now:
+
+          - `src/navigation/NavigationQuery.ts` — gameplay-facing navigation contract;
+          - `src/navigation/CollisionNavigationQuery.ts` — robust fallback / temporary obstacle steering;
+          - `src/navigation/RecastNavigationQuery.ts` — cached per-enemy Detour waypoint adapter;
+          - `src/navigation/RecastRuntimeNavigation.ts` — browser/WASM navmesh import and provider lifecycle;
+          - `src/navigation/LocalAvoidance.ts` + `SpatialHash` — local crowd separation remains independent of global pathfinding;
+          - `scripts/bake-navmesh.mjs` — Node-only offline navmesh generation and authored-spawn path probes;
+          - generated `public/assets/levels/abandoned-outskirts/navmesh.bin` — build artifact, intentionally Git-ignored.
+
+          `EnemySystem` remains Recast-agnostic. `GameApp` owns the lifecycle switch between Recast and collision fallback after level load. This is the source-of-truth structure for 0.13.0; older target-only Recast notes above should be read as completed history.
+          `);
+          NODE
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add package-lock.json dev.md history.md structure.md
+          if ! git diff --cached --quiet; then
+            git commit -m "docs: finalize 0.13.0 checkpoint"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+            git push origin "$GITHUB_HEAD_REF"
+          fi
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
       - name: Typecheck
