@@ -7,12 +7,23 @@ import { exportNavMesh, init, NavMeshQuery } from 'recast-navigation';
 import { threeToSoloNavMesh } from '@recast-navigation/three';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const sourcePath = resolve(root, 'public/assets/levels/abandoned-outskirts/level.glb');
-const outputPath = resolve(root, 'public/assets/levels/abandoned-outskirts/navmesh.bin');
+const levelRoot = resolve(root, 'public/assets/levels/abandoned-outskirts');
+const sourcePath = resolve(levelRoot, 'level.glb');
+const manifestPath = resolve(levelRoot, 'level.manifest.json');
+const outputPath = resolve(levelRoot, 'navmesh.bin');
 
 await init();
 
-const source = await readFile(sourcePath);
+const [source, manifestText] = await Promise.all([
+  readFile(sourcePath),
+  readFile(manifestPath, 'utf8'),
+]);
+const manifest = JSON.parse(manifestText);
+const playerSpawn = manifest.markers?.find((marker) => marker.kind === 'player-spawn');
+const enemySpawns = manifest.markers?.filter((marker) => marker.kind === 'enemy-spawn') ?? [];
+if (!playerSpawn?.position) throw new Error('Abandoned Outskirts manifest has no player-spawn marker');
+if (enemySpawns.length === 0) throw new Error('Abandoned Outskirts manifest has no enemy-spawn markers');
+
 const arrayBuffer = source.buffer.slice(source.byteOffset, source.byteOffset + source.byteLength);
 const loader = new GLTFLoader();
 const gltf = await new Promise((resolveGltf, reject) => loader.parse(arrayBuffer, '', resolveGltf, reject));
@@ -57,25 +68,23 @@ if (!result.success || !result.navMesh) {
 const query = new NavMeshQuery(result.navMesh, { maxNodes: 4096 });
 query.defaultQueryHalfExtents = { x: 2.5, y: 3, z: 2.5 };
 
-const probes = [
-  [{ x: 0, y: 0, z: -28 }, { x: 0, y: 0, z: 10 }, 'north-spawn'],
-  [{ x: -24, y: 0, z: -8 }, { x: 0, y: 0, z: 10 }, 'west-spawn'],
-];
-
-for (const [start, end, label] of probes) {
-  const projectedStart = query.findClosestPoint(start);
-  const projectedEnd = query.findClosestPoint(end);
+for (const spawn of enemySpawns) {
+  if (!spawn.position) throw new Error(`Enemy spawn ${spawn.id ?? '<unnamed>'} has no position`);
+  const projectedStart = query.findClosestPoint(spawn.position);
+  const projectedEnd = query.findClosestPoint(playerSpawn.position);
   if (!projectedStart.success || !projectedEnd.success) {
-    throw new Error(`Recast navmesh probe ${label} could not project start/end`);
+    throw new Error(`Recast navmesh probe ${spawn.id ?? '<unnamed>'} could not project start/end`);
   }
   const path = query.computePath(projectedStart.point, projectedEnd.point);
   if (!path.success || path.path.length < 2) {
-    throw new Error(`Recast navmesh probe ${label} has no traversable path`);
+    throw new Error(`Recast navmesh probe ${spawn.id ?? '<unnamed>'} has no traversable path to player start`);
   }
 }
 
 const bytes = exportNavMesh(result.navMesh);
 await writeFile(outputPath, bytes);
 
+query.destroy();
+result.navMesh.destroy();
 for (const mesh of meshes) mesh.geometry.dispose();
-console.log(`Facefall navmesh baked: ${bytes.byteLength} bytes · meshes=${meshes.length} · probes=${probes.length}`);
+console.log(`Facefall navmesh baked: ${bytes.byteLength} bytes · meshes=${meshes.length} · spawnProbes=${enemySpawns.length}`);
