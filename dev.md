@@ -602,3 +602,22 @@ Next: offline Recast navigation over the authored level, then realistic art repl
 - Финальный релизный gate: TypeScript strict, unit tests, Playwright browser/visual smoke, deploy build и sole deployment-root assertion.
 - Canonical source после merge: `main`. Продолжение разработки планируется отдельным этапом/перепиской.
 
+## 0.13.0 — Recast navigation checkpoint
+
+> This checkpoint is authoritative and supersedes stale unchecked authored-level/Recast items earlier in this file.
+
+- [x] Authored `Abandoned Outskirts` GLB is the active production level.
+- [x] Offline Recast/Detour navmesh bake from the authored GLB.
+- [x] Browser-compatible runtime import; no phone-side navmesh generation.
+- [x] `RecastNavigationQuery` behind the existing `NavigationQuery` boundary.
+- [x] Per-enemy path cache with bounded repath cadence and target-displacement invalidation.
+- [x] Collision-navigation fallback when Recast/WASM/navmesh is unavailable.
+- [x] Unit tests for cache/repath/fallback and Playwright smoke asserting `nav=recast`.
+- [x] Recast dependency/license registration and reproducible npm lock.
+
+Next ordered AI work:
+- [ ] final LOS/perception policy;
+- [ ] weapon/noise perception;
+- [ ] target stickiness/hysteresis;
+- [ ] AI/path update LOD;
+- [ ] optional nav debug overlay for development only.

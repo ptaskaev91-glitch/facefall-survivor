@@ -654,3 +654,16 @@ src/
 - Финальный релизный gate: TypeScript strict, unit tests, Playwright browser/visual smoke, deploy build и sole deployment-root assertion.
 - Canonical source после merge: `main`. Продолжение разработки планируется отдельным этапом/перепиской.
 
+## Engine Next 0.13.0 current navigation structure
+
+The current navigation stack is now:
+
+- `src/navigation/NavigationQuery.ts` — gameplay-facing navigation contract;
+- `src/navigation/CollisionNavigationQuery.ts` — robust fallback / temporary obstacle steering;
+- `src/navigation/RecastNavigationQuery.ts` — cached per-enemy Detour waypoint adapter;
+- `src/navigation/RecastRuntimeNavigation.ts` — browser/WASM navmesh import and provider lifecycle;
+- `src/navigation/LocalAvoidance.ts` + `SpatialHash` — local crowd separation remains independent of global pathfinding;
+- `scripts/bake-navmesh.mjs` — Node-only offline navmesh generation and authored-spawn path probes;
+- generated `public/assets/levels/abandoned-outskirts/navmesh.bin` — build artifact, intentionally Git-ignored.
+
+`EnemySystem` remains Recast-agnostic. `GameApp` owns the lifecycle switch between Recast and collision fallback after level load. This is the source-of-truth structure for 0.13.0; older target-only Recast notes above should be read as completed history.

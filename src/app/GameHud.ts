@@ -17,6 +17,7 @@ export interface HudSnapshot {
   score: number;
   qualityId: string;
   cameraMode: string;
+  navigationMode: string;
   weaponLabel: string;
   magazine: number;
   reserve: number;
@@ -56,6 +57,7 @@ export class GameHud {
       `score=${snapshot.score}`,
       `quality=${snapshot.qualityId}`,
       `camera=${snapshot.cameraMode}`,
+      `nav=${snapshot.navigationMode}`,
       `${snapshot.weaponLabel} ${snapshot.magazine}/${snapshot.reserve}`,
       `enemies=${snapshot.activeEnemies}/${snapshot.maxActiveEnemies}`,
       `pickups=${snapshot.pickups}`,

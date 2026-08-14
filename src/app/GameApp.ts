@@ -21,6 +21,7 @@ import { InputManager } from '../input/InputManager';
 import { KeyboardMouseInput } from '../input/KeyboardMouseInput';
 import { TouchInput } from '../input/TouchInput';
 import { CollisionNavigationQuery } from '../navigation/CollisionNavigationQuery';
+import { loadRecastNavigation, type LoadedRecastNavigation } from '../navigation/RecastRuntimeNavigation';
 import { PickupSystem } from '../pickups/PickupSystem';
 import { PlayerRuntime } from '../player/PlayerRuntime';
 import { WaveDirector } from '../waves/WaveDirector';
@@ -93,6 +94,9 @@ export class GameApp {
   private readonly waveDirector = new WaveDirector();
   private readonly family: FamilyCompanionSystem;
   private readonly coinSystem: CoinSystem;
+  private readonly collisionNavigation: CollisionNavigationQuery;
+  private recastNavigation: LoadedRecastNavigation | null = null;
+  private navigationMode: 'collision' | 'recast' = 'collision';
   private coins = 0;
   private readonly aimAssist = new AimAssist();
   private readonly maxActiveEnemies: number;
@@ -124,6 +128,7 @@ export class GameApp {
     this.player = new PlayerRuntime(this.world.scene, this.quality);
     this.hud = new GameHud(this.dom);
     this.keyboard = new KeyboardMouseInput(this.input);
+    this.collisionNavigation = new CollisionNavigationQuery(this.world.collisionWorld);
 
     this.lightPool = new LightPool(this.world.scene, Math.max(1, this.quality.maxDynamicLights));
     this.runtimeFx = new RuntimeFx(this.world.scene, this.quality.id === 'mobile-low' ? 220 : 360, this.quality.id === 'mobile-low' ? 48 : 80);
@@ -146,7 +151,7 @@ export class GameApp {
     });
     this.unregisterPlayerDamage = this.damageSystem.register({ id: 'player', health: this.playerHealth });
 
-    this.enemySystem.setNavigationQuery(new CollisionNavigationQuery(this.world.collisionWorld));
+    this.enemySystem.setNavigationQuery(this.collisionNavigation);
     this.combat = new CombatRuntime({
       events: this.events,
       damageSystem: this.damageSystem,
@@ -205,6 +210,7 @@ export class GameApp {
     window.removeEventListener('resize', this.onResize); document.removeEventListener('visibilitychange', this.onVisibilityChange);
     for (const unsubscribe of this.unsubscribeEvents.splice(0)) unsubscribe();
     this.combat.dispose(); this.unregisterPlayerDamage(); this.waveDirector.stop(); this.family.dispose(); this.coinSystem.dispose(); this.enemySystem.reset(); this.pickups.dispose();
+    this.recastNavigation?.dispose(); this.recastNavigation = null;
     this.projectileVisuals.dispose(); this.runtimeFx.dispose(); this.lightPool.dispose(); this.player.dispose(); this.world.dispose(); this.events.clear();
     this.dom.app.replaceChildren(); if (!this.state.is('disposed')) this.state.transition('disposed');
   }
@@ -292,6 +298,21 @@ export class GameApp {
   private async loadLevelManifest(): Promise<void> {
     const loaded = await this.world.loadManifest(); this.manifest = loaded.manifest; this.levelId = loaded.levelId;
     this.waveDirector.configure(loaded.manifest.markers); this.pickups.configure(loaded.manifest.markers);
+    await this.configureNavigation(loaded.levelId);
+  }
+
+  private async configureNavigation(levelId: string): Promise<void> {
+    this.recastNavigation?.dispose(); this.recastNavigation = null;
+    this.navigationMode = 'collision'; this.enemySystem.setNavigationQuery(this.collisionNavigation);
+    if (levelId !== 'abandoned-outskirts') return;
+
+    try {
+      const loaded = await loadRecastNavigation('/assets/levels/abandoned-outskirts/navmesh.bin', this.collisionNavigation);
+      if (this.disposed) { loaded.dispose(); return; }
+      this.recastNavigation = loaded; this.navigationMode = 'recast'; this.enemySystem.setNavigationQuery(loaded.query);
+    } catch (error) {
+      console.warn('Facefall: offline Recast navmesh unavailable, keeping collision navigation', error);
+    }
   }
 
   private resetRun(): void {
@@ -352,7 +373,7 @@ export class GameApp {
     if (this.dom.buyBow) { this.dom.buyBow.textContent = this.weaponSystem.isUnlocked('bow') ? 'ЛУК ✓' : 'ЛУК · 30'; this.dom.buyBow.disabled = !this.weaponSystem.isUnlocked('bow') && this.coins < 30; }
     const runtime = this.weaponSystem.runtime();
     this.hud.refresh({ state: this.state.current, levelId: this.levelId, hp: this.playerHealth.value, wave: this.waveDirector.wave, kills: this.session.kills, score: this.session.score,
-      qualityId: this.quality.id, cameraMode: this.cameraMode, weaponLabel: WEAPONS[this.weaponSystem.selected].label, magazine: runtime.magazine, reserve: runtime.reserve,
+      qualityId: this.quality.id, cameraMode: this.cameraMode, navigationMode: this.navigationMode, weaponLabel: WEAPONS[this.weaponSystem.selected].label, magazine: runtime.magazine, reserve: runtime.reserve,
       activeEnemies: this.enemySystem.activeCount, maxActiveEnemies: this.maxActiveEnemies, pickups: this.pickups.activeCount, projectiles: this.projectileSystem.active().length,
       spatialCells: this.enemySystem.occupiedCellCount, aimAssistStrength: this.aimAssistStrength, effectRecipeCount: Object.keys(EFFECTS).length });
   }
