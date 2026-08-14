@@ -4,7 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "bake:navmesh": "node scripts/bake-navmesh.mjs",
+    "predev:next": "npm run bake:navmesh",
     "dev:next": "vite --config vite.config.ts",
+    "prebuild:next": "npm run bake:navmesh",
     "build:next": "vite build --config vite.config.ts",
     "build:deploy": "npm run build:next && node scripts/promote-engine-next.mjs",
     "preview:next": "vite preview --config vite.config.ts",
