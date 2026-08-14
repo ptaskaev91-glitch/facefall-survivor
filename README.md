@@ -2,7 +2,7 @@
 
 Mobile-first browser 3D family survival shooter. Супер Макар uses local photos for Макар, Супермама and Суперпапа.
 
-## Current generation — Engine Next 0.12.0 · «Супер Макар»
+## Current generation — Engine Next 0.13.0 · «Супер Макар»
 
 The active game is built with **TypeScript + Vite + npm Three.js** and targets both Android/mobile and desktop browsers.
 
@@ -15,9 +15,23 @@ Current gameplay foundation:
 - recoil, movement-dependent spread, stagger and authored body-part hit zones;
 - Walker / Runner / Brute production-infected presentations built from one cached CC0 rigged zombie source with distinct silhouettes, gait and combat reactions;
 - waves, HP, score, kills, health/ammo pickups and game-over/restart;
-- obstacle collision, SpatialHash/local avoidance and navigation abstraction;
+- authored **Abandoned Outskirts** GLB level with static collision and gameplay manifest;
+- offline-baked **Recast/Detour** navmesh for the authored level, imported in-browser with collision-navigation fallback;
+- per-enemy cached path queries with repath throttling, plus SpatialHash/local avoidance;
 - rain, fog, storm/lightning, grass, pooled particles/decals/lights and procedural Web Audio;
 - strict TypeScript, reproducible `npm ci`, unit tests and Playwright desktop/mobile visual smoke gates.
+
+### 0.13.0 navigation milestone
+
+The Recast pass replaces the temporary authored-level steering path with a mobile-safe navigation foundation:
+
+- `scripts/bake-navmesh.mjs` builds the Abandoned Outskirts navmesh in Node before dev/build;
+- the browser never generates the navmesh on the phone: it imports the generated `navmesh.bin` and performs Detour queries only;
+- `RecastNavigationQuery` sits behind the existing `NavigationQuery` interface, so `EnemySystem` does not depend on Recast/WASM directly;
+- paths are cached per enemy and are refreshed on a bounded interval or when the target moves far enough;
+- if the navmesh/WASM import fails, gameplay keeps using `CollisionNavigationQuery` instead of failing the run;
+- CI/browser smoke asserts that the authored level reaches `nav=recast` and can return a finite waypoint;
+- the build-time bake validates traversable paths from the authored north/west enemy spawns to the player start.
 
 ### 0.10.0 production core milestone
 
@@ -49,7 +63,7 @@ Canonical architecture and roadmap live in:
 
 The current direction is:
 
-`TypeScript + Vite + Three.js + GLB/glTF + Octree/Capsule + SpatialHash/local avoidance + NavigationQuery/Recast target + event-driven combat/presentation + bounded/lazy assets + pooled FX + mobile-first controls`.
+`TypeScript + Vite + Three.js + GLB/glTF + Octree/Capsule + Recast/Detour NavigationQuery + SpatialHash/local avoidance + event-driven combat/presentation + bounded/lazy assets + pooled FX + mobile-first controls`.
 
 ## Development
 
@@ -57,6 +71,8 @@ The current direction is:
 npm ci
 npm run dev:next
 ```
+
+`npm run dev:next` and `npm run build:next` automatically run the offline navmesh bake first. The generated `public/assets/levels/abandoned-outskirts/navmesh.bin` is intentionally ignored by Git and is reproduced from the authored level during development/build.
 
 Useful checks:
 
@@ -75,15 +91,26 @@ GitHub is the source repository. The intended production target is Vercel. Until
 
 ## Next major product work
 
-With the production-core checklist closed, the next major visual gain is the authored **Abandoned Outskirts** level, followed by offline Recast navigation, Face System 2.0 polish and final HUD/performance work.
+With the authored level and Recast navigation now active, the next ordered work is **final LOS/perception and AI update LOD**, followed by Face System 2.0 polish and final HUD/performance work.
 
 ## Asset / source licensing
 
-Third-party code and vendored asset notices are tracked in `THIRD_PARTY_NOTICES.md`. Quaternius and Mesh2Motion asset folders retain provenance/license information; the shared Mesh2Motion zombie art source is CC0.
+Third-party code and vendored asset notices are tracked in `THIRD_PARTY_NOTICES.md`. Quaternius and Mesh2Motion asset folders retain provenance/license information; the shared Mesh2Motion zombie art source is CC0. Recast Navigation JS is used under MIT and is registered in the notices.
 
 The Facefall repository itself currently has no explicit public reuse license; selecting the project license remains an intentional pending decision rather than something inferred from third-party dependencies.
 
 ---
+
+## 0.13.0 — offline Recast navigation checkpoint (2026-08-14)
+
+- Abandoned Outskirts remains the canonical authored production level.
+- Added offline Recast/Detour navmesh bake from the authored GLB.
+- Added browser runtime import of the baked navmesh; no per-phone runtime navmesh generation.
+- `EnemySystem` is switched to `RecastNavigationQuery` only after successful authored-level/navmesh load, with collision-navigation fallback.
+- Recast paths are cached per enemy and repathed at a bounded cadence / meaningful target displacement.
+- HUD debug status exposes `nav=recast` / `nav=collision`.
+- Added unit coverage for path caching/repath/fallback and mobile browser smoke for real Recast activation.
+- Added pinned `recast-navigation@0.43.1` and `@recast-navigation/three@0.43.1` with locked dependencies and notices.
 
 ## 0.12.0 — «Супер Макар» family survival checkpoint (2026-08-14)
 
@@ -100,5 +127,4 @@ The Facefall repository itself currently has no explicit public reuse license; s
 - Добавлены `FamilyCompanionSystem`, `CoinSystem`, семейный HUD/menu и regression coverage.
 - Семейный Playwright smoke загружает три разные тестовые фотографии, проверяет unlock/markers/shop и создаёт `mobile-super-makar-family.png`.
 - Финальный релизный gate: TypeScript strict, unit tests, Playwright browser/visual smoke, deploy build и sole deployment-root assertion.
-- Canonical source после merge: `main`. Продолжение разработки планируется отдельным этапом/перепиской.
-
+- Canonical source после merge: `main`.
