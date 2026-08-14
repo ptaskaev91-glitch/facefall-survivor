@@ -1,6 +1,6 @@
 # Third-party notices
 
-Facefall Survivor primarily contains original project code. Where a small compatible implementation is directly adapted from an external permissively licensed project, or a production-direction asset is vendored from an external source, the source and license are recorded here.
+Facefall Survivor primarily contains original project code. Where a small compatible implementation is directly adapted from an external permissively licensed project, a runtime dependency is introduced, or a production-direction asset is vendored from an external source, the source and license are recorded here.
 
 ## Web-Based First Person Shooter Engine (`ivanoskov/shooter`)
 
@@ -38,6 +38,17 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+## Recast Navigation JS
+
+Source: `https://github.com/isaac-mason/recast-navigation-js`  
+Packages used by Engine Next 0.13.0: `recast-navigation@0.43.1`, `@recast-navigation/three@0.43.1`.
+
+Facefall uses Recast/Detour for the authored Abandoned Outskirts navigation layer. Navmesh generation runs in Node during development/build (`scripts/bake-navmesh.mjs`); mobile/browser clients import the generated binary and execute path queries only.
+
+License: **MIT**.
 
 ---
 
