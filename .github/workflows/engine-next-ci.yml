@@ -60,13 +60,16 @@ jobs:
         run: |
           set -euo pipefail
           npm install --package-lock-only --no-audit --no-fund
-          node --input-type=module <<'NODE'
-          import { readFileSync, writeFileSync } from 'node:fs';
-          function appendOnce(path, marker, text) {
-            const current = readFileSync(path, 'utf8');
-            if (!current.includes(marker)) writeFileSync(path, `${current.trimEnd()}\n\n${text.trim()}\n`);
-          }
-          appendOnce('dev.md', '## 0.13.0 — Recast navigation checkpoint', `
+          python3 <<'PY'
+          from pathlib import Path
+
+          def append_once(path, marker, text):
+              p = Path(path)
+              current = p.read_text()
+              if marker not in current:
+                  p.write_text(current.rstrip() + "\n\n" + text.strip() + "\n")
+
+          append_once('dev.md', '## 0.13.0 — Recast navigation checkpoint', '''
           ## 0.13.0 — Recast navigation checkpoint
 
           > This checkpoint is authoritative and supersedes stale unchecked authored-level/Recast items earlier in this file.
@@ -86,8 +89,9 @@ jobs:
           - [ ] target stickiness/hysteresis;
           - [ ] AI/path update LOD;
           - [ ] optional nav debug overlay for development only.
-          `);
-          appendOnce('history.md', '## 0.13.0 — Offline Recast navigation', `
+          ''')
+
+          append_once('history.md', '## 0.13.0 — Offline Recast navigation', '''
           ## 0.13.0 — Offline Recast navigation (2026-08-14)
 
           - Continued from the stable 0.12.0 «Супер Макар» checkpoint on `main`.
@@ -101,8 +105,9 @@ jobs:
           - Added unit and Playwright regression coverage; browser smoke has verified real Recast activation.
           - Added pinned `recast-navigation@0.43.1` and `@recast-navigation/three@0.43.1` plus MIT notice.
           - Development PR: #32.
-          `);
-          appendOnce('structure.md', '## Engine Next 0.13.0 current navigation structure', `
+          ''')
+
+          append_once('structure.md', '## Engine Next 0.13.0 current navigation structure', '''
           ## Engine Next 0.13.0 current navigation structure
 
           The current navigation stack is now:
@@ -116,8 +121,8 @@ jobs:
           - generated `public/assets/levels/abandoned-outskirts/navmesh.bin` — build artifact, intentionally Git-ignored.
 
           `EnemySystem` remains Recast-agnostic. `GameApp` owns the lifecycle switch between Recast and collision fallback after level load. This is the source-of-truth structure for 0.13.0; older target-only Recast notes above should be read as completed history.
-          `);
-          NODE
+          ''')
+          PY
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add package-lock.json dev.md history.md structure.md
