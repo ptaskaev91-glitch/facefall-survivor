@@ -10,6 +10,8 @@ test('engine-next boots menu and starts a run without fatal page errors', async 
   await expect(menu).toHaveAttribute('data-visible', 'true');
   await expect(page.locator('#startGame')).toBeVisible();
   await expect(page.locator('#menuCamTop')).toHaveAttribute('data-active', 'true');
+  await expect(page.locator('.lab-badge')).toContainText('0.13.0');
+  await expect(page.locator('.menu-kicker')).toContainText('ENGINE NEXT 0.13.0');
 
   await page.locator('#startGame').click();
 
