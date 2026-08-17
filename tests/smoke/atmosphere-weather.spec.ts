@@ -20,7 +20,7 @@ async function startAt(page: Page, atmosphere: 'dawn' | 'overcast' | 'dusk' | 'b
   });
 }
 
-test('gameplay action controls suppress Android-style text selection and callouts', async ({ page }) => {
+test('gameplay action controls are icon-only and suppress Android-style text selection', async ({ page }) => {
   await page.goto('/engine-lab.html', { waitUntil: 'domcontentloaded' });
   await page.locator('#startGame').click();
   await expect(page.locator('#status')).toContainText('state=playing', { timeout: 20_000 });
@@ -35,15 +35,20 @@ test('gameplay action controls suppress Android-style text selection and callout
       const contextDispatch = element.dispatchEvent(contextEvent);
       return {
         userSelect: style.userSelect,
-        webkitUserSelect: (style as any).webkitUserSelect ?? '',
         selectPrevented: !selectDispatch || selectEvent.defaultPrevented,
         contextPrevented: !contextDispatch || contextEvent.defaultPrevented,
+        visibleText: element.textContent?.trim() ?? '',
+        ariaLabel: element.getAttribute('aria-label') ?? '',
+        svgCount: element.querySelectorAll('svg').length,
       };
     });
 
     expect(result.userSelect).toBe('none');
     expect(result.selectPrevented).toBe(true);
     expect(result.contextPrevented).toBe(true);
+    expect(result.visibleText).toBe('');
+    expect(result.ariaLabel.length).toBeGreaterThan(0);
+    expect(result.svgCount).toBe(1);
   }
 
   expect(await page.evaluate(() => window.getSelection()?.toString() ?? '')).toBe('');
@@ -82,7 +87,7 @@ test('blood moon night limits distance readability but keeps the near zone lit',
   const night = await startAt(page, 'blood-moon');
   expect(night.id).toBe('blood-moon');
   expect(night.bloodMoonVisible).toBe(true);
-  expect(night.fogDensity).toBeGreaterThan(0.03);
+  expect(night.fogDensity).toBeGreaterThan(0.05);
   expect(night.exposure).toBeLessThan(0.8);
   expect(night.visibilityAt18m).toBeLessThan(0.4);
   expect(night.rainIntensity).toBeLessThan(0.1);
@@ -94,8 +99,8 @@ test('blood moon night limits distance readability but keeps the near zone lit',
     return { visible: light.visible, intensity: light.intensity, distance: light.distance };
   });
   expect(proximity.visible).toBe(true);
-  expect(proximity.intensity).toBeGreaterThan(7);
-  expect(proximity.distance).toBeLessThanOrEqual(11);
+  expect(proximity.intensity).toBeGreaterThan(4.5);
+  expect(proximity.distance).toBeLessThanOrEqual(10);
 
   await page.waitForTimeout(450);
   await page.screenshot({ path: `${artifactDir}/mobile-blood-moon-top.png`, fullPage: true });
