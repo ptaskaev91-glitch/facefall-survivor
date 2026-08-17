@@ -62,6 +62,8 @@ export class DebugPerformanceOverlay {
   private frames = 0;
   private frameMsTotal = 0;
   private frameMsMax = 0;
+  private totalLosQueries = 0;
+  private totalNavRequests = 0;
   private disposed = false;
   private restoreLos: (() => void) | null = null;
   private restoreSetNavigation: (() => void) | null = null;
@@ -117,6 +119,8 @@ export class DebugPerformanceOverlay {
     this.element.dataset.activeEnemies = String(enemySystem.activeCount);
     this.element.dataset.losPerSecond = (this.counters.losQueries / seconds).toFixed(1);
     this.element.dataset.navPerSecond = (this.counters.navRequests / seconds).toFixed(1);
+    this.element.dataset.losTotal = String(this.totalLosQueries);
+    this.element.dataset.navTotal = String(this.totalNavRequests);
     this.element.dataset.navigation = this.runtime.navigationMode;
 
     this.element.textContent = [
@@ -141,6 +145,7 @@ export class DebugPerformanceOverlay {
     const original = this.runtime.canEnemySeeTarget.bind(this.runtime);
     this.runtime.canEnemySeeTarget = (...args: any[]): boolean => {
       this.counters.losQueries += 1;
+      this.totalLosQueries += 1;
       const visible = original(...args);
       if (!visible) this.counters.losBlocked += 1;
       return visible;
@@ -166,6 +171,7 @@ export class DebugPerformanceOverlay {
     const original = navigation.nextWaypoint.bind(navigation);
     navigation.nextWaypoint = (...args: any[]): any => {
       this.counters.navRequests += 1;
+      this.totalNavRequests += 1;
       return original(...args);
     };
   }
@@ -186,6 +192,8 @@ export class DebugPerformanceOverlay {
     element.id = 'debugPerformance';
     element.dataset.visible = 'true';
     element.dataset.samples = '0';
+    element.dataset.losTotal = '0';
+    element.dataset.navTotal = '0';
     element.setAttribute('role', 'status');
     element.setAttribute('aria-label', 'Facefall performance metrics');
     Object.assign(element.style, {
