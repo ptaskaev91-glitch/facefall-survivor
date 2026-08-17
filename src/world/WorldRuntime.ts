@@ -94,7 +94,7 @@ export class WorldRuntime {
     this.grass.update(this.camera.position);
     this.rain.update(dt, playerPosition);
     this.haze.update(dt, playerPosition);
-    this.atmosphere.updateSkyPosition();
+    this.atmosphere.updatePresentationAnchor(playerPosition);
   }
 
   render(): void { this.renderer.render(this.scene, this.camera); }
