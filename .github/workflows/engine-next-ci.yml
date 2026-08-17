@@ -69,6 +69,15 @@ jobs:
               if marker not in current:
                   p.write_text(current.rstrip() + "\n\n" + text.strip() + "\n")
 
+          def replace_required(path, old, new):
+              p = Path(path)
+              current = p.read_text()
+              if new in current:
+                  return
+              if old not in current:
+                  raise RuntimeError(f'missing expected text in {path}: {old}')
+              p.write_text(current.replace(old, new, 1))
+
           append_once('dev.md', '## 0.14.0 — infected perception + AI LOD checkpoint', '''
           ## 0.14.0 — infected perception + AI LOD checkpoint (2026-08-17)
 
@@ -119,12 +128,33 @@ jobs:
 
           Recast remains the global pathfinding layer and is still hidden behind `NavigationQuery`. LOS uses collision geometry, not navmesh. Expensive LOS/path/crowd queries are distance-throttled, while actor velocity integration and animation remain fixed-step.
           ''')
+
+          replace_required(
+              'src/enemies/EnemySystem.ts',
+              'spawn(type: EnemyId, position: THREE.Vector3): EnemyActor | null {',
+              'spawn(type: EnemyId, position: THREE.Vector3, initialTarget?: THREE.Vector3): EnemyActor | null {'
+          )
+          replace_required(
+              'src/enemies/EnemySystem.ts',
+              '      alertTimer: 1.4,',
+              '      alertTimer: initialTarget ? 12 : 1.4,'
+          )
+          replace_required(
+              'src/enemies/EnemySystem.ts',
+              '      lastKnownTarget: position.clone(),',
+              '      lastKnownTarget: (initialTarget ?? position).clone(),'
+          )
+          replace_required(
+              'src/app/GameApp.ts',
+              'for (const request of this.waveDirector.update(dt, this.enemySystem.activeCount, effectiveMax, this.family.heroCount)) this.enemySystem.spawn(request.type, request.position);',
+              'for (const request of this.waveDirector.update(dt, this.enemySystem.activeCount, effectiveMax, this.family.heroCount)) this.enemySystem.spawn(request.type, request.position, this.player.position);'
+          )
           PY
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add package-lock.json dev.md history.md structure.md
+          git add package-lock.json dev.md history.md structure.md src/enemies/EnemySystem.ts src/app/GameApp.ts
           if ! git diff --cached --quiet; then
-            git commit -m "docs: finalize 0.14.0 checkpoint"
+            git commit -m "ai: preserve wave pressure without wallhack"
             git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
             git push origin "$GITHUB_HEAD_REF"
           fi
