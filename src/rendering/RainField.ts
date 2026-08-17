@@ -8,6 +8,7 @@ export class RainField {
   private readonly count: number;
   private readonly geometry = new THREE.BufferGeometry();
   private readonly material: THREE.PointsMaterial;
+  private readonly streakTexture: THREE.CanvasTexture;
   private intensity = 1;
   private activeCount: number;
 
@@ -16,18 +17,22 @@ export class RainField {
     this.activeCount = this.count;
     this.positions = new Float32Array(this.count * 3);
     this.speeds = new Float32Array(this.count);
-
-    for (let i = 0; i < this.count; i++) this.resetDrop(i, new THREE.Vector3());
+    const initialAnchor = new THREE.Vector3();
+    for (let i = 0; i < this.count; i++) this.resetDrop(i, initialAnchor);
 
     this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     this.geometry.setDrawRange(0, this.activeCount);
+    this.streakTexture = this.makeStreakTexture();
     this.material = new THREE.PointsMaterial({
-      color: 0xbcd0c5,
-      size: quality.id === 'desktop-high' ? 0.055 : 0.045,
+      color: 0xd0ddd7,
+      map: this.streakTexture,
+      alphaMap: this.streakTexture,
+      alphaTest: 0.02,
+      size: quality.id === 'desktop-high' ? 0.16 : 0.13,
       transparent: true,
-      opacity: quality.id === 'mobile-low' ? 0.42 : 0.5,
+      opacity: quality.id === 'mobile-low' ? 0.5 : 0.58,
       depthWrite: false,
-      sizeAttenuation: true
+      sizeAttenuation: true,
     });
     this.points = new THREE.Points(this.geometry, this.material);
     this.points.frustumCulled = false;
@@ -40,7 +45,7 @@ export class RainField {
     this.intensity = next;
     this.activeCount = Math.max(0, Math.floor(this.count * next));
     this.geometry.setDrawRange(0, this.activeCount);
-    this.material.opacity = 0.12 + next * 0.4;
+    this.material.opacity = 0.18 + next * 0.42;
     this.points.visible = this.activeCount > 0;
   }
 
@@ -69,6 +74,7 @@ export class RainField {
     this.points.removeFromParent();
     this.geometry.dispose();
     this.material.dispose();
+    this.streakTexture.dispose();
   }
 
   private resetDrop(index: number, anchor: THREE.Vector3): void {
@@ -77,5 +83,27 @@ export class RainField {
     this.positions[offset + 1] = anchor.y + 4 + Math.random() * 16;
     this.positions[offset + 2] = anchor.z + (Math.random() - 0.5) * 36;
     this.speeds[index] = 10 + Math.random() * 10;
+  }
+
+  private makeStreakTexture(): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Canvas 2D unavailable for rain texture');
+    const gradient = context.createLinearGradient(0, 4, 0, 60);
+    gradient.addColorStop(0, 'rgba(255,255,255,0)');
+    gradient.addColorStop(0.18, 'rgba(255,255,255,.42)');
+    gradient.addColorStop(0.72, 'rgba(255,255,255,.94)');
+    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+    context.fillStyle = gradient;
+    context.beginPath();
+    context.roundRect(29, 3, 6, 58, 3);
+    context.fill();
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = false;
+    return texture;
   }
 }
