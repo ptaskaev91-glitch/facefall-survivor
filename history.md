@@ -557,3 +557,15 @@ PR #28 replaces the active procedural environment with an authored GLB level whi
 - Added unit and Playwright regression coverage; browser smoke has verified real Recast activation.
 - Added pinned `recast-navigation@0.43.1` and `@recast-navigation/three@0.43.1` plus MIT notice.
 - Development PR: #32.
+
+## 0.14.0 — Infected perception + AI LOD (2026-08-17)
+
+- Continued from the stable 0.13.0 Recast checkpoint.
+- Wired infected LOS to the authored/static `CollisionWorld`; the previous default-visible path is no longer used by `GameApp`.
+- Added eye-to-torso LOS sampling, last-seen target memory and a short 0.65s sticky chase before investigate fallback.
+- Hidden player movement is no longer read as the pursuit target after LOS breaks; infected pursue the last actually seen/heard point.
+- Added distinct hearing radii for shotgun, pistol and bow plus walking/sprinting noise.
+- Supermama/Superpapa pistol fire now wakes nearby infected too.
+- Added distance-based cadence for LOS and nav/SpatialHash/local-avoidance steering while preserving fixed-step movement/animation.
+- Added unit and live Playwright behavior coverage for perception transitions and LOD policy.
+- Development PR: #34.

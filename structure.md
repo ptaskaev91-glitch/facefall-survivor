@@ -667,3 +667,17 @@ The current navigation stack is now:
 - generated `public/assets/levels/abandoned-outskirts/navmesh.bin` — build artifact, intentionally Git-ignored.
 
 `EnemySystem` remains Recast-agnostic. `GameApp` owns the lifecycle switch between Recast and collision fallback after level load. This is the source-of-truth structure for 0.13.0; older target-only Recast notes above should be read as completed history.
+
+## Engine Next 0.14.0 perception / AI structure
+
+The infected update path now separates perception cadence from movement integration:
+
+- `src/enemies/EnemyPerception.ts` — sight ranges, hearing radii, target-stick duration and distance-based perception/steering cadence policy;
+- `src/enemies/EnemyBrain.ts` — explicit wander / investigate / sticky chase / visible chase / hold / attack / stagger intent selection;
+- `src/enemies/EnemySystem.ts` — per-actor perception memory/timers, last-known target, steering cache and SpatialHash/local-avoidance refresh;
+- `GameApp.canEnemySeeTarget()` — authored/static collision LOS provider;
+- `CombatRuntime` — weapon-shot noise producer;
+- `GameApp` footstep event bridge — movement-noise producer;
+- `FamilyCompanionSystem` — ally pistol-noise producer.
+
+Recast remains the global pathfinding layer and is still hidden behind `NavigationQuery`. LOS uses collision geometry, not navmesh. Expensive LOS/path/crowd queries are distance-throttled, while actor velocity integration and animation remain fixed-step.
