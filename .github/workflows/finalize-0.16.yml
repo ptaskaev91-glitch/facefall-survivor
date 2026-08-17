@@ -1,5 +1,6 @@
 name: Finalize 0.16 checkpoint
 
+# Temporary feature-branch-only release helper; removed before merge.
 on:
   push:
     branches: [agent/0.16-debug-performance-overlay]
