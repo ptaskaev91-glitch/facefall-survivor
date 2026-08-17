@@ -32,12 +32,14 @@ export class AtmosphereSystem {
   private readonly moon: THREE.Sprite;
   private readonly moonMaterial: THREE.SpriteMaterial;
   private readonly moonTexture: THREE.CanvasTexture;
+  private readonly proximityLight = new THREE.PointLight(0xffa493, 0, 11, 2);
   private targetId: AtmosphereId = 'dawn';
   private appliedId: AtmosphereId = 'dawn';
   private rainIntensity = ATMOSPHERE_PRESETS.dawn.rainIntensity;
   private stormIntensity = ATMOSPHERE_PRESETS.dawn.stormIntensity;
   private hazeIntensity = ATMOSPHERE_PRESETS.dawn.hazeIntensity;
   private moonOpacity = 0;
+  private proximityIntensity = 0;
 
   constructor(private readonly deps: AtmosphereDependencies) {
     this.moonTexture = this.makeBloodMoonTexture();
@@ -56,7 +58,10 @@ export class AtmosphereSystem {
     this.moon.scale.set(18, 18, 1);
     this.moon.frustumCulled = false;
     this.moon.renderOrder = -100;
-    this.deps.scene.add(this.moon);
+    this.proximityLight.name = 'blood-moon-proximity-light';
+    this.proximityLight.castShadow = false;
+    this.proximityLight.visible = false;
+    this.deps.scene.add(this.moon, this.proximityLight);
     this.applyImmediate('dawn');
   }
 
@@ -83,17 +88,23 @@ export class AtmosphereSystem {
     this.stormIntensity = THREE.MathUtils.lerp(this.stormIntensity, target.stormIntensity, alpha);
     this.hazeIntensity = THREE.MathUtils.lerp(this.hazeIntensity, target.hazeIntensity, alpha);
     this.moonOpacity = THREE.MathUtils.lerp(this.moonOpacity, target.moonOpacity, alpha);
+    this.proximityIntensity = THREE.MathUtils.lerp(this.proximityIntensity, target.id === 'blood-moon' ? 7.5 : 0, alpha);
 
     this.deps.rain.setIntensity(this.rainIntensity);
     this.deps.storm.setActivity(this.stormIntensity);
     this.deps.haze.setIntensity(this.hazeIntensity, this.currentFogHex());
     this.moonMaterial.opacity = this.moonOpacity;
     this.moon.visible = this.moonOpacity > 0.01;
+    this.proximityLight.intensity = this.proximityIntensity;
+    this.proximityLight.visible = this.proximityIntensity > 0.02;
 
     if (this.closeEnough(target)) this.appliedId = this.targetId;
   }
 
-  updateSkyPosition(): void {
+  updatePresentationAnchor(playerPosition: THREE.Vector3): void {
+    this.proximityLight.position.copy(playerPosition);
+    this.proximityLight.position.y += 2.1;
+
     if (!this.moon.visible) return;
     const camera = this.deps.camera;
     camera.getWorldDirection(this.skyForward);
@@ -106,6 +117,7 @@ export class AtmosphereSystem {
 
   dispose(): void {
     this.moon.removeFromParent();
+    this.proximityLight.removeFromParent();
     this.moonMaterial.dispose();
     this.moonTexture.dispose();
   }
@@ -128,11 +140,14 @@ export class AtmosphereSystem {
     this.stormIntensity = preset.stormIntensity;
     this.hazeIntensity = preset.hazeIntensity;
     this.moonOpacity = preset.moonOpacity;
+    this.proximityIntensity = id === 'blood-moon' ? 7.5 : 0;
     this.deps.rain.setIntensity(this.rainIntensity);
     this.deps.storm.setActivity(this.stormIntensity);
     this.deps.haze.setIntensity(this.hazeIntensity, preset.fogColor);
     this.moonMaterial.opacity = this.moonOpacity;
     this.moon.visible = this.moonOpacity > 0.01;
+    this.proximityLight.intensity = this.proximityIntensity;
+    this.proximityLight.visible = this.proximityIntensity > 0.02;
     this.targetId = id;
     this.appliedId = id;
   }
