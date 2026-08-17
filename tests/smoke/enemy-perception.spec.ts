@@ -62,7 +62,23 @@ test('infected use LOS memory and hearing without reading a hidden player positi
       player: player.toArray(),
     };
 
-    return { hiddenState, heardState, visibleState };
+    // Breaking LOS should retain chase briefly, but only toward the last visible
+    // point. Once the sticky timer expires the same alert falls back to investigate.
+    app.enemySystem.options.canSeeTarget = () => false;
+    actor.perceptionTimer = 0;
+    app.enemySystem.update(1 / 60, player, () => {});
+    const stickyState = {
+      hasLineOfSight: actor.hasLineOfSight,
+      intent: actor.currentIntent,
+      targetStick: actor.targetStickTimer,
+      lastKnown: actor.lastKnownTarget.toArray(),
+    };
+    actor.targetStickTimer = 0;
+    actor.perceptionTimer = 0;
+    app.enemySystem.update(1 / 60, player, () => {});
+    const investigateState = { intent: actor.currentIntent, alert: actor.alertTimer };
+
+    return { hiddenState, heardState, visibleState, stickyState, investigateState };
   });
 
   expect(result.hiddenState.intent).toBe('wander');
@@ -77,5 +93,12 @@ test('infected use LOS memory and hearing without reading a hidden player positi
   expect(result.visibleState.intent).toBe('chase');
   expect(result.visibleState.targetStick).toBeGreaterThan(0);
   expect(result.visibleState.lastKnown).toEqual(result.visibleState.player);
+
+  expect(result.stickyState.hasLineOfSight).toBe(false);
+  expect(result.stickyState.intent).toBe('chase');
+  expect(result.stickyState.targetStick).toBeGreaterThan(0);
+  expect(result.stickyState.lastKnown).toEqual(result.visibleState.player);
+  expect(result.investigateState.intent).toBe('investigate');
+  expect(result.investigateState.alert).toBeGreaterThan(0);
   expect(pageErrors).toEqual([]);
 });
