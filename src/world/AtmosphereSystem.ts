@@ -32,7 +32,7 @@ export class AtmosphereSystem {
   private readonly moon: THREE.Sprite;
   private readonly moonMaterial: THREE.SpriteMaterial;
   private readonly moonTexture: THREE.CanvasTexture;
-  private readonly proximityLight = new THREE.PointLight(0xffa493, 0, 11, 2);
+  private readonly proximityLight = new THREE.PointLight(0xffa493, 0, 10, 2);
   private targetId: AtmosphereId = 'dawn';
   private appliedId: AtmosphereId = 'dawn';
   private rainIntensity = ATMOSPHERE_PRESETS.dawn.rainIntensity;
@@ -55,7 +55,7 @@ export class AtmosphereSystem {
     });
     this.moon = new THREE.Sprite(this.moonMaterial);
     this.moon.name = 'blood-moon-sky';
-    this.moon.scale.set(18, 18, 1);
+    this.moon.scale.set(14, 14, 1);
     this.moon.frustumCulled = false;
     this.moon.renderOrder = -100;
     this.proximityLight.name = 'blood-moon-proximity-light';
@@ -88,7 +88,7 @@ export class AtmosphereSystem {
     this.stormIntensity = THREE.MathUtils.lerp(this.stormIntensity, target.stormIntensity, alpha);
     this.hazeIntensity = THREE.MathUtils.lerp(this.hazeIntensity, target.hazeIntensity, alpha);
     this.moonOpacity = THREE.MathUtils.lerp(this.moonOpacity, target.moonOpacity, alpha);
-    this.proximityIntensity = THREE.MathUtils.lerp(this.proximityIntensity, target.id === 'blood-moon' ? 7.5 : 0, alpha);
+    this.proximityIntensity = THREE.MathUtils.lerp(this.proximityIntensity, target.id === 'blood-moon' ? 4.8 : 0, alpha);
 
     this.deps.rain.setIntensity(this.rainIntensity);
     this.deps.storm.setActivity(this.stormIntensity);
@@ -111,8 +111,8 @@ export class AtmosphereSystem {
     this.skyRight.crossVectors(this.skyForward, this.skyUp).normalize();
     this.moon.position.copy(camera.position)
       .addScaledVector(this.skyForward, 105)
-      .addScaledVector(this.skyRight, -38)
-      .addScaledVector(this.skyUp, 31);
+      .addScaledVector(this.skyRight, -18)
+      .addScaledVector(this.skyUp, 27);
   }
 
   dispose(): void {
@@ -140,7 +140,7 @@ export class AtmosphereSystem {
     this.stormIntensity = preset.stormIntensity;
     this.hazeIntensity = preset.hazeIntensity;
     this.moonOpacity = preset.moonOpacity;
-    this.proximityIntensity = id === 'blood-moon' ? 7.5 : 0;
+    this.proximityIntensity = id === 'blood-moon' ? 4.8 : 0;
     this.deps.rain.setIntensity(this.rainIntensity);
     this.deps.storm.setActivity(this.stormIntensity);
     this.deps.haze.setIntensity(this.hazeIntensity, preset.fogColor);
