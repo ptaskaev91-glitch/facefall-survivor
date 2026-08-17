@@ -62,6 +62,8 @@ test('dawn, overcast and dusk expose distinct weather/light states', async ({ pa
   expect(dawn.id).toBe('dawn');
   expect(dawn.fogDensity).toBeLessThan(0.015);
   expect(dawn.rainIntensity).toBeLessThan(0.15);
+  await page.waitForTimeout(350);
+  await page.screenshot({ path: `${artifactDir}/mobile-dawn.png`, fullPage: true });
 
   const overcast = await startAt(page, 'overcast');
   expect(overcast.id).toBe('overcast');
@@ -76,6 +78,8 @@ test('dawn, overcast and dusk expose distinct weather/light states', async ({ pa
   expect(dusk.exposure).toBeLessThan(dawn.exposure);
   expect(dusk.rainIntensity).toBeLessThan(overcast.rainIntensity);
   expect(dusk.fogDensity).toBeGreaterThan(overcast.fogDensity);
+  await page.waitForTimeout(350);
+  await page.screenshot({ path: `${artifactDir}/mobile-dusk.png`, fullPage: true });
 
   expect(errors, `Fatal browser errors: ${errors.join(' | ')}`).toEqual([]);
 });
