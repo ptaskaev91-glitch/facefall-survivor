@@ -74,7 +74,7 @@ export const ATMOSPHERE_PRESETS: Record<AtmosphereId, AtmospherePreset> = {
     id: 'blood-moon',
     background: 0x050305,
     fogColor: 0x1c080c,
-    fogDensity: 0.037,
+    fogDensity: 0.052,
     hemisphereSky: 0x371419,
     hemisphereGround: 0x060506,
     hemisphereIntensity: 0.72,
