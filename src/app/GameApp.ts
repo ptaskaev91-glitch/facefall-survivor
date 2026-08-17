@@ -258,7 +258,7 @@ export class GameApp {
     this.pickups.update(dt, this.player.position);
     this.coinSystem.update(dt, this.player.position);
     const effectiveMax = this.maxActiveEnemies + (this.family.heroCount - 1) * 6;
-    for (const request of this.waveDirector.update(dt, this.enemySystem.activeCount, effectiveMax, this.family.heroCount)) this.enemySystem.spawn(request.type, request.position);
+    for (const request of this.waveDirector.update(dt, this.enemySystem.activeCount, effectiveMax, this.family.heroCount)) this.enemySystem.spawn(request.type, request.position, this.player.position);
     void this.family.syncWave(this.waveDirector.wave);
     this.family.update(dt, this.player.position, this.player.facing);
     this.effects.update(dt); this.runtimeFx.update(dt); this.lightPool.update(dt); this.world.updateSimulation(dt);

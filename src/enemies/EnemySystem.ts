@@ -74,7 +74,7 @@ export class EnemySystem {
 
   setNavigationQuery(navigation: NavigationQuery): void { this.navigation = navigation; }
 
-  spawn(type: EnemyId, position: THREE.Vector3): EnemyActor | null {
+  spawn(type: EnemyId, position: THREE.Vector3, initialTarget?: THREE.Vector3): EnemyActor | null {
     if (this.activeCount >= this.options.maxActive) return null;
     const archetype = ENEMY_ARCHETYPES[type];
     const id = `enemy-${type}-${this.nextId++}`;
@@ -94,7 +94,7 @@ export class EnemySystem {
       steeringVelocity: new THREE.Vector3(),
       attackTimer: 0,
       staggerTimer: 0,
-      alertTimer: 1.4,
+      alertTimer: initialTarget ? 12 : 1.4,
       targetStickTimer: 0,
       perceptionTimer: Math.random() * 0.08,
       steeringTimer: Math.random() * 0.05,
@@ -103,7 +103,7 @@ export class EnemySystem {
       wanderTimer: 0,
       deathTimer: 0,
       groanTimer: 1.5 + Math.random() * 3.5,
-      lastKnownTarget: position.clone(),
+      lastKnownTarget: (initialTarget ?? position).clone(),
       wanderTarget: position.clone(),
       alive: true,
       unregisterDamage,
