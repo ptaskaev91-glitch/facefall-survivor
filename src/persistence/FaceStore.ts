@@ -24,7 +24,10 @@ export class FaceStore {
 
   save(dataUrl: string): void {
     try {
+      // Only release the legacy copy after the normalized v2 write succeeded.
+      // If quota/security blocks the new write, the user's previous photo remains intact.
       localStorage.setItem(this.key, dataUrl);
+      this.removeLegacy();
     } catch (error) {
       console.warn('[Super Makar] could not persist face locally', error);
     }
@@ -33,12 +36,16 @@ export class FaceStore {
   remove(): void {
     try {
       localStorage.removeItem(this.key);
-      localStorage.removeItem(this.legacyKey);
-      if (this.slot === 'makar') localStorage.removeItem('facefall.face.v1');
+      this.removeLegacy();
     } catch { /* local storage is optional */ }
   }
 
   private loadLegacy(): string | null {
     return localStorage.getItem(this.legacyKey) ?? (this.slot === 'makar' ? localStorage.getItem('facefall.face.v1') : null);
+  }
+
+  private removeLegacy(): void {
+    localStorage.removeItem(this.legacyKey);
+    if (this.slot === 'makar') localStorage.removeItem('facefall.face.v1');
   }
 }
