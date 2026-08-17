@@ -583,3 +583,15 @@ PR #28 replaces the active procedural environment with an authored GLB level whi
 - Added unit and live mobile browser coverage for the new preprocessing path.
 - Development PR: #35.
 
+## 0.16.0 — debug/performance overlay (2026-08-17)
+
+- Continued from the stable 0.15.0 Face System 2.0 checkpoint.
+- Added an opt-in `DebugPerformanceOverlay` activated only by `?debug=1`.
+- Added FPS, average/max frame time, draw calls, triangles and DPR from the live Three.js renderer.
+- Added active infected and AI intent distribution to the panel.
+- Counted LOS and navigation requests at their existing runtime boundaries without changing EnemySystem decision semantics.
+- The navigation counter follows collision → Recast runtime switching and reports active navigation mode.
+- Added SpatialHash occupied-cell and quality-profile visibility for mobile tuning.
+- Added regression coverage proving normal runs have no debug panel and debug runs produce non-zero renderer/LOS/Recast-nav metrics.
+- Development PR: #36.
+

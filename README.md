@@ -2,7 +2,7 @@
 
 Mobile-first browser 3D family survival shooter. Супер Макар uses local photos for Макар, Супермама and Суперпапа.
 
-## Current generation — Engine Next 0.15.0 · «Супер Макар»
+## Current generation — Engine Next 0.16.0 · «Супер Макар»
 
 The active game is built with **TypeScript + Vite + npm Three.js** and targets both Android/mobile and desktop browsers.
 
@@ -102,13 +102,15 @@ npm run build:deploy
 
 The Vite development entrypoint is `/engine-lab.html`; production promotes the exact same compiled document to `/` and CI verifies the two built HTML files are byte-identical.
 
+For profiling, append `?debug=1` to the game URL. The overlay is intentionally opt-in so ordinary runs do not install its LOS/navigation counters or DOM panel.
+
 ## Hosting
 
 GitHub is the source repository. The intended production target is Vercel. Until the Vercel project connection is restored, CI publishes the verified build to the `engine-next-preview` branch for browser testing.
 
 ## Next major product work
 
-With Face System 2.0 now active, the next ordered work is **?debug=1 performance/AI/nav metrics**, followed by Android profiling, budget tuning and final HUD cleanup.
+With the opt-in performance overlay now active, the next ordered work is **Android profiling and adaptive budget tuning** using real FPS/frame/draw/AI/nav measurements, followed by final HUD cleanup.
 
 ## Asset / source licensing
 
@@ -118,6 +120,18 @@ The Facefall repository itself currently has no explicit public reuse license; s
 
 ---
 
+
+
+## 0.16.0 — debug/performance overlay checkpoint (2026-08-17)
+
+- Added an opt-in **`?debug=1`** profiler panel for real-device tuning; normal runs do not create the panel or install LOS/navigation instrumentation.
+- The panel samples at roughly 4 Hz and reports FPS, average/max frame time, Three.js draw calls, triangle count and renderer DPR.
+- AI diagnostics report active infected plus chase / investigate / attack intent counts.
+- Existing expensive boundaries are instrumented without changing their decisions: LOS queries are shown as `LOS/s` with blocked share, and navigation/steering requests as `NAV/s`.
+- SpatialHash occupied cells, active quality profile and current navigation mode are shown beside the performance metrics.
+- Navigation instrumentation follows runtime switches from collision fallback to the authored Recast query.
+- Browser smoke verifies the overlay is absent normally, then verifies real non-zero renderer, LOS and Recast navigation metrics under `?debug=1`.
+- The next checkpoint is Android profiling and budget tuning using these metrics, followed by final HUD cleanup.
 
 ## 0.15.0 — Face System 2.0 checkpoint (2026-08-17)
 
