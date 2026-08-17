@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { compactNumber } from '../../src/debug/DebugPerformanceOverlay';
+import { compactNumber } from '../../src/debug/DebugMetricFormat';
 
 test('debug metric display keeps large triangle counts compact', () => {
   assert.equal(compactNumber(999), '999');
