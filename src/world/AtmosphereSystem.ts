@@ -187,13 +187,19 @@ export class AtmosphereSystem {
   }
 
   private ensureBackground(): THREE.Color {
-    if (!(this.deps.scene.background instanceof THREE.Color)) this.deps.scene.background = new THREE.Color(0x07100b);
-    return this.deps.scene.background;
+    const current = this.deps.scene.background;
+    if (current instanceof THREE.Color) return current;
+    const replacement = new THREE.Color(0x07100b);
+    this.deps.scene.background = replacement;
+    return replacement;
   }
 
   private ensureFog(): THREE.FogExp2 {
-    if (!(this.deps.scene.fog instanceof THREE.FogExp2)) this.deps.scene.fog = new THREE.FogExp2(0x0b1610, 0.015);
-    return this.deps.scene.fog;
+    const current = this.deps.scene.fog;
+    if (current instanceof THREE.FogExp2) return current;
+    const replacement = new THREE.FogExp2(0x0b1610, 0.015);
+    this.deps.scene.fog = replacement;
+    return replacement;
   }
 
   private makeBloodMoonTexture(): THREE.CanvasTexture {
