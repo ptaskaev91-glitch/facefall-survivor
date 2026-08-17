@@ -15,6 +15,7 @@ import { EffectSystem } from '../effects/EffectSystem';
 import { LightPool } from '../effects/LightPool';
 import { EFFECTS } from '../effects/recipes';
 import { RuntimeFx } from '../effects/RuntimeFx';
+import { footstepNoiseRadius } from '../enemies/EnemyPerception';
 import { EnemySystem, type EnemyActor } from '../enemies/EnemySystem';
 import { detectQuality, type QualityProfile } from '../graphics/quality';
 import { InputManager } from '../input/InputManager';
@@ -107,6 +108,9 @@ export class GameApp {
   private readonly aimDirection = new THREE.Vector3();
   private readonly aimNdc = new THREE.Vector2();
   private readonly assistDelta = new THREE.Vector2();
+  private readonly losStart = new THREE.Vector3();
+  private readonly losEnd = new THREE.Vector3();
+  private readonly losDirection = new THREE.Vector3();
   private readonly raycaster = new THREE.Raycaster();
   private readonly unsubscribeEvents: Array<() => void> = [];
   private readonly loop: GameLoop;
@@ -141,7 +145,12 @@ export class GameApp {
 
     this.projectileSystem = new ProjectileSystem(this.damageSystem, (from, to) => this.queryProjectileCollision(from, to), this.quality.id === 'mobile-low' ? 32 : 48);
     this.projectileVisuals = new ProjectileVisuals(this.world.scene, this.quality.id === 'mobile-low' ? 32 : 48);
-    this.enemySystem = new EnemySystem(this.world.scene, this.damageSystem, { shadows: this.quality.shadows, maxActive: this.maxActiveEnemies, onGroan: (actor) => this.events.emit('enemyGroan', { position: actor.root.position.clone(), kind: actor.archetype.id }) });
+    this.enemySystem = new EnemySystem(this.world.scene, this.damageSystem, {
+      shadows: this.quality.shadows,
+      maxActive: this.maxActiveEnemies,
+      canSeeTarget: (from, to) => this.canEnemySeeTarget(from, to),
+      onGroan: (actor) => this.events.emit('enemyGroan', { position: actor.root.position.clone(), kind: actor.archetype.id })
+    });
     this.family = new FamilyCompanionSystem(this.world.scene, this.quality, this.enemySystem, this.damageSystem);
     this.coinSystem = new CoinSystem(this.world.scene, (amount) => { this.coins += amount; this.hud.setLastEvent(`МОНЕТЫ +${amount}`); this.refreshStatus(); });
     this.pickups = new PickupSystem(this.world.scene, {
@@ -169,6 +178,9 @@ export class GameApp {
       endRun: () => this.endRun()
     });
     this.unsubscribeEvents.push(this.events.on('kill', (hit) => { if (hit.targetId === 'player') return; const amount = hit.targetId.includes('-brute-') ? 5 : hit.targetId.includes('-runner-') ? 3 : 2; this.coinSystem.spawn(hit.hitPoint, amount); }));
+    this.unsubscribeEvents.push(this.events.on('footstep', ({ position, sprinting }) => {
+      this.enemySystem.hearNoise(position, footstepNoiseRadius(sprinting), sprinting ? 2.8 : 1.6);
+    }));
     this.bindUi();
 
     this.loop = new GameLoop({ fixedUpdate: (dt) => this.fixedUpdate(dt), render: (_alpha, frameDt) => this.render(frameDt) }, { fixedStep: 1 / 60, maxFrameDelta: 0.1, maxSubSteps: 5 });
@@ -327,6 +339,16 @@ export class GameApp {
     if (!this.state.is('playing')) return;
     this.waveDirector.stop(); this.loop.stop(); this.input.reset(); this.state.transition('gameover');
     this.hud.showGameOver(this.waveDirector.wave, this.session.kills, this.session.score); this.hud.setLastEvent('RUN ENDED'); this.refreshStatus();
+  }
+
+  private canEnemySeeTarget(from: THREE.Vector3, target: THREE.Vector3): boolean {
+    this.losStart.copy(from); this.losStart.y += 1.35;
+    this.losEnd.copy(target); this.losEnd.y += 1.05;
+    this.losDirection.copy(this.losEnd).sub(this.losStart);
+    const distance = this.losDirection.length();
+    if (distance <= 1e-5) return true;
+    const hit = this.world.collisionWorld.raycast(this.losStart, this.losDirection.multiplyScalar(1 / distance), Math.max(0, distance - 0.15));
+    return hit === null;
   }
 
   private queryProjectileCollision(from: THREE.Vector3, to: THREE.Vector3): ProjectileCollision | null {
