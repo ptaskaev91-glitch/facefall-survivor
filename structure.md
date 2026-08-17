@@ -681,3 +681,16 @@ The infected update path now separates perception cadence from movement integrat
 - `FamilyCompanionSystem` — ally pistol-noise producer.
 
 Recast remains the global pathfinding layer and is still hidden behind `NavigationQuery`. LOS uses collision geometry, not navmesh. Expensive LOS/path/crowd queries are distance-throttled, while actor velocity integration and animation remain fixed-step.
+
+## Engine Next 0.15.0 Face System structure
+
+Face ownership is now split into two explicit layers:
+
+- src/characters/FaceImageProcessor.ts — browser-local detection/crop/resize/compression policy;
+- src/persistence/FaceStore.ts — normalized v2 family portrait persistence and v1 migration;
+- src/app/ProductShell.ts — upload orchestration and migration gate before run start;
+- src/characters/CharacterModel.ts — production curved front/rear face shells attached to the real Head bone;
+- src/characters/FaceSystem.ts — low-poly fallback only.
+
+The preprocessing layer has no Three.js dependency and the 3D fitting layer has no file-input/localStorage responsibility. No server/backend owns face data.
+
