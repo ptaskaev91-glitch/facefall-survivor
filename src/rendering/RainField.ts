@@ -8,15 +8,19 @@ export class RainField {
   private readonly count: number;
   private readonly geometry = new THREE.BufferGeometry();
   private readonly material: THREE.PointsMaterial;
+  private intensity = 1;
+  private activeCount: number;
 
   constructor(scene: THREE.Scene, quality: QualityProfile) {
     this.count = quality.id === 'mobile-low' ? 420 : quality.id === 'mobile-high' ? 760 : 1200;
+    this.activeCount = this.count;
     this.positions = new Float32Array(this.count * 3);
     this.speeds = new Float32Array(this.count);
 
     for (let i = 0; i < this.count; i++) this.resetDrop(i, new THREE.Vector3());
 
     this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
+    this.geometry.setDrawRange(0, this.activeCount);
     this.material = new THREE.PointsMaterial({
       color: 0xbcd0c5,
       size: quality.id === 'desktop-high' ? 0.055 : 0.045,
@@ -30,10 +34,24 @@ export class RainField {
     scene.add(this.points);
   }
 
+  setIntensity(value: number): void {
+    const next = THREE.MathUtils.clamp(Number.isFinite(value) ? value : 0, 0, 1);
+    if (Math.abs(next - this.intensity) < 0.005) return;
+    this.intensity = next;
+    this.activeCount = Math.max(0, Math.floor(this.count * next));
+    this.geometry.setDrawRange(0, this.activeCount);
+    this.material.opacity = 0.12 + next * 0.4;
+    this.points.visible = this.activeCount > 0;
+  }
+
+  get currentIntensity(): number { return this.intensity; }
+
   update(dt: number, anchor: THREE.Vector3): void {
-    for (let i = 0; i < this.count; i++) {
+    if (!this.points.visible || this.activeCount <= 0) return;
+    const wind = 0.4 + this.intensity * 0.55;
+    for (let i = 0; i < this.activeCount; i++) {
       const offset = i * 3;
-      this.positions[offset] += dt * 0.75;
+      this.positions[offset] += dt * wind;
       this.positions[offset + 1] -= this.speeds[i] * dt;
       this.positions[offset + 2] += dt * 0.2;
 
