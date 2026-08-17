@@ -5,6 +5,7 @@ import type { FacefallEvents, HitZone, ShotEvent } from '../combat/types';
 import { WEAPONS, type WeaponDefinition } from '../combat/weapons';
 import type { EventBus } from '../core/EventBus';
 import type { EffectSystem } from '../effects/EffectSystem';
+import { weaponNoiseRadius } from '../enemies/EnemyPerception';
 import type { EnemySystem } from '../enemies/EnemySystem';
 import type { PlayerRuntime } from '../player/PlayerRuntime';
 import type { WorldRuntime } from '../world/WorldRuntime';
@@ -31,6 +32,7 @@ export class CombatRuntime {
     this.unsubs.push(o.events.on('shot', (shot) => {
       o.effects.play(`${shot.weaponId}-shot`, { origin: shot.origin, direction: shot.direction });
       const definition = WEAPONS[shot.weaponId];
+      o.enemySystem.hearNoise(shot.origin, weaponNoiseRadius(shot.weaponId), 4.8);
       if (shot.sourceId === 'player') { o.player.playWeaponFire(shot.weaponId); o.applyWeaponRecoil(definition); }
       if (definition.fireModel === 'projectile') {
         const direction = this.spreadDirection(shot.direction, definition.spread * o.movementSpread());

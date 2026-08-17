@@ -39,6 +39,7 @@ export class FamilyCompanionSystem {
             const hitPoint = this.target.clone().add(new THREE.Vector3(0, 1, 0));
             const shot = hitPoint.clone().sub(c.root.position).normalize();
             this.damage.apply({ amount: c.role === 'mama' ? 17 : 21, kind: 'bullet', sourceId: `super-${c.role}`, targetId: id, hitPoint, direction: shot, impulse: 5, hitZone: 'torso', critical: false });
+            this.enemies.hearNoise(c.root.position, 18, 3.8);
             c.model.playPistolFire();
           }
         }

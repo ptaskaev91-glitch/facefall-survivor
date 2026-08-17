@@ -6,6 +6,7 @@ export interface EnemyBrainContext {
   attackTimer: number;
   staggerTimer: number;
   hasLineOfSight: boolean;
+  targetStickTimer: number;
   alertTimer: number;
 }
 
@@ -24,6 +25,9 @@ export class EnemyBrain {
       return 'chase';
     }
 
+    // Briefly keep the high-urgency pursuit state after LOS breaks. EnemySystem
+    // pursues the last actually seen position rather than reading the hidden player.
+    if (context.targetStickTimer > 0) return 'chase';
     if (context.alertTimer > 0) return 'investigate';
     return 'wander';
   }

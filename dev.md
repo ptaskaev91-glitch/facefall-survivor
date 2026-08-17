@@ -621,3 +621,22 @@ Next ordered AI work:
 - [ ] target stickiness/hysteresis;
 - [ ] AI/path update LOD;
 - [ ] optional nav debug overlay for development only.
+
+## 0.14.0 — infected perception + AI LOD checkpoint (2026-08-17)
+
+> This checkpoint is authoritative and closes the first four AI items left after 0.13.0.
+
+- [x] final static-world LOS/perception policy;
+- [x] weapon/noise perception;
+- [x] target stickiness / last-seen memory;
+- [x] distance-based AI/path/SpatialHash update LOD;
+- [x] footsteps and family-pistol noise feed the same perception system;
+- [x] browser regression covers hidden → heard → visible → sticky chase → investigate;
+- [x] unit coverage for cadence/noise hierarchy and EnemyBrain transitions.
+
+Next ordered work:
+- [ ] Face System 2.0 crop/fitting polish on the production head;
+- [ ] `?debug=1` performance/AI/nav metrics overlay;
+- [ ] Android profiling and budget tuning;
+- [ ] final HUD cleanup after profiling;
+- [ ] optional nav debug overlay only if useful for development.
