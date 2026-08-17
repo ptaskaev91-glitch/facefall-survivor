@@ -27,8 +27,6 @@ test('debug=1 reports renderer, AI, LOS and navigation cadence', async ({ page }
     const actor = app.enemySystem.spawn('walker', spawn, player);
     if (!actor) throw new Error('failed to spawn debug metrics actor');
 
-    // Force enough expensive AI samples to make the 4 Hz overlay interval
-    // deterministic instead of depending on wave timing.
     for (let i = 0; i < 12; i += 1) {
       actor.perceptionTimer = 0;
       actor.steeringTimer = 0;
@@ -36,8 +34,11 @@ test('debug=1 reports renderer, AI, LOS and navigation cadence', async ({ page }
     }
   });
 
-  await expect.poll(async () => Number(await overlay.getAttribute('data-los-per-second')), { timeout: 5_000 }).toBeGreaterThan(0);
-  await expect.poll(async () => Number(await overlay.getAttribute('data-nav-per-second')), { timeout: 5_000 }).toBeGreaterThan(0);
+  // LOS/s and NAV/s are intentionally interval values and may return to zero
+  // after the forced workload. Monotonic totals prove instrumentation without
+  // racing the 250 ms presentation window.
+  await expect.poll(async () => Number(await overlay.getAttribute('data-los-total')), { timeout: 5_000 }).toBeGreaterThan(0);
+  await expect.poll(async () => Number(await overlay.getAttribute('data-nav-total')), { timeout: 5_000 }).toBeGreaterThan(0);
   await expect(overlay).toContainText('FPS');
   await expect(overlay).toContainText('FRAME');
   await expect(overlay).toContainText('DRAW');
@@ -55,6 +56,8 @@ test('debug=1 reports renderer, AI, LOS and navigation cadence', async ({ page }
     activeEnemies: Number((element as HTMLElement).dataset.activeEnemies),
     losPerSecond: Number((element as HTMLElement).dataset.losPerSecond),
     navPerSecond: Number((element as HTMLElement).dataset.navPerSecond),
+    losTotal: Number((element as HTMLElement).dataset.losTotal),
+    navTotal: Number((element as HTMLElement).dataset.navTotal),
     navigation: (element as HTMLElement).dataset.navigation,
   }));
 
@@ -63,8 +66,10 @@ test('debug=1 reports renderer, AI, LOS and navigation cadence', async ({ page }
   expect(metrics.drawCalls).toBeGreaterThan(0);
   expect(metrics.triangles).toBeGreaterThan(0);
   expect(metrics.activeEnemies).toBe(1);
-  expect(metrics.losPerSecond).toBeGreaterThan(0);
-  expect(metrics.navPerSecond).toBeGreaterThan(0);
+  expect(metrics.losPerSecond).toBeGreaterThanOrEqual(0);
+  expect(metrics.navPerSecond).toBeGreaterThanOrEqual(0);
+  expect(metrics.losTotal).toBeGreaterThan(0);
+  expect(metrics.navTotal).toBeGreaterThan(0);
   expect(metrics.navigation).toBe('recast');
   expect(pageErrors).toEqual([]);
 });
