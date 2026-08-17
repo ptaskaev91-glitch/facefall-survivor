@@ -2,7 +2,7 @@
 
 Mobile-first browser 3D family survival shooter. Супер Макар uses local photos for Макар, Супермама and Суперпапа.
 
-## Current generation — Engine Next 0.13.0 · «Супер Макар»
+## Current generation — Engine Next 0.14.0 · «Супер Макар»
 
 The active game is built with **TypeScript + Vite + npm Three.js** and targets both Android/mobile and desktop browsers.
 
@@ -17,9 +17,26 @@ Current gameplay foundation:
 - waves, HP, score, kills, health/ammo pickups and game-over/restart;
 - authored **Abandoned Outskirts** GLB level with static collision and gameplay manifest;
 - offline-baked **Recast/Detour** navmesh for the authored level, imported in-browser with collision-navigation fallback;
-- per-enemy cached path queries with repath throttling, plus SpatialHash/local avoidance;
+- real static-world LOS perception, sound investigation and last-seen target memory for infected;
+- per-enemy cached Recast paths plus distance-throttled LOS/steering/SpatialHash work for mobile AI LOD;
 - rain, fog, storm/lightning, grass, pooled particles/decals/lights and procedural Web Audio;
 - strict TypeScript, reproducible `npm ci`, unit tests and Playwright desktop/mobile visual smoke gates.
+
+### 0.14.0 infected perception + AI LOD milestone
+
+The infected AI now uses actual level information rather than treating the player as globally visible:
+
+- LOS is sampled against `CollisionWorld` from infected eye height to the player's torso;
+- an infected only refreshes `lastKnownTarget` after a successful LOS sample or an audible event;
+- when LOS breaks, target stickiness keeps a short high-urgency chase toward the **last seen point**, then falls back to investigate;
+- pistol, shotgun and bow have different hearing radii; walking and sprinting also generate different noise radii;
+- Supermama/Superpapa pistol fire is audible to nearby infected as well;
+- noise redirects infected that do not currently have a visible target, without overriding an active visual lock;
+- LOS cadence scales with distance, from high-frequency near checks to low-frequency far checks;
+- Recast/SpatialHash/local-avoidance steering refresh is also distance-throttled while movement integration and animation continue every fixed step;
+- steering is refreshed immediately when perception, intent, noise or stagger state changes;
+- unit tests cover noise hierarchy, AI cadence and sticky-target transitions;
+- Playwright browser smoke drives the live `EnemySystem` through hidden → heard → visible → sticky chase → investigate states.
 
 ### 0.13.0 navigation milestone
 
@@ -63,7 +80,7 @@ Canonical architecture and roadmap live in:
 
 The current direction is:
 
-`TypeScript + Vite + Three.js + GLB/glTF + Octree/Capsule + Recast/Detour NavigationQuery + SpatialHash/local avoidance + event-driven combat/presentation + bounded/lazy assets + pooled FX + mobile-first controls`.
+`TypeScript + Vite + Three.js + GLB/glTF + Octree/Capsule + Recast/Detour NavigationQuery + LOS/noise perception + SpatialHash/local avoidance + event-driven combat/presentation + bounded/lazy assets + pooled FX + mobile-first controls`.
 
 ## Development
 
@@ -91,7 +108,7 @@ GitHub is the source repository. The intended production target is Vercel. Until
 
 ## Next major product work
 
-With the authored level and Recast navigation now active, the next ordered work is **final LOS/perception and AI update LOD**, followed by Face System 2.0 polish and final HUD/performance work.
+With authored navigation and infected perception now active, the next ordered work is **Face System 2.0 crop/fitting polish**, followed by a debug/performance overlay, Android profiling and final HUD/performance work.
 
 ## Asset / source licensing
 
@@ -100,6 +117,17 @@ Third-party code and vendored asset notices are tracked in `THIRD_PARTY_NOTICES.
 The Facefall repository itself currently has no explicit public reuse license; selecting the project license remains an intentional pending decision rather than something inferred from third-party dependencies.
 
 ---
+
+## 0.14.0 — infected perception + AI LOD checkpoint (2026-08-17)
+
+- Wired infected LOS to actual authored/static collision geometry.
+- Added distance-throttled LOS sampling and steering refresh.
+- Added last-seen target memory and 0.65s chase stickiness before investigate fallback.
+- Added weapon hearing hierarchy: shotgun > pistol > bow.
+- Added walking/sprinting noise and family-pistol noise.
+- Noise does not override a currently visible target.
+- Recast/SpatialHash/local avoidance remain the movement foundation; only expensive query cadence is reduced with distance.
+- Added unit and live-browser regression coverage for hidden/heard/visible/sticky/investigate transitions.
 
 ## 0.13.0 — offline Recast navigation checkpoint (2026-08-14)
 
