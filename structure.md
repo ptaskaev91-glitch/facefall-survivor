@@ -694,3 +694,15 @@ Face ownership is now split into two explicit layers:
 
 The preprocessing layer has no Three.js dependency and the 3D fitting layer has no file-input/localStorage responsibility. No server/backend owns face data.
 
+## Engine Next 0.16.0 debug/performance structure
+
+Performance instrumentation is intentionally outside the gameplay ownership tree:
+
+- `src/debug/DebugPerformanceOverlay.ts` — browser-only opt-in sampler and presentation;
+- `src/debug/DebugMetricFormat.ts` — zero-dependency metric formatting helpers;
+- `src/main.ts` — attaches the profiler only when `?debug=1` is present;
+- existing `GameApp.canEnemySeeTarget` and `NavigationQuery.nextWaypoint` boundaries are counted only in debug mode;
+- `WorldRuntime.renderer.info` remains the source of render calls/triangles; no rendering framework or production telemetry SDK was added.
+
+Normal gameplay has no profiler DOM or instrumentation. This checkpoint creates the measurement layer for Android budget tuning rather than changing budgets speculatively.
+

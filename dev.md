@@ -660,3 +660,24 @@ Next ordered work:
 - [ ] final HUD cleanup after profiling;
 - [ ] optional nav debug overlay only if it materially helps profiling.
 
+## 0.16.0 — debug/performance overlay checkpoint (2026-08-17)
+
+> This checkpoint is authoritative for on-device performance instrumentation. The profiler is opt-in and does not change normal gameplay behavior.
+
+- [x] `?debug=1` overlay with ~4 Hz sampling;
+- [x] FPS plus average/max frame time;
+- [x] Three.js draw-call / triangle / DPR metrics;
+- [x] active infected and intent distribution;
+- [x] LOS query cadence + blocked share;
+- [x] navigation/steering query cadence + SpatialHash cells;
+- [x] quality profile + active navigation mode;
+- [x] normal-mode regression proving no profiler DOM/instrumentation;
+- [x] live browser regression proving non-zero renderer, LOS and Recast-nav measurements.
+
+Next ordered work:
+- [ ] profile the published build on Android in TOP and 3RD with low/medium/high enemy pressure;
+- [ ] establish frame-time, draw-call, triangle and AI-query budgets per mobile quality tier;
+- [ ] tune DPR, shadows, FX, enemy cap and LOS/nav cadence from measured bottlenecks;
+- [ ] final HUD cleanup after performance budgets stabilize;
+- [ ] optional nav visualization only if measurements show it is needed.
+
