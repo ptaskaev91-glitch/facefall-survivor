@@ -10,6 +10,7 @@ export interface AtmospherePreset {
   hemisphereIntensity: number;
   keyColor: number;
   keyIntensity: number;
+  keyPosition: readonly [number, number, number];
   exposure: number;
   rainIntensity: number;
   stormIntensity: number;
@@ -28,6 +29,7 @@ export const ATMOSPHERE_PRESETS: Record<AtmosphereId, AtmospherePreset> = {
     hemisphereIntensity: 1.6,
     keyColor: 0xffc68b,
     keyIntensity: 2.15,
+    keyPosition: [-24, 14, -18],
     exposure: 1.18,
     rainIntensity: 0.08,
     stormIntensity: 0,
@@ -44,6 +46,7 @@ export const ATMOSPHERE_PRESETS: Record<AtmosphereId, AtmospherePreset> = {
     hemisphereIntensity: 1.25,
     keyColor: 0xaebcb4,
     keyIntensity: 1.55,
+    keyPosition: [-18, 30, -12],
     exposure: 1.02,
     rainIntensity: 1,
     stormIntensity: 0.72,
@@ -60,6 +63,7 @@ export const ATMOSPHERE_PRESETS: Record<AtmosphereId, AtmospherePreset> = {
     hemisphereIntensity: 1.12,
     keyColor: 0xff8b55,
     keyIntensity: 2.35,
+    keyPosition: [-31, 8, -20],
     exposure: 0.94,
     rainIntensity: 0.18,
     stormIntensity: 0.12,
@@ -76,6 +80,7 @@ export const ATMOSPHERE_PRESETS: Record<AtmosphereId, AtmospherePreset> = {
     hemisphereIntensity: 0.72,
     keyColor: 0xc92c38,
     keyIntensity: 1.65,
+    keyPosition: [-20, 24, -34],
     exposure: 0.72,
     rainIntensity: 0.04,
     stormIntensity: 0,
