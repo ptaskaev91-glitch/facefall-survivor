@@ -36,7 +36,8 @@ test('debug=1 reports renderer, AI, LOS and navigation cadence', async ({ page }
     }
   });
 
-  await expect.poll(async () => Number(await overlay.getAttribute('data-samples')), { timeout: 5_000 }).toBeGreaterThan(0);
+  await expect.poll(async () => Number(await overlay.getAttribute('data-los-per-second')), { timeout: 5_000 }).toBeGreaterThan(0);
+  await expect.poll(async () => Number(await overlay.getAttribute('data-nav-per-second')), { timeout: 5_000 }).toBeGreaterThan(0);
   await expect(overlay).toContainText('FPS');
   await expect(overlay).toContainText('FRAME');
   await expect(overlay).toContainText('DRAW');
