@@ -55,7 +55,7 @@ export class AtmosphereSystem {
     });
     this.moon = new THREE.Sprite(this.moonMaterial);
     this.moon.name = 'blood-moon-sky';
-    this.moon.scale.set(14, 14, 1);
+    this.moon.scale.set(12, 12, 1);
     this.moon.frustumCulled = false;
     this.moon.renderOrder = -100;
     this.proximityLight.name = 'blood-moon-proximity-light';
@@ -111,7 +111,7 @@ export class AtmosphereSystem {
     this.skyRight.crossVectors(this.skyForward, this.skyUp).normalize();
     this.moon.position.copy(camera.position)
       .addScaledVector(this.skyForward, 105)
-      .addScaledVector(this.skyRight, -18)
+      .addScaledVector(this.skyRight, -14)
       .addScaledVector(this.skyUp, 27);
   }
 
