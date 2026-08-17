@@ -25,6 +25,10 @@ export class AtmosphereSystem {
   private readonly hemiSky = new THREE.Color();
   private readonly hemiGround = new THREE.Color();
   private readonly keyColor = new THREE.Color();
+  private readonly keyTargetPosition = new THREE.Vector3();
+  private readonly skyForward = new THREE.Vector3();
+  private readonly skyRight = new THREE.Vector3();
+  private readonly skyUp = new THREE.Vector3(0, 1, 0);
   private readonly moon: THREE.Sprite;
   private readonly moonMaterial: THREE.SpriteMaterial;
   private readonly moonTexture: THREE.CanvasTexture;
@@ -92,15 +96,12 @@ export class AtmosphereSystem {
   updateSkyPosition(): void {
     if (!this.moon.visible) return;
     const camera = this.deps.camera;
-    const forward = new THREE.Vector3();
-    const right = new THREE.Vector3();
-    const up = new THREE.Vector3(0, 1, 0);
-    camera.getWorldDirection(forward);
-    right.crossVectors(forward, up).normalize();
+    camera.getWorldDirection(this.skyForward);
+    this.skyRight.crossVectors(this.skyForward, this.skyUp).normalize();
     this.moon.position.copy(camera.position)
-      .addScaledVector(forward, 105)
-      .addScaledVector(right, -38)
-      .addScaledVector(up, 31);
+      .addScaledVector(this.skyForward, 105)
+      .addScaledVector(this.skyRight, -38)
+      .addScaledVector(this.skyUp, 31);
   }
 
   dispose(): void {
@@ -121,6 +122,7 @@ export class AtmosphereSystem {
     this.deps.hemisphere.intensity = preset.hemisphereIntensity;
     this.deps.key.color.setHex(preset.keyColor);
     this.deps.key.intensity = preset.keyIntensity;
+    this.deps.key.position.set(...preset.keyPosition);
     this.deps.renderer.toneMappingExposure = preset.exposure;
     this.rainIntensity = preset.rainIntensity;
     this.stormIntensity = preset.stormIntensity;
@@ -148,11 +150,13 @@ export class AtmosphereSystem {
     this.hemiSky.setHex(target.hemisphereSky);
     this.hemiGround.setHex(target.hemisphereGround);
     this.keyColor.setHex(target.keyColor);
+    this.keyTargetPosition.set(...target.keyPosition);
     this.deps.hemisphere.color.lerp(this.hemiSky, alpha);
     this.deps.hemisphere.groundColor.lerp(this.hemiGround, alpha);
     this.deps.hemisphere.intensity = THREE.MathUtils.lerp(this.deps.hemisphere.intensity, target.hemisphereIntensity, alpha);
     this.deps.key.color.lerp(this.keyColor, alpha);
     this.deps.key.intensity = THREE.MathUtils.lerp(this.deps.key.intensity, target.keyIntensity, alpha);
+    this.deps.key.position.lerp(this.keyTargetPosition, alpha);
     this.deps.renderer.toneMappingExposure = THREE.MathUtils.lerp(this.deps.renderer.toneMappingExposure, target.exposure, alpha);
   }
 
