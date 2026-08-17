@@ -2,7 +2,7 @@
 
 Mobile-first browser 3D family survival shooter. Супер Макар uses local photos for Макар, Супермама and Суперпапа.
 
-## Current generation — Engine Next 0.14.0 · «Супер Макар»
+## Current generation — Engine Next 0.15.0 · «Супер Макар»
 
 The active game is built with **TypeScript + Vite + npm Three.js** and targets both Android/mobile and desktop browsers.
 
@@ -108,7 +108,7 @@ GitHub is the source repository. The intended production target is Vercel. Until
 
 ## Next major product work
 
-With authored navigation and infected perception now active, the next ordered work is **Face System 2.0 crop/fitting polish**, followed by a debug/performance overlay, Android profiling and final HUD/performance work.
+With Face System 2.0 now active, the next ordered work is **?debug=1 performance/AI/nav metrics**, followed by Android profiling, budget tuning and final HUD cleanup.
 
 ## Asset / source licensing
 
@@ -117,6 +117,18 @@ Third-party code and vendored asset notices are tracked in `THIRD_PARTY_NOTICES.
 The Facefall repository itself currently has no explicit public reuse license; selecting the project license remains an intentional pending decision rather than something inferred from third-party dependencies.
 
 ---
+
+
+## 0.15.0 — Face System 2.0 checkpoint (2026-08-17)
+
+- Family portrait uploads are normalized locally to a bounded **512×640 / 4:5** texture before storage and rendering.
+- When the browser exposes the native Shape Detection FaceDetector, the largest detected face drives the crop, including off-center phone photos.
+- Browsers without FaceDetector use a deterministic upward-biased 4:5 fallback, so photo upload never depends on that optional API.
+- Makar, Mama and Papa have separate crop profiles for slightly different face framing.
+- The normalized portrait is stored as a compact JPEG instead of retaining the original multi-megabyte phone image in localStorage.
+- Existing v1 local face entries are migrated on-device to v2 before a run starts; photos are never uploaded to a server.
+- CharacterModel remains the owner of the curved shell attached to the real Head bone; image preparation now lives separately in FaceImageProcessor.
+- Unit tests cover detected, off-center, fallback and role-specific crops; mobile Playwright covers upload → face-aware crop → 512×640 JPEG → all three production face shells.
 
 ## 0.14.0 — infected perception + AI LOD checkpoint (2026-08-17)
 

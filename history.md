@@ -569,3 +569,17 @@ PR #28 replaces the active procedural environment with an authored GLB level whi
 - Added distance-based cadence for LOS and nav/SpatialHash/local-avoidance steering while preserving fixed-step movement/animation.
 - Added unit and live Playwright behavior coverage for perception transitions and LOD policy.
 - Development PR: #34.
+
+## 0.15.0 — Face System 2.0 (2026-08-17)
+
+- Continued from the stable 0.14.0 infected-perception checkpoint.
+- Added FaceImageProcessor as the client-side preprocessing boundary for family portraits.
+- Portraits are normalized to 512×640 / 4:5 before entering FaceStore or CharacterModel.
+- Native FaceDetector is used when available to follow the largest off-center face; unsupported/failing browsers fall back safely.
+- Added family-specific crop profiles for Makar, Mama and Papa.
+- FaceStore moved to v2 compact JPEG entries and locally migrates existing v1 portraits.
+- No photo network transfer was introduced; the complete pipeline remains on-device/browser-local.
+- Existing curved face shell on the real Head bone remains the production 3D fitting approach.
+- Added unit and live mobile browser coverage for the new preprocessing path.
+- Development PR: #35.
+

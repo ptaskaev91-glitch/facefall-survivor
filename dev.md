@@ -640,3 +640,23 @@ Next ordered work:
 - [ ] Android profiling and budget tuning;
 - [ ] final HUD cleanup after profiling;
 - [ ] optional nav debug overlay only if useful for development.
+
+## 0.15.0 — Face System 2.0 checkpoint (2026-08-17)
+
+> This checkpoint is authoritative for family portrait preprocessing and supersedes the older raw-photo fitting path.
+
+- [x] local 512×640 / 4:5 portrait normalization before persistence;
+- [x] optional native FaceDetector crop for off-center faces;
+- [x] deterministic fallback when Shape Detection is unavailable;
+- [x] separate Makar / Mama / Papa crop profiles;
+- [x] compact JPEG v2 storage with local v1 migration;
+- [x] production curved Head-bone shell retained as the 3D fitting boundary;
+- [x] unit crop-policy coverage;
+- [x] mobile browser coverage for detector path, normalized dimensions and all three family face shells.
+
+Next ordered work:
+- [ ] ?debug=1 FPS/frame-time/draw-call/triangle/active-enemy/AI-nav metrics;
+- [ ] Android profiling and budget tuning;
+- [ ] final HUD cleanup after profiling;
+- [ ] optional nav debug overlay only if it materially helps profiling.
+
