@@ -1,4 +1,5 @@
 import type { GameApp } from '../app/GameApp';
+import { compactNumber } from './DebugMetricFormat';
 
 interface RendererInfoLike {
   render: {
@@ -213,10 +214,4 @@ export function attachDebugPerformanceOverlay(app: GameApp): DebugPerformanceOve
   if (typeof window === 'undefined') return null;
   if (new URLSearchParams(window.location.search).get('debug') !== '1') return null;
   return new DebugPerformanceOverlay(app);
-}
-
-export function compactNumber(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}m`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
-  return String(value);
 }
