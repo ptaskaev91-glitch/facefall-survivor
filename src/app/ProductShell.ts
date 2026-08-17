@@ -1,5 +1,6 @@
 import { aimController } from '../aim/AimController';
 import type { CameraMode } from '../camera/CameraDirector';
+import { normalizeFaceDataUrl } from '../characters/FaceImageProcessor';
 import { FaceStore, type FaceSlot } from '../persistence/FaceStore';
 import { SettingsStore, type FacefallSettings } from '../persistence/SettingsStore';
 import type { AudioSystem } from '../presentation/audio/AudioSystem';
@@ -42,9 +43,21 @@ export class ProductShell {
   private async onFaceChange(role: FaceSlot): Promise<void> {
     const file = this.dom[role].input.files?.[0]; if (!file) return;
     if (!file.type.startsWith('image/') || file.size > 12 * 1024 * 1024) { this.dom.error.textContent = 'Нужно изображение до 12 МБ.'; return; }
-    try { const data = await this.readFile(file); this.faces[role] = data; this.stores[role].save(data); this.dom.error.textContent = ''; this.refreshFaces(); }
-    catch { this.dom.error.textContent = 'Не удалось прочитать фотографию.'; }
-    finally { this.dom[role].input.value = ''; }
+    this.dom.loading.textContent = 'КАДРИРУЕМ ЛИЦО…';
+    try {
+      const raw = await this.readFile(file);
+      const normalized = await normalizeFaceDataUrl(raw, role);
+      this.faces[role] = normalized.dataUrl;
+      this.stores[role].save(normalized.dataUrl);
+      this.dom[role].preview.dataset.autoCrop = normalized.detected ? 'face' : 'center';
+      this.dom.error.textContent = '';
+      this.refreshFaces();
+    } catch {
+      this.dom.error.textContent = 'Не удалось подготовить фотографию.';
+    } finally {
+      this.dom.loading.textContent = '';
+      this.dom[role].input.value = '';
+    }
   }
   private onTop = (): void => { this.cameraMode = 'top'; this.refreshCamera(); };
   private onThird = (): void => { this.cameraMode = 'third'; this.refreshCamera(); };
@@ -57,7 +70,7 @@ export class ProductShell {
   };
   private applySettings(): void { aimController.configure({ sensitivity: this.settings.aimSensitivity, deadzone: this.settings.aimDeadzone }); this.app.configureAimAssist(Math.max(0.01, this.settings.aimAssist)); this.audio.setVolume(this.settings.masterVolume); }
   private refreshSettings(): void { this.dom.sensitivity.value = String(this.settings.aimSensitivity); this.dom.deadzone.value = String(this.settings.aimDeadzone); this.dom.aimAssist.value = String(this.settings.aimAssist); this.dom.volume.value = String(this.settings.masterVolume); this.dom.sensitivityValue.textContent = `${this.settings.aimSensitivity.toFixed(2)}×`; this.dom.deadzoneValue.textContent = `${Math.round(this.settings.aimDeadzone * 100)}%`; this.dom.aimAssistValue.textContent = `${Math.round(this.settings.aimAssist * 100)}%`; this.dom.volumeValue.textContent = `${Math.round(this.settings.masterVolume * 100)}%`; }
-  private refreshFaces(): void { for (const role of ['makar', 'mama', 'papa'] as FaceSlot[]) { const face = this.dom[role]; const src = this.faces[role]; if (src) { face.preview.src = src; face.preview.hidden = false; face.empty.hidden = true; face.remove.hidden = false; } else { face.preview.removeAttribute('src'); face.preview.hidden = true; face.empty.hidden = false; face.remove.hidden = true; } } }
+  private refreshFaces(): void { for (const role of ['makar', 'mama', 'papa'] as FaceSlot[]) { const face = this.dom[role]; const src = this.faces[role]; if (src) { face.preview.src = src; face.preview.hidden = false; face.empty.hidden = true; face.remove.hidden = false; } else { face.preview.removeAttribute('src'); delete face.preview.dataset.autoCrop; face.preview.hidden = true; face.empty.hidden = false; face.remove.hidden = true; } } }
   private refreshCamera(): void { this.dom.cameraTop.dataset.active = String(this.cameraMode === 'top'); this.dom.cameraThird.dataset.active = String(this.cameraMode === 'third'); }
   private readFile(file: File): Promise<string> { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Invalid image data')); reader.onerror = () => reject(reader.error); reader.readAsDataURL(file); }); }
 }
