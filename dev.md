@@ -5,8 +5,8 @@ Repository: `ptaskaev91-glitch/facefall-survivor`
 Source of truth: `main` + активная feature-ветка только до merge  
 Testing preview: `engine-next-preview` после зелёного main CI.
 
-Текущий стабильный checkpoint: **0.16.0 — debug/performance overlay**.  
-Текущий активный этап: **0.17.0 — Blood Moon / Weather Pass**.
+Текущий стабильный checkpoint: **0.17.0 — Blood Moon / Weather Pass**.  
+Текущий активный этап: **Android profiling + adaptive mobile budgets**.
 
 Этот файл — актуальный roadmap. Подробные завершённые изменения фиксируются в `history.md`, ownership — в `structure.md`.
 
@@ -154,7 +154,7 @@ Hard rules:
 
 # 5. 0.17.0 — Blood Moon / Weather Pass
 
-**Status: ACTIVE.**
+**Status: COMPLETE.**
 
 User-facing goal: сцена должна перестать выглядеть как один постоянный сумрачный preset и получить заметный survival-horror ритм: **рассвет → сумрачный дождливый день → закат → кровавая ночь**.
 
@@ -164,11 +164,11 @@ Problem evidence: на Android long-press по `FIRE / WEAP / CAM` иногда 
 
 Required:
 
-- [ ] `user-select: none` / `-webkit-user-select: none` на gameplay controls;
-- [ ] `-webkit-touch-callout: none`;
-- [ ] prevent gameplay `contextmenu` / `selectstart` where appropriate;
-- [ ] сохранить `aria-label` и button semantics для accessibility;
-- [ ] Playwright regression: long-press/selection не создаёт text selection на action controls.
+- [x] `user-select: none` / `-webkit-user-select: none` на gameplay controls;
+- [x] `-webkit-touch-callout: none`;
+- [x] prevent gameplay `contextmenu` / `selectstart` where appropriate;
+- [x] сохранить `aria-label` и button semantics для accessibility;
+- [x] Playwright regression: long-press/selection не создаёт text selection на action controls.
 
 ## 5.2 Atmosphere model
 
@@ -178,33 +178,33 @@ Canonical presets:
 
 ### DAWN — рассвет
 
-- [ ] холодный зелёно-синий ambient + мягкий тёплый key light;
-- [ ] умеренный туман;
-- [ ] дождь слабый/отсутствует;
-- [ ] visibility высокая.
+- [x] холодный зелёно-синий ambient + мягкий тёплый key light;
+- [x] умеренный туман;
+- [x] дождь слабый/отсутствует;
+- [x] visibility высокая.
 
 ### OVERCAST — сумрачный дождливый день
 
-- [ ] серо-зелёный ambient;
-- [ ] постоянный дождь;
-- [ ] мокрый/холодный визуальный тон;
-- [ ] умеренно плотный haze;
-- [ ] storm/lightning разрешены.
+- [x] серо-зелёный ambient;
+- [x] постоянный дождь;
+- [x] мокрый/холодный визуальный тон;
+- [x] умеренно плотный haze;
+- [x] storm/lightning разрешены.
 
 ### DUSK — закат
 
-- [ ] оранжево-красный directional tint;
-- [ ] длинное/контрастное ощущение света;
-- [ ] туман чуть плотнее дня;
-- [ ] rain reduced.
+- [x] оранжево-красный directional tint;
+- [x] длинное/контрастное ощущение света;
+- [x] туман чуть плотнее дня;
+- [x] rain reduced.
 
 ### BLOOD_MOON — кровавая ночь
 
-- [ ] почти чёрный фон/ambient;
-- [ ] красная moon/key light;
-- [ ] красноватый дальний fog;
-- [ ] rain минимальный или выключен;
-- [ ] самая короткая визуальная дальность.
+- [x] почти чёрный фон/ambient;
+- [x] красная moon/key light;
+- [x] красноватый дальний fog;
+- [x] rain минимальный или выключен;
+- [x] самая короткая визуальная дальность.
 
 ## 5.3 Progression policy
 
@@ -229,10 +229,10 @@ Debug override для тестов допускается как `?atmosphere=da
 
 Не использовать тяжёлый true volumetric fog в 0.17.
 
-- [ ] динамический `FogExp2` density/color по preset;
-- [ ] дешёвый ground-haze слой только если mobile budget позволяет;
-- [ ] fog плавно интерполируется при смене фазы;
-- [ ] никакой новой per-pixel multi-pass postprocessing цепочки в этом этапе.
+- [x] динамический `FogExp2` density/color по preset;
+- [x] дешёвый ground-haze слой только если mobile budget позволяет;
+- [x] fog плавно интерполируется при смене фазы;
+- [x] никакой новой per-pixel multi-pass postprocessing цепочки в этом этапе.
 
 ## 5.5 Night enemy visibility falloff
 
@@ -240,40 +240,40 @@ Gameplay AI **не должен получать искусственное ух
 
 Ночью ухудшается именно presentation для игрока:
 
-- [ ] near zone примерно 0–6 m — заражённый читается нормально;
-- [ ] mid zone 6–12 m — сильнее смешивается с fog/background;
-- [ ] far zone 12+ m — заметно темнее и менее контрастный;
-- [ ] эффект обновляется с LOD cadence, не через тяжёлый material clone каждый frame;
-- [ ] hit proxies / raycast / damage semantics не меняются;
-- [ ] близкий атакующий заражённый всегда остаётся читаемым.
+- [x] near zone примерно 0–6 m — заражённый читается нормально;
+- [x] mid zone 6–12 m — сильнее смешивается с fog/background;
+- [x] far zone 12+ m — заметно темнее и менее контрастный;
+- [x] эффект обновляется с LOD cadence, не через тяжёлый material clone каждый frame;
+- [x] hit proxies / raycast / damage semantics не меняются;
+- [x] близкий атакующий заражённый всегда остаётся читаемым.
 
 Preferred implementation: shared visual-material tint/fog response or lightweight per-infected presentation LOD; не менять LOS/brain policy.
 
 ## 5.6 Weather controls
 
-- [ ] `RainField.setIntensity(0..1)` без пересоздания particle buffer;
-- [ ] `StormSystem.setEnabled()` / intensity policy;
-- [ ] environment transitions do not allocate large resources per wave;
-- [ ] debug overlay показывает текущий atmosphere preset.
+- [x] `RainField.setIntensity(0..1)` без пересоздания particle buffer;
+- [x] `StormSystem.setEnabled()` / intensity policy;
+- [x] environment transitions do not allocate large resources per wave;
+- [x] debug overlay показывает текущий atmosphere preset.
 
 ## 5.7 Automated evidence
 
 Unit:
 
-- [ ] wave → atmosphere mapping;
-- [ ] preset parameter sanity;
-- [ ] night visibility curve monotonic: distance ↑ → visibility ↓;
-- [ ] near-night visibility floor remains playable.
+- [x] wave → atmosphere mapping;
+- [x] preset parameter sanity;
+- [x] night visibility curve monotonic: distance ↑ → visibility ↓;
+- [x] near-night visibility floor remains playable.
 
 Playwright:
 
-- [ ] no gameplay text selection regression;
-- [ ] force each atmosphere preset and assert world state;
-- [ ] Blood Moon screenshot TOP;
-- [ ] Blood Moon screenshot 3RD;
-- [ ] overcast/rain screenshot;
-- [ ] no page errors;
-- [ ] existing aim/face/family/Recast tests remain green.
+- [x] no gameplay text selection regression;
+- [x] force each atmosphere preset and assert world state;
+- [x] Blood Moon screenshot TOP;
+- [x] Blood Moon screenshot 3RD;
+- [x] overcast/rain screenshot;
+- [x] no page errors;
+- [x] existing aim/face/family/Recast tests remain green.
 
 Exit criterion:
 
@@ -281,7 +281,7 @@ Exit criterion:
 
 ---
 
-# 6. After 0.17
+# 6. Next
 
 Ordered next work:
 
