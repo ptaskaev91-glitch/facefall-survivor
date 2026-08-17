@@ -22,11 +22,18 @@ export class ProductShell {
   private cameraMode: CameraMode = 'top';
   private settings: FacefallSettings = this.settingsStore.defaults();
   private busy = false;
+  private facePreparation: Promise<void> = Promise.resolve();
 
   constructor(private readonly app: GameApp, private readonly dom: ProductShellDom, private readonly audio: AudioSystem) {}
 
   attach(): void {
-    for (const role of ['makar', 'mama', 'papa'] as FaceSlot[]) { this.faces[role] = this.stores[role].load(); this.bindFace(role); }
+    const migrations: Promise<void>[] = [];
+    for (const role of ['makar', 'mama', 'papa'] as FaceSlot[]) {
+      this.faces[role] = this.stores[role].load();
+      this.bindFace(role);
+      if (this.faces[role] && this.stores[role].needsNormalization()) migrations.push(this.normalizeStoredFace(role));
+    }
+    this.facePreparation = Promise.all(migrations).then(() => undefined);
     this.settings = this.settingsStore.load(); this.applySettings(); this.refreshFaces(); this.refreshCamera(); this.refreshSettings();
     this.dom.cameraTop.addEventListener('click', this.onTop); this.dom.cameraThird.addEventListener('click', this.onThird);
     for (const input of [this.dom.sensitivity, this.dom.deadzone, this.dom.aimAssist, this.dom.volume]) input.addEventListener('input', this.onSettingsInput);
@@ -59,12 +66,26 @@ export class ProductShell {
       this.dom[role].input.value = '';
     }
   }
+  private async normalizeStoredFace(role: FaceSlot): Promise<void> {
+    const source = this.faces[role];
+    if (!source) return;
+    try {
+      const normalized = await normalizeFaceDataUrl(source, role);
+      if (this.faces[role] !== source) return;
+      this.faces[role] = normalized.dataUrl;
+      this.stores[role].save(normalized.dataUrl);
+      this.dom[role].preview.dataset.autoCrop = normalized.detected ? 'face' : 'center';
+      this.refreshFaces();
+    } catch (error) {
+      console.warn(`[Super Makar] could not migrate ${role} face to v2`, error);
+    }
+  }
   private onTop = (): void => { this.cameraMode = 'top'; this.refreshCamera(); };
   private onThird = (): void => { this.cameraMode = 'third'; this.refreshCamera(); };
   private onSettingsInput = (): void => { this.settings = { aimSensitivity: Number(this.dom.sensitivity.value), aimDeadzone: Number(this.dom.deadzone.value), aimAssist: Number(this.dom.aimAssist.value), masterVolume: Number(this.dom.volume.value) }; this.settingsStore.save(this.settings); this.applySettings(); this.refreshSettings(); };
   private onStart = async (): Promise<void> => {
     if (this.busy) return; this.busy = true; this.dom.start.disabled = true; this.dom.error.textContent = ''; this.dom.loading.textContent = 'ЗАГРУЖАЕМ СУПЕР МАКАРА…';
-    try { await this.audio.resume(); await this.app.start({ cameraMode: this.cameraMode, faceDataUrl: this.faces.makar, mamaFaceDataUrl: this.faces.mama, papaFaceDataUrl: this.faces.papa }); this.dom.overlay.dataset.visible = 'false'; this.dom.loading.textContent = ''; }
+    try { await this.facePreparation; await this.audio.resume(); await this.app.start({ cameraMode: this.cameraMode, faceDataUrl: this.faces.makar, mamaFaceDataUrl: this.faces.mama, papaFaceDataUrl: this.faces.papa }); this.dom.overlay.dataset.visible = 'false'; this.dom.loading.textContent = ''; }
     catch (error) { this.dom.error.textContent = `Не удалось запустить игру: ${error instanceof Error ? error.message : String(error)}`; this.app.enterMenu(); }
     finally { this.busy = false; this.dom.start.disabled = false; }
   };
