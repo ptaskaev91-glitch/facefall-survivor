@@ -1,6 +1,6 @@
 # Супер Макар — Structure
 
-Последняя актуализация: **2026-08-14**  
+Последняя актуализация: **2026-08-17**  
 Repository: `ptaskaev91-glitch/facefall-survivor`  
 Source of truth: `main` after PR #30 merge  
 Architecture checkpoint: **0.12.0 СУПЕР МАКАР — FAMILY SURVIVAL**
@@ -706,3 +706,18 @@ Performance instrumentation is intentionally outside the gameplay ownership tree
 
 Normal gameplay has no profiler DOM or instrumentation. This checkpoint creates the measurement layer for Android budget tuning rather than changing budgets speculatively.
 
+# 0.17 atmosphere / weather ownership
+
+- `src/world/AtmospherePresets.ts` — canonical dawn / overcast / dusk / Blood Moon data, wave mapping, URL override parsing and presentation visibility curve.
+- `src/world/AtmosphereSystem.ts` — owns smooth environment blending, Blood Moon sprite and short-range night readability light. It is presentation-only and must not own infected perception.
+- `src/world/WorldRuntime.ts` — constructs/owns AtmosphereSystem and passes environment lifecycle into simulation/frame updates.
+- `src/app/GameApp.ts` — passes the current `WaveDirector.wave` to WorldRuntime; it does not contain weather parameter data.
+- `src/rendering/RainField.ts` — fixed-capacity rain buffer with runtime draw-range intensity and generated streak texture.
+- `src/rendering/StormSystem.ts` — bounded reused lightning light with atmosphere-controlled activity.
+- `src/rendering/GroundHazeField.ts` — one-draw-call low mist layer; complements `FogExp2` without volumetric postprocessing.
+- `src/debug/DebugPerformanceOverlay.ts` — opt-in debug panel also reports current atmosphere.
+- `src/main.ts` + `engine-lab.html` — gameplay-control selection/callout hardening; mobile action buttons are icon-only SVG with aria labels.
+- `tests/unit/atmosphere-presets.test.ts` — pure progression/visibility policy tests.
+- `tests/smoke/atmosphere-weather.spec.ts` — mobile browser behavior + four-phase visual evidence.
+
+Hard boundary: **weather changes rendering/presentation, not EnemyBrain / EnemySystem LOS, hearing, Recast navigation, collision or damage.** The next optimization pass should tune these environment costs using the 0.16 debug metrics rather than introducing new rendering frameworks.

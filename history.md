@@ -1,6 +1,6 @@
 # Супер Макар — History
 
-Последняя актуализация: **2026-08-14**  
+Последняя актуализация: **2026-08-17**  
 Repository: `ptaskaev91-glitch/facefall-survivor`  
 Source of truth: `main`
 
@@ -595,3 +595,16 @@ PR #28 replaces the active procedural environment with an authored GLB level whi
 - Added regression coverage proving normal runs have no debug panel and debug runs produce non-zero renderer/LOS/Recast-nav metrics.
 - Development PR: #36.
 
+# 0.17.0 — Blood Moon / Weather Pass (2026-08-17)
+
+Real-device Android feedback showed that the touch action labels could be treated as ordinary selectable text: a long press on FIRE opened the browser/system selection/search UI. The fix was intentionally stronger than CSS alone: the mobile action cluster became icon-only SVG controls with accessible aria labels, and gameplay controls also suppress selectstart/contextmenu/touch callout behavior. External OS-level OCR cannot be controlled by the web app, but there is no longer ordinary visible FIRE / R / WEAP / CAM text in the action buttons.
+
+The same checkpoint introduced the requested environment cycle. The production policy is deterministic by survival wave rather than tied to the phone clock: waves 1–2 use dawn, 3–4 a gloomy rainy day, 5–6 dusk, and wave 7+ Blood Moon. This makes the progression reproducible in CI and means Supermama enters during the rainy phase while Superpapa arrives as Blood Moon begins.
+
+`AtmosphereSystem` is owned by `WorldRuntime`. It blends scene background, `FogExp2`, hemisphere/key lighting, directional-light angle, renderer exposure, rain, storm activity and low haze. A small generated sprite provides the Blood Moon. Rain can change active draw count without reallocating its buffer, and low haze stays one draw call. Heavy volumetric fog/post-processing was deliberately rejected until real Android profiling proves a budget for it.
+
+Night visibility is presentation-only. Dense red-black exponential fog and low exposure remove distant detail, while a short-range no-shadow light follows the player to preserve close combat readability. The AI still uses the same authored collision LOS, hearing, target memory, Recast pathfinding and damage semantics; night does not give infected artificial blindness.
+
+The debug profiler was extended with the active atmosphere id. Unit tests cover wave/preset/visibility policy. Mobile Playwright covers non-selectable icon controls and all four states, with explicit dawn, overcast-rain, dusk, Blood Moon TOP and Blood Moon 3RD screenshots. The screenshots were inspected and used to brighten the overcast day, soften near-player night lighting, and fully frame the Blood Moon on narrow mobile screens.
+
+PR #38: `feat: add 0.17 blood moon weather pass`.

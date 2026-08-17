@@ -32,7 +32,7 @@ interface EnemySystemLike {
 }
 
 interface DebugAppInternals {
-  world: { renderer: RendererLike };
+  world: { renderer: RendererLike; atmosphereId?: string };
   enemySystem: EnemySystemLike;
   quality: { id: string };
   navigationMode: string;
@@ -110,6 +110,7 @@ export class DebugPerformanceOverlay {
     const enemySystem = this.runtime.enemySystem;
     const intents = this.countIntents(enemySystem.actors);
     const blockedPct = this.counters.losQueries > 0 ? (this.counters.losBlocked / this.counters.losQueries) * 100 : 0;
+    const atmosphere = this.runtime.world.atmosphereId ?? 'unknown';
 
     this.element.dataset.samples = String(Number(this.element.dataset.samples ?? '0') + 1);
     this.element.dataset.fps = fps.toFixed(1);
@@ -122,9 +123,10 @@ export class DebugPerformanceOverlay {
     this.element.dataset.losTotal = String(this.totalLosQueries);
     this.element.dataset.navTotal = String(this.totalNavRequests);
     this.element.dataset.navigation = this.runtime.navigationMode;
+    this.element.dataset.atmosphere = atmosphere;
 
     this.element.textContent = [
-      `DEBUG PERF · ${this.runtime.quality.id} · nav=${this.runtime.navigationMode}`,
+      `DEBUG PERF · ${this.runtime.quality.id} · nav=${this.runtime.navigationMode} · sky=${atmosphere}`,
       `FPS ${fps.toFixed(1)} · FRAME ${avgFrameMs.toFixed(2)} ms · MAX ${this.frameMsMax.toFixed(1)} ms`,
       `DRAW ${renderInfo.calls} · TRI ${compactNumber(renderInfo.triangles)} · DPR ${renderer.getPixelRatio().toFixed(2)}`,
       `AI ${enemySystem.activeCount} · chase ${intents.chase} · inv ${intents.investigate} · atk ${intents.attack}`,

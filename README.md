@@ -2,7 +2,7 @@
 
 Mobile-first browser 3D family survival shooter. Супер Макар uses local photos for Макар, Супермама and Суперпапа.
 
-## Current generation — Engine Next 0.16.0 · «Супер Макар»
+## Current generation — Engine Next 0.17.0 · «Супер Макар»
 
 The active game is built with **TypeScript + Vite + npm Three.js** and targets both Android/mobile and desktop browsers.
 
@@ -19,7 +19,7 @@ Current gameplay foundation:
 - offline-baked **Recast/Detour** navmesh for the authored level, imported in-browser with collision-navigation fallback;
 - real static-world LOS perception, sound investigation and last-seen target memory for infected;
 - per-enemy cached Recast paths plus distance-throttled LOS/steering/SpatialHash work for mobile AI LOD;
-- rain, fog, storm/lightning, grass, pooled particles/decals/lights and procedural Web Audio;
+- wave-driven dawn / rainy overcast / dusk / Blood Moon atmosphere, mobile-safe fog/haze/rain/storm, grass, pooled particles/decals/lights and procedural Web Audio;
 - strict TypeScript, reproducible `npm ci`, unit tests and Playwright desktop/mobile visual smoke gates.
 
 ### 0.14.0 infected perception + AI LOD milestone
@@ -110,7 +110,7 @@ GitHub is the source repository. The intended production target is Vercel. Until
 
 ## Next major product work
 
-With the opt-in performance overlay now active, the next ordered work is **Android profiling and adaptive budget tuning** using real FPS/frame/draw/AI/nav measurements, followed by final HUD cleanup.
+With the Blood Moon / weather pass active, the next ordered work is **real Android profiling across dawn / rain / dusk / Blood Moon in TOP and 3RD**, then adaptive DPR / shadow / FX / enemy / LOS / NAV budget tuning, followed by final HUD cleanup.
 
 ## Asset / source licensing
 
@@ -182,3 +182,19 @@ The Facefall repository itself currently has no explicit public reuse license; s
 - Семейный Playwright smoke загружает три разные тестовые фотографии, проверяет unlock/markers/shop и создаёт `mobile-super-makar-family.png`.
 - Финальный релизный gate: TypeScript strict, unit tests, Playwright browser/visual smoke, deploy build и sole deployment-root assertion.
 - Canonical source после merge: `main`.
+
+## 0.17.0 — Blood Moon / Weather Pass checkpoint (2026-08-17)
+
+- Mobile action controls are now icon-first: FIRE / R / WEAP / CAM visible words were removed from the touch action cluster, while Russian `aria-label` semantics remain for accessibility.
+- Gameplay controls also suppress browser text selection, touch callouts and context-menu selection, addressing the Android long-press behavior seen in real-device testing.
+- Added a WorldRuntime-owned `AtmosphereSystem` with deterministic progression: waves 1–2 dawn, 3–4 gloomy/rainy overcast, 5–6 dusk, wave 7+ Blood Moon.
+- Added deterministic QA overrides: `?atmosphere=dawn`, `overcast`, `dusk` and `blood-moon`.
+- Each phase controls background, exponential fog, hemisphere/key lighting, key-light angle, exposure, rain, storm activity and low ground haze.
+- Rain intensity changes through draw ranges without rebuilding the particle buffer; rain uses a small generated streak texture.
+- Silent-Hill-like low mist is implemented with `FogExp2` plus one inexpensive ground-haze draw call instead of mobile-heavy volumetric postprocessing.
+- Blood Moon adds a generated red moon sprite, dense red-black distance fog and a short-range no-shadow proximity light around the player.
+- Night distance readability is presentation-only: near combat stays visible while 12–24m+ infected disappear into darkness/fog; infected LOS, hearing, Recast navigation, collision and damage rules are unchanged.
+- `?debug=1` now reports the active atmosphere preset.
+- Unit coverage verifies wave mapping, parameter ranges and monotonic Blood Moon visibility falloff.
+- Mobile Playwright verifies icon-only/non-selectable controls, all four atmosphere states and captures dawn, rain, dusk, Blood Moon TOP and Blood Moon 3RD visual checkpoints.
+- Visual artifacts were inspected before release; the Blood Moon was repositioned/scaled to remain fully framed on narrow mobile viewports.

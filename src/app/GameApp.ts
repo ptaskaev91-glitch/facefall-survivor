@@ -261,7 +261,7 @@ export class GameApp {
     for (const request of this.waveDirector.update(dt, this.enemySystem.activeCount, effectiveMax, this.family.heroCount)) this.enemySystem.spawn(request.type, request.position, this.player.position);
     void this.family.syncWave(this.waveDirector.wave);
     this.family.update(dt, this.player.position, this.player.facing);
-    this.effects.update(dt); this.runtimeFx.update(dt); this.lightPool.update(dt); this.world.updateSimulation(dt);
+    this.effects.update(dt); this.runtimeFx.update(dt); this.lightPool.update(dt); this.world.updateSimulation(dt, this.waveDirector.wave);
     if (this.input.consumePressed('toggleCamera')) this.setCameraMode(this.cameraMode === 'top' ? 'third' : 'top');
     if (this.input.consumePressed('switchWeapon')) this.player.setActiveWeapon(this.weaponSystem.cycle());
     if (this.input.consumePressed('reload')) this.weaponSystem.reload();

@@ -5,12 +5,25 @@ import type { FacefallEvents } from '../combat/types';
 import { EventBus } from '../core/EventBus';
 import type { QualityProfile } from '../graphics/quality';
 import { CollisionWorld } from '../physics/CollisionWorld';
+import { GroundHazeField } from '../rendering/GroundHazeField';
 import { RainField } from '../rendering/RainField';
 import { StormSystem } from '../rendering/StormSystem';
 import { AssetManager } from './AssetManager';
+import { AtmosphereSystem } from './AtmosphereSystem';
+import { atmosphereForWave, parseAtmosphereOverride, type AtmosphereId } from './AtmospherePresets';
 import { GrassField } from './GrassField';
 import { LevelLoader } from './LevelLoader';
 import type { LevelManifest, LevelMarker } from './LevelManifest';
+
+export interface AtmosphereDebugState {
+  id: AtmosphereId;
+  fogDensity: number;
+  exposure: number;
+  rainIntensity: number;
+  stormIntensity: number;
+  bloodMoonVisible: boolean;
+  visibilityAt18m: number;
+}
 
 /**
  * Owns renderer, scene, static collision and environment lifecycle.
@@ -26,7 +39,12 @@ export class WorldRuntime {
   private readonly staticWorld = new THREE.Group();
   private readonly grass: GrassField;
   private readonly rain: RainField;
+  private readonly haze: GroundHazeField;
   private readonly storm: StormSystem;
+  private readonly hemisphere = new THREE.HemisphereLight(0xc6d4c7, 0x172019, 1.5);
+  private readonly keyLight = new THREE.DirectionalLight(0xdbe8df, 2.0);
+  private readonly atmosphere: AtmosphereSystem;
+  private atmosphereOverride: AtmosphereId | null;
   private readonly assets = new AssetManager();
   private readonly levelLoader = new LevelLoader(this.assets, this.collisionWorld);
   private readonly levelLights: THREE.Light[] = [];
@@ -38,19 +56,45 @@ export class WorldRuntime {
     this.cameraRig.setCollision(new CameraCollision(this.collisionWorld));
     this.grass = new GrassField(quality);
     this.rain = new RainField(this.scene, quality);
+    this.haze = new GroundHazeField(this.scene, quality);
     this.storm = new StormSystem(this.scene, events);
     this.configureScene();
+    this.atmosphere = new AtmosphereSystem({
+      scene: this.scene,
+      renderer: this.renderer,
+      camera: this.camera,
+      hemisphere: this.hemisphere,
+      key: this.keyLight,
+      rain: this.rain,
+      storm: this.storm,
+      haze: this.haze,
+    });
+    this.atmosphereOverride = typeof window === 'undefined'
+      ? null
+      : parseAtmosphereOverride(new URLSearchParams(window.location.search).get('atmosphere'));
+    if (this.atmosphereOverride) this.atmosphere.setPreset(this.atmosphereOverride, true);
     this.createFallbackGeometry();
   }
 
   setCameraMode(mode: CameraMode): void { this.cameraRig.setMode(mode); }
 
-  updateSimulation(dt: number): void { this.storm.update(dt); }
+  setAtmosphereOverride(id: AtmosphereId | null, immediate = false): void {
+    this.atmosphereOverride = id;
+    this.atmosphere.setPreset(id ?? 'dawn', immediate);
+  }
+
+  updateSimulation(dt: number, wave = 1): void {
+    this.atmosphere.setPreset(this.atmosphereOverride ?? atmosphereForWave(wave));
+    this.atmosphere.update(dt);
+    this.storm.update(dt);
+  }
 
   updateFrame(playerPosition: THREE.Vector3, facing: THREE.Vector3, dt: number): void {
     this.cameraRig.update(playerPosition, facing, dt);
     this.grass.update(this.camera.position);
     this.rain.update(dt, playerPosition);
+    this.haze.update(dt, playerPosition);
+    this.atmosphere.updatePresentationAnchor(playerPosition);
   }
 
   render(): void { this.renderer.render(this.scene, this.camera); }
@@ -60,6 +104,21 @@ export class WorldRuntime {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.quality.maxPixelRatio));
+  }
+
+  get atmosphereId(): AtmosphereId { return this.atmosphere.target; }
+
+  getAtmosphereDebugState(): AtmosphereDebugState {
+    const fog = this.scene.fog instanceof THREE.FogExp2 ? this.scene.fog : null;
+    return {
+      id: this.atmosphere.target,
+      fogDensity: fog?.density ?? 0,
+      exposure: this.renderer.toneMappingExposure,
+      rainIntensity: this.rain.currentIntensity,
+      stormIntensity: this.storm.currentActivity,
+      bloodMoonVisible: Boolean(this.scene.getObjectByName('blood-moon-sky')?.visible),
+      visibilityAt18m: this.atmosphere.visibilityAtDistance(18),
+    };
   }
 
   async loadManifest(): Promise<{ manifest: LevelManifest; levelId: string }> {
@@ -80,6 +139,8 @@ export class WorldRuntime {
 
   dispose(): void {
     for (const light of this.levelLights.splice(0)) light.removeFromParent();
+    this.atmosphere.dispose();
+    this.haze.dispose();
     this.rain.dispose();
     this.storm.dispose();
     this.assets.clearCache();
@@ -108,12 +169,11 @@ export class WorldRuntime {
   private configureScene(): void {
     this.scene.background = new THREE.Color(0x07100b);
     this.scene.fog = new THREE.FogExp2(0x0b1610, this.quality.fogDensity);
-    this.scene.add(new THREE.HemisphereLight(0xc6d4c7, 0x172019, 1.5));
-    const moon = new THREE.DirectionalLight(0xdbe8df, 2.0);
-    moon.position.set(-18, 32, -12);
-    moon.castShadow = this.quality.shadows;
-    moon.shadow.mapSize.set(this.quality.shadowMapSize, this.quality.shadowMapSize);
-    this.scene.add(moon);
+    this.scene.add(this.hemisphere);
+    this.keyLight.position.set(-18, 32, -12);
+    this.keyLight.castShadow = this.quality.shadows;
+    this.keyLight.shadow.mapSize.set(this.quality.shadowMapSize, this.quality.shadowMapSize);
+    this.scene.add(this.keyLight);
     this.scene.add(this.staticWorld);
     this.scene.add(this.grass.group);
   }
