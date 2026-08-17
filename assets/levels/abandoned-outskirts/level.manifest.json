@@ -1,0 +1,65 @@
+{
+  "id": "abandoned-outskirts",
+  "name": "Abandoned Outskirts",
+  "version": 1,
+  "markers": [
+    {
+      "id": "player-start",
+      "kind": "player-spawn",
+      "position": { "x": 0, "y": 0, "z": 10 },
+      "rotationY": 3.14159
+    },
+    {
+      "id": "spawn-road-north",
+      "kind": "enemy-spawn",
+      "position": { "x": 0, "y": 0, "z": -28 },
+      "radius": 5,
+      "tags": ["road", "wave"]
+    },
+    {
+      "id": "spawn-west-field",
+      "kind": "enemy-spawn",
+      "position": { "x": -24, "y": 0, "z": -8 },
+      "radius": 6,
+      "tags": ["field", "wave"]
+    },
+    {
+      "id": "loot-health-road",
+      "kind": "loot",
+      "position": { "x": 4.6, "y": 0, "z": 4.5 },
+      "data": { "type": "health", "amount": 35 }
+    },
+    {
+      "id": "loot-ammo-west",
+      "kind": "loot",
+      "position": { "x": -7.5, "y": 0, "z": 1.5 },
+      "data": { "type": "ammo", "amount": 30 }
+    },
+    {
+      "id": "loot-ammo-north",
+      "kind": "loot",
+      "position": { "x": 5.5, "y": 0, "z": -11 },
+      "data": { "type": "ammo", "amount": 24 }
+    },
+    {
+      "id": "choke-main-gate",
+      "kind": "choke-point",
+      "position": { "x": 8, "y": 0, "z": -2 },
+      "radius": 3,
+      "tags": ["gate"]
+    },
+    {
+      "id": "lamp-main-road-01",
+      "kind": "light",
+      "position": { "x": 5, "y": 4.5, "z": 4 },
+      "data": { "intensity": 8, "distance": 16, "warm": true }
+    },
+    {
+      "id": "wind-field-west",
+      "kind": "wind-zone",
+      "position": { "x": -18, "y": 0, "z": 0 },
+      "radius": 14,
+      "data": { "strength": 0.35 }
+    }
+  ]
+}
