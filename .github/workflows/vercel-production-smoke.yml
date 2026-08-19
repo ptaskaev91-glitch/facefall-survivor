@@ -1,8 +1,6 @@
 name: Vercel Production Smoke
 
 on:
-  push:
-    branches: ['agent/vercel-production-smoke']
   pull_request:
     branches: [main]
 
@@ -11,8 +9,10 @@ permissions:
 
 jobs:
   smoke:
-    runs-on: [self-hosted, linux, x64, moscow-game]
-    timeout-minutes: 12
+    # One-time temporary external HTTP probe. This branch/PR is never merged;
+    # the canonical Engine Next CI in main remains Moscow self-hosted only.
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
     steps:
       - name: Poll Vercel production deployment
         shell: bash
@@ -21,7 +21,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "Polling $URL"
-          for i in $(seq 1 120); do
+          for i in $(seq 1 36); do
             code="$(curl -L -sS -o /tmp/super-makar.html -w '%{http_code}' --connect-timeout 10 --max-time 30 "$URL" || true)"
             echo "attempt=$i http=$code"
             if [ "$code" = "200" ] && grep -qi '<title>Супер Макар</title>' /tmp/super-makar.html; then
