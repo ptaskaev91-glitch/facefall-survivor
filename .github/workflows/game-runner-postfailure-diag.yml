@@ -1,0 +1,41 @@
+name: Game runner postfailure diag
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/game-runner-postfailure-diag.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diag:
+    runs-on: [self-hosted, linux, x64, moscow-game]
+    timeout-minutes: 3
+    steps:
+      - name: Inspect runner, heavy lock and host pressure
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== TIME ==='; date -Is
+          echo '=== RUNNER PROCESSES ==='
+          ps -eo pid,ppid,user,etime,%cpu,%mem,args --sort=-%cpu | grep -E 'Runner.Listener|Runner.Worker|dev-heavy|playwright|chromium|chrome|super-makar-onboarding|performance-matrix' | grep -v grep | head -n 180 || true
+          echo
+          echo '=== HEAVY LOCK ==='
+          lslocks | grep -E 'heavy.lock|COMMAND' || true
+          fuser -v /var/lock/dev-platform/heavy.lock || true
+          echo
+          echo '=== LATEST GAME RUNNER DIAG ==='
+          latest="$(ls -t /opt/actions-runner-game/_diag/Runner_*.log 2>/dev/null | head -n 1 || true)"
+          echo "latest=$latest"
+          [ -z "$latest" ] || tail -n 220 "$latest" | sed -E 's/(Authorization|token|access_token|client_secret)[^ ]*/REDACTED/Ig'
+          echo
+          echo '=== WORKER DIAG TAILS ==='
+          for f in $(ls -t /opt/actions-runner-game/_diag/Worker_*.log 2>/dev/null | head -n 3); do
+            echo "--- $f ---"
+            tail -n 120 "$f" | sed -E 's/(Authorization|token|access_token|client_secret)[^ ]*/REDACTED/Ig' || true
+          done
+          echo
+          echo '=== MEMORY ==='; free -h
+          echo '=== LOAD ==='; uptime
