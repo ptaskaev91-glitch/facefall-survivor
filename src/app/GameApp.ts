@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { AimAssist } from '../aim/AimAssist';
 import { aimController } from '../aim/AimController';
+import { resolveThirdPersonAimPoint, resolveThirdPersonShotDirection } from '../aim/ThirdPersonShotResolver';
 import type { CameraMode } from '../camera/CameraDirector';
 import { DamageSystem } from '../combat/DamageSystem';
 import { Health } from '../combat/Health';
@@ -77,7 +78,7 @@ export class GameApp {
   private readonly session = new RunSession();
   private readonly combat: CombatRuntime;
 
-  private readonly weaponSystem = new WeaponSystem(this.events);
+  private readonly weaponSystem = new WeaponSystem(this.events, (out, origin) => this.resolvePlayerAim(out, origin));
   private readonly damageSystem = new DamageSystem(this.events);
   private readonly playerHealth = new Health(100);
   private readonly input = new InputManager();
@@ -106,6 +107,9 @@ export class GameApp {
   private readonly temp = new THREE.Vector3();
   private readonly muzzle = new THREE.Vector3();
   private readonly aimDirection = new THREE.Vector3();
+  private readonly cameraRayOrigin = new THREE.Vector3();
+  private readonly cameraRayDirection = new THREE.Vector3();
+  private readonly cameraAimPoint = new THREE.Vector3();
   private readonly aimNdc = new THREE.Vector2();
   private readonly assistDelta = new THREE.Vector2();
   private readonly losStart = new THREE.Vector3();
@@ -287,6 +291,34 @@ export class GameApp {
     this.aimDirection.copy(aimController.getWorldDirection(this.aimDirection)).setY(0);
     if (this.aimDirection.lengthSq() <= 1e-5) return;
     this.aimDirection.normalize(); this.player.facing.lerp(this.aimDirection, 1 - Math.exp(-dt * 18)).normalize();
+  }
+
+  private resolvePlayerAim(out: THREE.Vector3, origin: THREE.Vector3): THREE.Vector3 {
+    if (this.cameraMode === 'top') {
+      out.copy(aimController.getWorldDirection(out)).setY(0);
+      if (out.lengthSq() <= 1e-6) out.copy(this.player.facing);
+      return out.normalize();
+    }
+
+    aimController.getCameraRay(this.world.camera, this.cameraRayOrigin, this.cameraRayDirection);
+    this.raycaster.set(this.cameraRayOrigin, this.cameraRayDirection);
+    this.raycaster.far = 70;
+
+    const enemyEntry = this.raycaster
+      .intersectObjects([...this.enemySystem.meshes], true)
+      .find((entry) => entry.object.visible && entry.object.userData.damageTargetId);
+    const worldEntry = this.world.collisionWorld.raycast(this.cameraRayOrigin, this.cameraRayDirection, 70);
+
+    resolveThirdPersonAimPoint(
+      this.cameraRayOrigin,
+      this.cameraRayDirection,
+      enemyEntry ? { point: enemyEntry.point, distance: enemyEntry.distance } : null,
+      worldEntry ? { point: worldEntry.position, distance: worldEntry.distance } : null,
+      70,
+      this.cameraAimPoint
+    );
+
+    return resolveThirdPersonShotDirection(origin, this.cameraAimPoint, this.cameraRayDirection, out);
   }
 
   private updateFootsteps(dt: number, targetSpeed: number, sprinting: boolean): void {
