@@ -8,7 +8,7 @@ Canonical infrastructure standard: `ptaskaev91-glitch/server-control-ru/DEVELOPM
 Текущий стабильный gameplay checkpoint: **0.17.0 — Blood Moon / Weather Pass**.  
 Infrastructure checkpoint: **Moscow Development Platform migration — COMPLETE**.  
 Текущий активный gameplay этап: **Step 1 — Third-person Aim/Camera correctness**.  
-Active PR: **#45 — Fix third-person reticle-to-shot correctness**.
+Active PR: **#46 — Fix third-person reticle-to-shot correctness v2**.
 
 > Рабочее правило: один bounded gameplay step → лёгкие проверки → один `dev-heavy` browser/build job → review/merge → deploy exact green SHA → smoke → следующий step.
 
@@ -115,9 +115,10 @@ After the 2026-08-20 recovery:
 - [x] nginx local `/health` returned HTTP 200;
 - [x] RAM returned to a healthy range (~841 MiB used / ~1.1 GiB available at verification time);
 - [x] swap was effectively unused;
-- [ ] platform-level resource guard / canonical `dev-platform-recover` still needs implementation in `server-control-ru`;
+- [x] resource-aware `dev-heavy` + canonical `dev-platform-recover` implemented and merged in `server-control-ru` (`bf37d14...`);
+- [ ] platform-health must confirm v2 commands are installed on the live Moscow host;
 - [ ] public Moscow HTTPS certificate for `super-makar.72-56-14-168.sslip.io` needs correction;
-- [ ] reduce unnecessary simultaneous Runner.Worker activity after reboot.
+- [ ] reduce unnecessary simultaneous Runner.Worker activity after reboot where practical.
 
 These are platform-hardening tasks. They must not be reimplemented as permanent Game-specific debug workflows.
 
@@ -129,6 +130,8 @@ Normal Game validation:
 PR
  ↓
 moscow-game-01
+ ↓
+resource-guard preflight
  ↓
 npm ci
  ↓
@@ -204,7 +207,7 @@ User-visible problem: in 3RD the reticle can visually sit on an infected while t
 
 ## 4.1 Root cause — confirmed
 
-Current chain:
+Old chain:
 
 ```text
 reticle NDC
@@ -246,37 +249,40 @@ ShotEvent.direction
 CombatRuntime
 ```
 
-Required:
+Implementation state in PR #46:
 
-- [ ] expose exact current camera ray from `AimController`;
-- [ ] make `WeaponSystem` player aim resolver receive the physical muzzle origin;
-- [ ] choose the first valid enemy/world point under the reticle;
-- [ ] calculate shot direction from real muzzle to that point;
-- [ ] retain vertical 3RD aim component;
-- [ ] preserve TOP facing/gameplay behavior;
-- [ ] preserve existing hit-zone/damage semantics;
-- [ ] world cover must remain authoritative;
-- [ ] no second hidden aim authority.
+- [x] expose exact current camera ray from `AimController`;
+- [x] make `WeaponSystem` player aim resolver receive the physical muzzle origin;
+- [x] choose the first valid enemy/world point under the reticle;
+- [x] calculate shot direction from real muzzle to that point;
+- [x] retain vertical 3RD aim component;
+- [x] preserve TOP direction calculation in code;
+- [x] preserve existing hit-zone/damage semantics;
+- [x] projectile/world collision remains authoritative after the shot leaves the muzzle;
+- [x] no second hidden 3RD shot authority.
 
 `player.facing` remains body/animation orientation, not universal 3RD shot direction.
 
 ## 4.3 Required tests
 
-Unit:
+Unit added:
 
-- [ ] nearest camera-ray hit selection;
-- [ ] muzzle → aim point direction;
-- [ ] `WeaponSystem` passes exact physical origin to resolver;
-- [ ] deterministic fallback direction.
+- [x] nearest camera-ray hit selection;
+- [x] muzzle → aim point direction;
+- [x] `WeaponSystem` passes exact physical origin to resolver;
+- [ ] deterministic zero-length fallback test.
 
-Browser:
+Browser regression added:
 
-- [ ] 3RD reticle on target → emitted real shot follows target line;
-- [ ] deliberately wrong `player.facing` does not redirect 3RD shot;
-- [ ] vertical/off-axis reticle keeps X/Y semantics;
-- [ ] cover still blocks shot;
-- [ ] TOP regression remains green;
-- [ ] no fatal page errors.
+- [x] deterministic target placed on the actual camera-reticle ray;
+- [x] real emitted shot-line measured against that target;
+- [x] deliberately wrong `player.facing` must not redirect 3RD shot;
+- [ ] explicit vertical/off-axis reticle case;
+- [ ] explicit near-cover case;
+- [ ] TOP regression remains green through existing suite;
+- [x] no fatal page errors assertion.
+
+All tests above still require a green Moscow CI before the step can be marked complete.
 
 Exit condition:
 
@@ -364,14 +370,14 @@ Possible scope:
 
 # 11. Immediate execution order
 
-1. **Finish PR #45 — Third-person Aim/Camera correctness.**
-2. Run lightweight checks on Moscow.
-3. Run exactly one `dev-heavy` Playwright/build validation.
-4. Inspect regression evidence.
-5. Merge only after green.
-6. Fix Moscow public HTTPS as infrastructure follow-up before declaring Moscow public production canonical.
+1. **Finish PR #46 — Third-person Aim/Camera correctness v2.**
+2. Resource-guard preflight on Moscow must pass.
+3. Run lightweight typecheck + unit tests.
+4. Run exactly one `dev-heavy` Playwright/build validation.
+5. Inspect regression evidence and merge only after green.
+6. Fix Moscow public HTTPS before declaring Moscow public production canonical.
 7. Deploy exact green SHA and smoke.
-8. Update `history.md` checkpoint.
+8. Update `history.md` checkpoint and mark Step 1 complete in this file.
 9. Move to Step 2.
 
 No parallel gameplay feature work until Step 1 is closed.
