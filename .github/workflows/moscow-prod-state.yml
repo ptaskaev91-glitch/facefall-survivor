@@ -1,0 +1,31 @@
+name: Moscow production state
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/moscow-prod-state.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [self-hosted, linux, x64, moscow-game]
+    timeout-minutes: 3
+    steps:
+      - name: Inspect host and Game production
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== TIME ==='; date -Is
+          echo '=== LOAD ==='; uptime
+          echo '=== MEMORY ==='; free -h
+          echo '=== RUNNER WORKERS ==='
+          ps -eo pid,ppid,user,etime,%cpu,%mem,args --sort=-%cpu | grep -E 'Runner.Worker|dev-heavy|npm run build:deploy|certbot|nginx|super-makar' | grep -v grep | head -n 120 || true
+          echo '=== NGINX CONFIG ==='
+          test -e /etc/nginx/sites-enabled/super-makar && ls -l /etc/nginx/sites-enabled/super-makar || true
+          echo '=== LOCAL HTTP ==='
+          curl -sS -D- --max-time 10 -H 'Host: super-makar.72-56-14-168.sslip.io' http://127.0.0.1/health || true
+          echo '=== PUBLIC HTTPS ==='
+          curl -sS -D- --max-time 15 https://super-makar.72-56-14-168.sslip.io/health || true
