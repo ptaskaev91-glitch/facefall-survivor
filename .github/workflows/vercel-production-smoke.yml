@@ -13,21 +13,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Check no-team-id Vercel deployment
+      - name: Check production aliases
         shell: bash
-        env:
-          URL: https://super-makar-public-probe-o6u7c9zv2-pavels-projects-0b29bb12.vercel.app
         run: |
           set -u
-          code="$(curl -sS -D /tmp/headers.txt -o /tmp/body.txt -w '%{http_code}' --connect-timeout 10 --max-time 30 "$URL" || true)"
-          echo "http=$code"
-          cat /tmp/headers.txt
-          echo '--- body ---'
-          head -c 800 /tmp/body.txt || true
-          echo
-          if [ "$code" = "200" ] && grep -q 'public-probe-2026-08-19' /tmp/body.txt; then
-            echo 'PUBLIC=true'
-            exit 0
-          fi
-          echo 'PUBLIC=false'
-          exit 1
+          check() {
+            label="$1"; url="$2"; expected="$3"
+            code="$(curl -sS -D "/tmp/${label}.headers" -o "/tmp/${label}.body" -w '%{http_code}' --connect-timeout 10 --max-time 30 "$url" || true)"
+            echo "${label}_http=$code"
+            grep -iE '^(location:|server:|x-vercel-id:)' "/tmp/${label}.headers" || true
+            if [ "$code" = "200" ] && grep -qi "$expected" "/tmp/${label}.body"; then
+              echo "${label}_PUBLIC=true"
+              return 0
+            fi
+            echo "${label}_PUBLIC=false"
+            return 1
+          }
+
+          ok=0
+          check live_alias 'https://super-makar-live-pavels-projects-0b29bb12.vercel.app' '<title>Супер Макар</title>' && ok=1
+          check live_short 'https://super-makar-live.vercel.app' '<title>Супер Макар</title>' && ok=1
+          exit $((1-ok))
