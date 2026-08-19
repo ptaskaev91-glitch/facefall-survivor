@@ -30,6 +30,13 @@ Canonical Moscow paths:
 - state: `/var/lib/dev-platform/state/game`
 - registry: `/etc/dev-platform/projects.d/game.conf`
 
+Control-plane closeout evidence (2026-08-19):
+- stale duplicate `super-makar.conf` for this repository was removed by the Moscow bootstrap;
+- `game.conf` is the sole canonical registry entry for `facefall-survivor`;
+- `moscow-game-01` was restarted through `moscow-control-ru` and verified `active (running)`;
+- `github-runner-game` is a member of `dev-platform`;
+- all canonical `game` directories were verified present with the platform group boundary.
+
 Caches:
 - npm: `/var/cache/dev-platform/npm`
 - Playwright browsers: `/var/cache/dev-platform/browsers`
