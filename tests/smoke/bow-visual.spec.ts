@@ -76,22 +76,22 @@ test('bow visual follows combat release and reload lifecycle', async ({ page }) 
   await expect.poll(async () => page.evaluate(() => {
     const app = (window as any).__facefallApp;
     const arrow = app.player.root.getObjectByName('bow-nocked-arrow');
-    const string = app.player.root.getObjectByName('bow-string') as any;
-    const positions = string?.geometry?.getAttribute('position');
     return {
       state: app.weaponSystem.runtime('bow').state as string,
-      arrowVisible: Boolean(arrow?.visible),
-      stringNockZ: positions ? positions.getZ(1) as number : 0
+      arrowVisible: Boolean(arrow?.visible)
     };
   }), { timeout: 3_000 }).toMatchObject({ state: 'reloading', arrowVisible: true });
 
-  const drawing = await page.evaluate(() => {
+  // Bow reload is intentionally animated over subsequent simulation frames. The
+  // contract is that the string actually starts drawing during reload, not that its
+  // geometry mutates synchronously inside WeaponSystem.reload().
+  await expect.poll(async () => page.evaluate(() => {
     const app = (window as any).__facefallApp;
     const string = app.player.root.getObjectByName('bow-string') as any;
     const positions = string?.geometry?.getAttribute('position');
-    return { stringNockZ: positions ? positions.getZ(1) as number : 0 };
-  });
-  expect(drawing.stringNockZ).toBeLessThan(-0.05);
+    return positions ? positions.getZ(1) as number : 0;
+  }), { timeout: 2_000, intervals: [50, 100, 150] }).toBeLessThan(-0.05);
+
   await page.screenshot({ path: `${artifactDir}/mobile-bow-draw-third.png`, fullPage: true });
 
   expect(errors, `Fatal browser errors: ${errors.join(' | ')}`).toEqual([]);
