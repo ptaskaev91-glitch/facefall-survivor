@@ -60,6 +60,11 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Provision Node.js on Moscow runner
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
       - name: Install locked dependencies from Moscow cache
         run: npm ci --no-audit --no-fund --cache "$NPM_CONFIG_CACHE"
 
