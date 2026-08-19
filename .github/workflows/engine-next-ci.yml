@@ -1,34 +1,146 @@
 name: Engine Next CI
 
+# Feature branches are validated once through pull_request. Only main receives
+# push validation, preventing duplicate full Playwright jobs on moscow-game-01.
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
+      - 'src/**'
+      - 'public/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'engine-lab.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'playwright.config.ts'
+      - 'tsconfig.json'
+      - 'tsconfig.tests.json'
+      - 'vite.config.ts'
+      - 'vercel.json'
+      - 'PROJECT.md'
+      - 'ARCHITECTURE.md'
+      - 'dev.md'
       - '.github/workflows/engine-next-ci.yml'
   pull_request:
     branches: [main]
     paths:
+      - 'src/**'
+      - 'public/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'engine-lab.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'playwright.config.ts'
+      - 'tsconfig.json'
+      - 'tsconfig.tests.json'
+      - 'vite.config.ts'
+      - 'vercel.json'
+      - 'PROJECT.md'
+      - 'ARCHITECTURE.md'
+      - 'dev.md'
       - '.github/workflows/engine-next-ci.yml'
 
 permissions:
   contents: read
 
-# Emergency circuit breaker. This run cancels stale heavy Engine Next work in the
-# same v3 concurrency group. Restore the full workflow only after Moscow platform
-# bootstrap installs the guarded dev-heavy wrapper.
 concurrency:
   group: engine-next-v3-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NPM_CONFIG_CACHE: /var/cache/dev-platform/npm
+  PLAYWRIGHT_BROWSERS_PATH: /var/cache/dev-platform/browsers
+  RELEASE_CANDIDATE_ROOT: /var/lib/dev-platform/state/game/release-candidates
+
 jobs:
-  circuit-breaker:
+  validate:
     runs-on: [self-hosted, linux, x64, moscow-game]
-    timeout-minutes: 2
+    timeout-minutes: 35
     steps:
-      - name: Hold Game CI during host recovery
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Provision Node.js on Moscow runner
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Install locked dependencies from Moscow cache
+        run: nice -n 5 npm ci --no-audit --no-fund --cache "$NPM_CONFIG_CACHE"
+
+      - name: Typecheck
+        run: nice -n 5 npm run typecheck
+
+      - name: Unit tests
+        run: nice -n 5 npm run test:unit
+
+      - name: Ensure Chromium exists in shared Moscow cache
+        run: PLAYWRIGHT_BROWSERS_PATH="$PLAYWRIGHT_BROWSERS_PATH" npx playwright install chromium
+
+      - name: Heavy browser smoke and deploy build
+        shell: bash
+        run: |
+          dev-heavy bash -lc '
+            set -euo pipefail
+            export PLAYWRIGHT_BROWSERS_PATH=/var/cache/dev-platform/browsers
+            export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=768}"
+            npm run test:smoke -- --workers=1
+            npm run build:deploy
+            test -f dist-next/index.html
+            test -f dist-next/engine-lab.html
+            cmp -s dist-next/index.html dist-next/engine-lab.html
+            test ! -e dist-next/legacy
+          '
+
+      - name: Publish green main release candidate locally
+        if: ${{ success() && github.ref == 'refs/heads/main' }}
         shell: bash
         run: |
           set -euo pipefail
-          echo "MOSCOW_GAME_CI_CIRCUIT_BREAKER $(date -Is)"
-          echo "Heavy Game CI intentionally disabled until guarded dev-heavy is installed."
+          root="$RELEASE_CANDIDATE_ROOT"
+          dest="$root/$GITHUB_SHA"
+          tmp="$root/.${GITHUB_SHA}.${GITHUB_RUN_ID}.tmp"
+          mkdir -p "$root"
+          rm -rf "$tmp"
+          mkdir -p "$tmp"
+          cp -a dist-next "$tmp/dist-next"
+          {
+            echo "sha=$GITHUB_SHA"
+            echo 'status=green'
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "created_at=$(date -Is)"
+          } > "$tmp/manifest.txt"
+          rm -rf "$dest"
+          mv "$tmp" "$dest"
+          test -s "$dest/dist-next/index.html"
+          test -s "$dest/manifest.txt"
+          echo "MOSCOW_RELEASE_CANDIDATE_READY sha=$GITHUB_SHA path=$dest"
+
+      - name: Store diagnostics locally on Moscow
+        if: always()
+        shell: bash
+        run: |
+          set -u
+          dst="/var/lib/dev-platform/artifacts/game/${GITHUB_RUN_ID}"
+          mkdir -p "$dst"
+          cp -a test-artifacts "$dst/" 2>/dev/null || true
+          cp -a reports "$dst/" 2>/dev/null || true
+          cp -a playwright-report "$dst/" 2>/dev/null || true
+          if [ -d dist-next ]; then
+            du -sh dist-next > "$dst/build-size.txt" 2>/dev/null || true
+          fi
+          {
+            echo "time=$(date -Is)"
+            echo "host=$(hostname)"
+            echo "repository=$GITHUB_REPOSITORY"
+            echo "sha=$GITHUB_SHA"
+            echo "ref=$GITHUB_REF"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "job_status=${{ job.status }}"
+            echo "artifact_root=$dst"
+            echo "release_candidate_root=$RELEASE_CANDIDATE_ROOT"
+          } > "$dst/status.txt"
