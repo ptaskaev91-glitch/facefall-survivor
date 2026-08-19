@@ -3,7 +3,7 @@ name: Engine Next CI
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, 'agent/**']
     paths:
       - 'src/**'
       - 'public/**'
@@ -17,6 +17,9 @@ on:
       - 'tsconfig.tests.json'
       - 'vite.config.ts'
       - 'vercel.json'
+      - 'PROJECT.md'
+      - 'ARCHITECTURE.md'
+      - 'dev.md'
       - '.github/workflows/engine-next-ci.yml'
   pull_request:
     paths:
@@ -32,73 +35,81 @@ on:
       - 'tsconfig.tests.json'
       - 'vite.config.ts'
       - 'vercel.json'
+      - 'PROJECT.md'
+      - 'ARCHITECTURE.md'
+      - 'dev.md'
       - '.github/workflows/engine-next-ci.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: engine-next-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NPM_CONFIG_CACHE: /var/cache/dev-platform/npm
+  PLAYWRIGHT_BROWSERS_PATH: /var/cache/dev-platform/browsers
+
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  validate:
+    runs-on: [self-hosted, linux, x64, moscow-game]
+    timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Provision Node.js on Moscow runner
+        uses: actions/setup-node@v6
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: package-lock.json
-      - name: Install locked dependencies
-        run: npm ci --no-audit --no-fund
+
+      - name: Install locked dependencies from Moscow cache
+        run: npm ci --no-audit --no-fund --cache "$NPM_CONFIG_CACHE"
+
       - name: Typecheck
         run: npm run typecheck
+
       - name: Unit tests
         run: npm run test:unit
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-      - name: Browser smoke and visual checkpoints
-        run: npm run test:smoke
-      - name: Upload visual smoke screenshots
+
+      - name: Ensure Chromium exists in shared Moscow cache
+        run: PLAYWRIGHT_BROWSERS_PATH="$PLAYWRIGHT_BROWSERS_PATH" npx playwright install chromium
+
+      - name: Heavy browser smoke and deploy build
+        run: |
+          dev-heavy bash -lc '
+            set -euo pipefail
+            export PLAYWRIGHT_BROWSERS_PATH=/var/cache/dev-platform/browsers
+            npm run test:smoke
+            npm run build:deploy
+            test -f dist-next/index.html
+            test -f dist-next/engine-lab.html
+            cmp -s dist-next/index.html dist-next/engine-lab.html
+            test ! -e dist-next/legacy
+          '
+
+      - name: Store diagnostics locally on Moscow
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: facefall-visual-checkpoints
-          path: test-artifacts
-          if-no-files-found: ignore
-          retention-days: 3
-      - name: Build Vercel bundle
-        run: npm run build:deploy
-      - name: Verify engine-next is sole deployment root
+        shell: bash
         run: |
-          test -f dist-next/index.html
-          test -f dist-next/engine-lab.html
-          cmp -s dist-next/index.html dist-next/engine-lab.html
-          test ! -e dist-next/legacy
-      - name: Upload deploy artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: facefall-engine-next
-          path: dist-next
-          if-no-files-found: error
-          retention-days: 7
-      - name: Publish engine-next preview branch
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          rm -rf .engine-next-preview
-          mkdir -p .engine-next-preview
-          cp -a dist-next/. .engine-next-preview/
-          cd .engine-next-preview
-          git init
-          git checkout -b engine-next-preview
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -A
-          git commit -m "Engine next preview $GITHUB_SHA"
-          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git push --force origin engine-next-preview
+          set -u
+          dst="/var/lib/dev-platform/artifacts/super-makar/${GITHUB_RUN_ID}"
+          mkdir -p "$dst"
+          cp -a test-artifacts "$dst/" 2>/dev/null || true
+          cp -a reports "$dst/" 2>/dev/null || true
+          cp -a playwright-report "$dst/" 2>/dev/null || true
+          if [ -d dist-next ]; then
+            du -sh dist-next > "$dst/build-size.txt" 2>/dev/null || true
+          fi
+          {
+            echo "time=$(date -Is)"
+            echo "host=$(hostname)"
+            echo "repository=$GITHUB_REPOSITORY"
+            echo "sha=$GITHUB_SHA"
+            echo "ref=$GITHUB_REF"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "job_status=${{ job.status }}"
+            echo "artifact_root=$dst"
+          } > "$dst/status.txt"
