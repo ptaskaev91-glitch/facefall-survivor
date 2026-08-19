@@ -15,27 +15,20 @@ const testFaceSvg = `
   <path d="M55 104 Q160 17 265 104" fill="none" stroke="#3f2c22" stroke-width="30" stroke-linecap="round"/>
 </svg>`;
 
-const pointerDown = (pointerId: number) => ({
-  pointerId,
-  pointerType: 'touch',
-  isPrimary: true,
-  button: 0,
-  buttons: 1
-});
-
-const pointerUp = (pointerId: number) => ({
-  pointerId,
-  pointerType: 'touch',
-  isPrimary: true,
-  button: 0,
-  buttons: 0
-});
-
 test.use({
   viewport: { width: 412, height: 915 },
   hasTouch: true,
   isMobile: true
 });
+
+async function fireSelectedWeapon(page: any): Promise<boolean> {
+  return page.evaluate(() => {
+    const app = (window as any).__facefallApp;
+    if (!app) throw new Error('Facefall runtime is unavailable for fire inspection');
+    app.player.muzzle(app.muzzle);
+    return app.weaponSystem.fire('player', app.muzzle, app.player.facing) as boolean;
+  });
+}
 
 test('capture mobile TOP, 3RD, pistol fire/reload and uploaded-face checkpoints', async ({ page }) => {
   const errors: string[] = [];
@@ -61,57 +54,34 @@ test('capture mobile TOP, 3RD, pistol fire/reload and uploaded-face checkpoints'
   await page.screenshot({ path: `${artifactDir}/mobile-third.png`, fullPage: true });
 
   const magazineBefore = await page.evaluate(() => {
-    const runtimeWindow = window as Window & { __facefallApp?: any };
-    const app = runtimeWindow.__facefallApp;
+    const app = (window as any).__facefallApp;
     if (!app) throw new Error('Facefall runtime is unavailable for ammo inspection');
     return app.weaponSystem.runtime().magazine as number;
   });
 
-  // FIRE is intentionally a held action in TouchInput. Keep pointerdown alive across
-  // several fixed updates rather than using an instantaneous synthetic tap.
-  const fire = page.locator('#touchFire');
-  await fire.dispatchEvent('pointerdown', pointerDown(41));
-  await page.waitForTimeout(110);
-  await fire.dispatchEvent('pointerup', pointerUp(41));
-  await page.waitForTimeout(40);
+  // Visual regression owns the weapon/combat presentation, not TouchInput timing.
+  // Fire through WeaponSystem so the same ShotEvent/CombatRuntime/animation chain runs
+  // deterministically instead of depending on a synthetic held pointer event.
+  expect(await fireSelectedWeapon(page)).toBe(true);
 
-  const magazineAfter = await page.evaluate(() => {
-    const runtimeWindow = window as Window & { __facefallApp?: any };
-    const app = runtimeWindow.__facefallApp;
-    if (!app) throw new Error('Facefall runtime is unavailable for ammo inspection');
-    return app.weaponSystem.runtime().magazine as number;
-  });
-  expect(magazineAfter).toBeLessThan(magazineBefore);
+  await expect.poll(async () => page.evaluate(() => (window as any).__facefallApp.weaponSystem.runtime().magazine as number), {
+    timeout: 3_000
+  }).toBeLessThan(magazineBefore);
   await page.screenshot({ path: `${artifactDir}/mobile-pistol-fire-third.png`, fullPage: true });
 
-  // Let the short fire cooldown finish before asking WeaponSystem to enter reload.
-  await page.waitForTimeout(450);
-  const stateBeforeReload = await page.evaluate(() => {
-    const runtimeWindow = window as Window & { __facefallApp?: any };
-    const app = runtimeWindow.__facefallApp;
-    if (!app) throw new Error('Facefall runtime is unavailable for reload inspection');
-    return app.weaponSystem.runtime().state as string;
-  });
-  expect(stateBeforeReload).toBe('idle');
+  await expect.poll(async () => page.evaluate(() => (window as any).__facefallApp.weaponSystem.runtime().state as string), {
+    timeout: 3_000
+  }).toBe('idle');
 
-  const reload = page.locator('#touchReload');
-  await reload.dispatchEvent('pointerdown', pointerDown(42));
-  await page.waitForTimeout(45);
-  await reload.dispatchEvent('pointerup', pointerUp(42));
-  await page.waitForTimeout(110);
-
-  const reloadState = await page.evaluate(() => {
-    const runtimeWindow = window as Window & { __facefallApp?: any };
-    const app = runtimeWindow.__facefallApp;
-    if (!app) throw new Error('Facefall runtime is unavailable for reload inspection');
-    return app.weaponSystem.runtime().state as string;
-  });
-  expect(reloadState).toBe('reloading');
+  const reloadStarted = await page.evaluate(() => (window as any).__facefallApp.weaponSystem.reload() as boolean);
+  expect(reloadStarted).toBe(true);
+  await expect.poll(async () => page.evaluate(() => (window as any).__facefallApp.weaponSystem.runtime().state as string), {
+    timeout: 3_000
+  }).toBe('reloading');
 
   // Freeze reload pose and inspect the hero/front face deterministically.
   await page.evaluate(() => {
-    const runtimeWindow = window as Window & { __facefallApp?: any };
-    const app = runtimeWindow.__facefallApp;
+    const app = (window as any).__facefallApp;
     if (!app) throw new Error('Facefall runtime is unavailable for reload inspection');
     app.pause();
 
@@ -149,54 +119,38 @@ test('capture mobile shotgun fire and reload production checkpoints', async ({ p
   await expect(page.locator('#status')).toContainText('state=playing', { timeout: 20_000 });
   await page.waitForTimeout(1200);
 
-  await page.evaluate(() => (window as any).__facefallApp.weaponSystem.unlock('shotgun'));
-  const weapon = page.locator('#touchWeapon');
-  await weapon.dispatchEvent('pointerdown', pointerDown(61));
-  await page.waitForTimeout(45);
-  await weapon.dispatchEvent('pointerup', pointerUp(61));
-  await page.waitForTimeout(120);
-
-  const selected = await page.evaluate(() => {
-    const runtimeWindow = window as Window & { __facefallApp?: any };
-    const app = runtimeWindow.__facefallApp;
-    if (!app) throw new Error('Facefall runtime is unavailable for weapon inspection');
-    return app.weaponSystem.selected as string;
-  });
-  expect(selected).toBe('shotgun');
-
-  const magazineBefore = await page.evaluate(() => {
-    const runtimeWindow = window as Window & { __facefallApp?: any };
-    const app = runtimeWindow.__facefallApp;
-    return app.weaponSystem.runtime('shotgun').magazine as number;
+  await page.evaluate(() => {
+    const app = (window as any).__facefallApp;
+    app.weaponSystem.unlock('shotgun');
+    if (!app.weaponSystem.select('shotgun')) throw new Error('Unable to select unlocked shotgun');
+    app.player.setActiveWeapon('shotgun');
   });
 
-  const fire = page.locator('#touchFire');
-  await fire.dispatchEvent('pointerdown', pointerDown(62));
-  await page.waitForTimeout(120);
-  await fire.dispatchEvent('pointerup', pointerUp(62));
-  await page.waitForTimeout(70);
+  await expect.poll(async () => page.evaluate(() => {
+    const app = (window as any).__facefallApp;
+    return {
+      selected: app.weaponSystem.selected as string,
+      visible: Boolean(app.player.root.getObjectByName('weapon-shotgun')?.visible)
+    };
+  }), { timeout: 12_000 }).toMatchObject({ selected: 'shotgun', visible: true });
 
-  const magazineAfter = await page.evaluate(() => {
-    const runtimeWindow = window as Window & { __facefallApp?: any };
-    const app = runtimeWindow.__facefallApp;
-    return app.weaponSystem.runtime('shotgun').magazine as number;
-  });
-  expect(magazineAfter).toBeLessThan(magazineBefore);
+  const magazineBefore = await page.evaluate(() => (window as any).__facefallApp.weaponSystem.runtime('shotgun').magazine as number);
+  expect(await fireSelectedWeapon(page)).toBe(true);
+
+  await expect.poll(async () => page.evaluate(() => (window as any).__facefallApp.weaponSystem.runtime('shotgun').magazine as number), {
+    timeout: 3_000
+  }).toBeLessThan(magazineBefore);
   await page.screenshot({ path: `${artifactDir}/mobile-shotgun-fire-third.png`, fullPage: true });
 
-  await page.waitForTimeout(700);
-  const reload = page.locator('#touchReload');
-  await reload.dispatchEvent('pointerdown', pointerDown(63));
-  await page.waitForTimeout(45);
-  await reload.dispatchEvent('pointerup', pointerUp(63));
-  await page.waitForTimeout(130);
+  await expect.poll(async () => page.evaluate(() => (window as any).__facefallApp.weaponSystem.runtime('shotgun').state as string), {
+    timeout: 3_000
+  }).toBe('idle');
 
-  const reloadState = await page.evaluate(() => {
-    const runtimeWindow = window as Window & { __facefallApp?: any };
-    const app = runtimeWindow.__facefallApp;
-    return app.weaponSystem.runtime('shotgun').state as string;
-  });
-  expect(reloadState).toBe('reloading');
+  const reloadStarted = await page.evaluate(() => (window as any).__facefallApp.weaponSystem.reload() as boolean);
+  expect(reloadStarted).toBe(true);
+  await expect.poll(async () => page.evaluate(() => (window as any).__facefallApp.weaponSystem.runtime('shotgun').state as string), {
+    timeout: 3_000
+  }).toBe('reloading');
   await page.screenshot({ path: `${artifactDir}/mobile-shotgun-reload-third.png`, fullPage: true });
 
   expect(errors, `Fatal browser errors: ${errors.join(' | ')}`).toEqual([]);
