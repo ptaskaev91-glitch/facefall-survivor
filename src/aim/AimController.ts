@@ -73,7 +73,6 @@ export class AimController {
     if (this.mode === 'third') {
       this.thirdTurnDelta += (dx / width) * this.touchSensitivity * 1.8;
       this.thirdTurnDelta = Math.max(-0.36, Math.min(0.36, this.thirdTurnDelta));
-      // Manual camera look should not leave a stale lock glued to the previous screen point.
       const recenter = Math.min(0.72, Math.abs(dx) / width * 5 + Math.abs(dy) / height * 3);
       this.ndc.multiplyScalar(1 - recenter);
       this.renderAimUi();
@@ -97,7 +96,6 @@ export class AimController {
   nudgeNdc(delta: Vector2): void {
     this.ndc.add(delta);
     if (this.mode === 'third') {
-      // Keep some body/camera follow so the weapon gradually turns toward the lock as well.
       this.thirdTurnDelta += delta.x * 0.34;
       this.thirdTurnDelta = Math.max(-0.12, Math.min(0.12, this.thirdTurnDelta));
     }
@@ -128,6 +126,13 @@ export class AimController {
 
   getWorldDirection(out = new Vector3()): Vector3 {
     return out.copy(this.worldDirection);
+  }
+
+  /** Exact camera ray represented by the visible reticle. */
+  getCameraRay(camera: PerspectiveCamera, originOut: Vector3, directionOut: Vector3): void {
+    this.raycaster.setFromCamera(this.ndc, camera);
+    originOut.copy(this.raycaster.ray.origin);
+    directionOut.copy(this.raycaster.ray.direction).normalize();
   }
 
   updateWorldAim(camera: PerspectiveCamera, playerPosition: Vector3): void {
