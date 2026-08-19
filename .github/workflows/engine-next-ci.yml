@@ -95,7 +95,7 @@ jobs:
         shell: bash
         run: |
           set -u
-          dst="/var/lib/dev-platform/artifacts/super-makar/${GITHUB_RUN_ID}"
+          dst="/var/lib/dev-platform/artifacts/game/${GITHUB_RUN_ID}"
           mkdir -p "$dst"
           cp -a test-artifacts "$dst/" 2>/dev/null || true
           cp -a reports "$dst/" 2>/dev/null || true
