@@ -2,15 +2,16 @@
 
 Последняя актуализация: **2026-08-19**  
 Repository: `ptaskaev91-glitch/facefall-survivor`  
-Source of truth: `main` + активная feature-ветка только до merge  
-Production/preview deploy: **Vercel из GitHub** после зелёного Moscow CI.
+Source of truth: `main`; рабочие изменения — только через focused feature branch / PR.  
+Public production: **https://super-makar-live.vercel.app**.
 
-Текущий стабильный checkpoint: **0.17.0 — Blood Moon / Weather Pass**.  
-Текущий активный этап: **MIGRATION GATE — перевод проекта на Moscow Development Platform (`server-control-ru`)**.
+Текущий стабильный gameplay checkpoint: **0.17.0 — Blood Moon / Weather Pass**.  
+Infrastructure checkpoint: **Moscow Development Platform migration — COMPLETE**.  
+Текущий активный gameplay этап: **Step 1 — Third-person Aim/Camera correctness**.
 
-> **ЖЁСТКОЕ ПРАВИЛО:** до полного завершения и проверки Migration Gate никакая новая игровая механика, визуальный pass, HUD cleanup, profiling/tuning или рефакторинг gameplay не начинается. Сначала переводим проект на новую технологию разработки и доказываем, что новый цикл работает end-to-end. Только после этого продолжаем реализацию step by step.
+> Правило после миграции: один bounded step → тесты → Moscow CI → review/merge → production release/smoke → следующий step. Несвязанные крупные рефакторинги параллельно не начинаем.
 
-Этот файл — актуальный roadmap. Подробные завершённые изменения фиксируются в `history.md`, ownership — в `structure.md`.
+`dev.md` — актуальный roadmap. История решений и checkpoint’ов — в `history.md`, архитектурные границы — в `ARCHITECTURE.md` / `structure.md`, проектные метаданные — в `PROJECT.md`.
 
 ---
 
@@ -29,9 +30,10 @@ Production/preview deploy: **Vercel из GitHub** после зелёного Mo
 - локальные фото Макара / Супермамы / Суперпапы;
 - Android — главная real-device платформа;
 - authored `Abandoned Outskirts`;
-- Recast navigation;
+- offline Recast/Detour navigation;
 - атмосферная погода / время суток;
-- стабильные mobile performance budgets.
+- стабильные mobile performance budgets;
+- предсказуемый и воспроизводимый development/release lifecycle.
 
 Главный hook: **«Твоё лицо — твой герой в survival shooter.»**
 
@@ -39,9 +41,9 @@ Production/preview deploy: **Vercel из GitHub** после зелёного Mo
 
 # 2. Canonical technology
 
-## 2.1 Game/runtime technology
+## 2.1 Runtime
 
-> **TypeScript strict + Vite + bundled Three.js + glTF/GLB + manifest-driven authored level + Octree/Capsule + offline Recast/Detour + SpatialHash/local avoidance + data-driven combat + event-driven presentation + bounded FX/audio + local-first Face System + mobile-first controls + Playwright/CI.**
+> **TypeScript strict + Vite + bundled Three.js + glTF/GLB + manifest-driven authored level + Octree/Capsule + offline Recast/Detour + SpatialHash/local avoidance + data-driven combat + event-driven presentation + bounded FX/audio + local-first Face System + mobile-first controls + Playwright.**
 
 Hard runtime rules:
 
@@ -50,46 +52,56 @@ Hard runtime rules:
 - не отправлять пользовательские фото на сервер;
 - не добавлять тяжёлый volumetric fog без реального Android-профиля;
 - обычный запуск не должен платить за `?debug=1` instrumentation;
-- не заявлять real-device/preview проверку без фактического evidence.
+- visual/device claims требуют фактического evidence.
 
-## 2.2 Canonical development / CI / deploy technology — NEW
+## 2.2 Development platform — ACTIVE STANDARD
 
 Источник стандарта: `ptaskaev91-glitch/server-control-ru` → `DEVELOPMENT_PLATFORM.md` + `NEW_PROJECT_STANDARD.md`.
-
-Каноническая схема проекта после Migration Gate:
 
 ```text
 ChatGPT / developer
         ↓
-GitHub feature branch / PR
+GitHub focused branch / PR
         ↓
 Moscow VPS 72.56.14.168
-self-hosted runner: moscow-game
+runner: moscow-game-01
+label: moscow-game
         ↓
-typecheck / unit / build / Playwright
+typecheck / unit / Playwright / build
         ↓
-local diagnostics on Moscow VPS
+local Moscow diagnostics
         ↓
-PR / review / merge main
+review / merge
         ↓
-Moscow main CI green
+release from exact green Git SHA
         ↓
-Vercel Preview / Production from GitHub
+Vercel production
         ↓
-smoke test
+public smoke
 ```
 
 Роли:
 
 - **GitHub** — source of truth: code, branches, PR, history, tags;
-- **Moscow VPS `72.56.14.168`** — CI/build/tests/Playwright/caches/local diagnostics;
+- **Moscow VPS `72.56.14.168`** — штатные CI/build/tests/Playwright/caches/diagnostics;
 - **`server-control-ru`** — control plane московской development platform;
-- **Vercel** — web preview/production deploy из GitHub;
-- **GitHub-hosted Actions** — не использовать для штатного CI;
-- **GitHub Artifacts** — не использовать как рабочее хранилище;
-- **Netherlands VPS** — не development node проекта игры.
+- **Vercel** — public production hosting/release target;
+- **Netherlands VPS** — не Game development node;
+- **GitHub-hosted Actions** — не штатный compute path проекта;
+- **GitHub Artifacts** — не рабочее хранилище и не deploy transport.
 
-Canonical Moscow paths for Game:
+## 2.3 Canonical Moscow identity
+
+```text
+project slug: game
+repository: ptaskaev91-glitch/facefall-survivor
+runner: moscow-game-01
+runner label: moscow-game
+runner user: github-runner-game
+profile: node
+```
+
+Paths:
 
 ```text
 /srv/dev-platform/workspaces/game
@@ -100,39 +112,82 @@ Canonical Moscow paths for Game:
 /etc/dev-platform/projects.d/game.conf
 ```
 
-Heavy browser/build jobs:
+Shared caches:
+
+```text
+/var/cache/dev-platform/npm
+/var/cache/dev-platform/browsers
+```
+
+Heavy work:
 
 ```bash
 dev-heavy <command>
 ```
 
-GitHub workflow target:
+## 2.4 CI contract
 
-```yaml
-runs-on: [self-hosted, linux, x64, moscow-game]
+`.github/workflows/engine-next-ci.yml`:
+
+- `runs-on: [self-hosted, linux, x64, moscow-game]`;
+- `concurrency.cancel-in-progress: true`;
+- locked `npm ci`;
+- TypeScript typecheck;
+- unit tests;
+- Chromium/Playwright smoke + visual coverage;
+- `npm run build:deploy`;
+- production-root assertions;
+- heavy browser/build phase через `dev-heavy`;
+- diagnostics → `/var/lib/dev-platform/artifacts/game/<run-id>`;
+- no normal `actions/upload-artifact`;
+- no legacy `engine-next-preview` publishing.
+
+## 2.5 Vercel release contract
+
+Фактический release path после миграции **не использует автоматическую Vercel Git Integration**, потому что текущий Vercel connector не предоставляет действие link/import Git repository и не предоставляет project-protection mutation.
+
+Вместо этого production release SHA-pinned:
+
+```text
+known green Git SHA
+        ↓
+Vercel deployment bootstrap
+        ↓
+checkout exact SHA from public GitHub repository
+        ↓
+npm ci
+        ↓
+npm run build:deploy
+        ↓
+publish dist-next
 ```
 
-CI rules after migration:
+Repository contract остаётся:
 
-- `concurrency.cancel-in-progress: true`;
-- no `ubuntu-latest` for штатный project CI;
-- no normal `actions/upload-artifact` pipeline;
-- Playwright screenshots/reports → `/var/lib/dev-platform/artifacts/game/<run-id>`;
-- npm cache → Moscow local cache;
-- Playwright/Chromium and other heavy jobs → through `dev-heavy`;
-- Vercel deploy remains separated from Moscow computation;
-- no gameplay/runtime service is introduced unless the game actually needs one.
+```text
+vercel.json
+buildCommand: npm run build:deploy
+outputDirectory: dist-next
+```
+
+Canonical public URL:
+
+```text
+https://super-makar-live.vercel.app
+```
+
+Важно: технические deployment/team aliases текущего Vercel account могут редиректить в Vercel Authentication. **Они не являются public production contract.** Короткий production domain `super-makar-live.vercel.app` проверен извне без авторизации: HTTP 200 + реальный HTML игры.
 
 ---
 
-# 3. Current implemented baseline
+# 3. Implemented gameplay baseline
 
-## Gameplay / family
+## Core / family
 
 - [x] menu / loading / playing / paused / game-over / restart;
 - [x] TOP + 3RD на одной simulation;
 - [x] mobile dynamic joystick + manual fire;
-- [x] mobile 3RD horizontal camera control + X/Y aim-assist reticle;
+- [x] mobile 3RD camera control + X/Y aim-assist reticle;
 - [x] pistol / shotgun / bow;
 - [x] health / ammo / reload / recoil / hit zones / stagger / death;
 - [x] Walker / Runner / Brute;
@@ -163,12 +218,12 @@ CI rules after migration:
 - [x] distance-based perception + steering/nav cadence;
 - [x] SpatialHash + local avoidance.
 
-## Presentation / performance
+## Presentation / performance foundation
 
 - [x] grass;
 - [x] rain field;
 - [x] lightning/thunder foundation;
-- [x] `FogExp2` foundation;
+- [x] `FogExp2`;
 - [x] bounded particles / decals / dynamic lights;
 - [x] WebAudio ambience/combat/zombie layer;
 - [x] `?debug=1` FPS / frame time / draw / TRI / DPR / AI / LOS / NAV metrics;
@@ -176,7 +231,7 @@ CI rules after migration:
 
 ---
 
-# 4. Completed checkpoints
+# 4. Completed gameplay checkpoints
 
 ## 0.11.0 — Abandoned Outskirts
 
@@ -223,326 +278,224 @@ CI rules after migration:
 - [x] active infected + intent counts;
 - [x] LOS/s + blocked share;
 - [x] NAV/s + SpatialHash cells;
-- [x] deterministic cumulative browser instrumentation verification.
+- [x] deterministic browser instrumentation verification.
+
+## 0.17.0 — Blood Moon / Weather Pass
+
+**COMPLETE.**
+
+- [x] gameplay touch controls suppress text selection/context menu/touch callout;
+- [x] icon-first mobile action controls with accessibility labels;
+- [x] `DAWN`, `OVERCAST`, `DUSK`, `BLOOD_MOON` presets;
+- [x] waves 1–2 dawn, 3–4 rainy overcast, 5–6 dusk, 7+ Blood Moon;
+- [x] debug atmosphere override;
+- [x] dynamic `FogExp2`, lighting, exposure, rain/storm/haze;
+- [x] mobile-safe implementation without heavy volumetric chain;
+- [x] Blood Moon distance readability falloff without changing AI semantics;
+- [x] weather intensity controls without particle-buffer rebuild;
+- [x] unit coverage for preset mapping/ranges/visibility;
+- [x] Playwright coverage for controls + all atmosphere states;
+- [x] TOP/3RD visual checkpoints inspected.
 
 ---
 
-# 5. 0.17.0 — Blood Moon / Weather Pass
+# 5. Infrastructure checkpoint — Moscow Development Platform migration
 
-**Status: COMPLETE.**
+**STATUS: COMPLETE. Gameplay work is unlocked.**
 
-User-facing goal: сцена должна перестать выглядеть как один постоянный сумрачный preset и получить заметный survival-horror ритм: **рассвет → сумрачный дождливый день → закат → кровавая ночь**.
+Pre-migration baseline: `main` at `5f2c4751c2813970924e17fd3b7bb3aa6b1476c2`.  
+Migration PR: **#39 — Migrate Super Makar development to Moscow platform**.  
+Merged migration checkpoint: `90a394b4242a91f0d6efdae8975f4c0d843bea4b`.
 
-## 5.1 Touch/UI selection hardening
+## 5.1 Freeze / rollback discipline
 
-Problem evidence: на Android long-press по `FIRE / WEAP / CAM` иногда включает системное выделение текста и contextual search UI.
+- [x] migration declared blocking before gameplay work;
+- [x] dedicated migration branch used;
+- [x] 0.17 gameplay checkpoint preserved;
+- [x] gameplay source files were not changed as part of infrastructure migration;
+- [x] pre-migration SHA recorded;
+- [x] rollback point preserved through Git history.
 
-- [x] `user-select: none` / `-webkit-user-select: none` на gameplay controls;
-- [x] `-webkit-touch-callout: none`;
-- [x] prevent gameplay `contextmenu` / `selectstart` where appropriate;
-- [x] сохранить `aria-label` и button semantics для accessibility;
-- [x] Playwright regression: long-press/selection не создаёт text selection на action controls.
+## 5.2 Moscow registration
 
-## 5.2 Atmosphere presets
+- [x] project registered with canonical slug `game`;
+- [x] repository `ptaskaev91-glitch/facefall-survivor` registered;
+- [x] canonical project directories created by `dev-platform-register-project`;
+- [x] dedicated self-hosted runner installed;
+- [x] runner name `moscow-game-01`;
+- [x] labels include `self-hosted`, `linux`, `x64`, `moscow-game`;
+- [x] runner user `github-runner-game`;
+- [x] runner systemd service observed active after installation;
+- [x] runner actually accepted and completed repository CI;
+- [x] shared npm/browser caches used;
+- [x] no unrestricted root shell granted by project standard; reviewed sudo boundary remains canonical project entry points only.
 
-### DAWN
+## 5.3 CI migration
 
-- [x] холодный зелёно-синий ambient + мягкий тёплый key light;
-- [x] умеренный туман;
-- [x] дождь слабый/отсутствует;
-- [x] visibility высокая.
+- [x] normal CI moved from `ubuntu-latest` to `moscow-game`;
+- [x] Node 20 provisioned deterministically by `actions/setup-node@v6`;
+- [x] locked dependencies install from Moscow cache;
+- [x] typecheck green;
+- [x] **39/39 unit tests green** on migration run;
+- [x] Chromium Linux runtime dependencies installed on Moscow host;
+- [x] Playwright/browser smoke green;
+- [x] production deploy build green;
+- [x] `dist-next/index.html` / `engine-lab.html` deployment-root assertions green;
+- [x] heavy browser/build work through `dev-heavy`;
+- [x] GitHub Artifact upload removed from normal CI;
+- [x] legacy preview-branch publishing removed;
+- [x] diagnostics stored locally on Moscow;
+- [x] diagnostics path corrected to canonical `/var/lib/dev-platform/artifacts/game/<run-id>`.
 
-### OVERCAST
+## 5.4 Vercel release verification
 
-- [x] серо-зелёный ambient;
-- [x] постоянный дождь;
-- [x] мокрый/холодный визуальный тон;
-- [x] умеренно плотный haze;
-- [x] storm/lightning разрешены.
+- [x] CI and deploy separated: Moscow validates; Vercel hosts production;
+- [x] Vercel production project/deployment created programmatically through connected Vercel tooling;
+- [x] production built from exact green migration SHA `90a394b...`;
+- [x] public production domain established: `https://super-makar-live.vercel.app`;
+- [x] independent no-auth probe returned HTTP 200 and actual `<title>Супер Макар</title>`;
+- [x] Vercel SSO behavior investigated rather than hidden: generated deployment/team aliases are protected, short production domain is public;
+- [x] no Vercel token/project secret exists in the game repository;
+- [x] release therefore does not depend on a GitHub-hosted deploy job or GitHub Artifact hand-off;
+- [x] exact current Vercel release method documented in `PROJECT.md` / `ARCHITECTURE.md`.
 
-### DUSK
+Not part of the canonical contract right now:
 
-- [x] оранжево-красный directional tint;
-- [x] длинное/контрастное ощущение света;
-- [x] туман чуть плотнее дня;
-- [x] rain reduced.
+- automatic feature-branch Vercel Preview;
+- Vercel Git repository linking;
+- repository-stored `VERCEL_TOKEN`.
 
-### BLOOD_MOON
+These are intentionally **not blockers** because the current connected Vercel tool can publish the exact green SHA directly and the public production domain is verified. If Vercel later exposes project linking/protection mutation through the connector, we can simplify this release path without changing gameplay architecture.
 
-- [x] почти чёрный фон/ambient;
-- [x] красная moon/key light;
-- [x] красноватый дальний fog;
-- [x] rain минимальный или выключен;
-- [x] самая короткая визуальная дальность.
+## 5.5 Migration Gate Definition of Done
 
-## 5.3 Progression policy
+- [x] dedicated `moscow-game-01` runner works;
+- [x] canonical `game` registry/path boundary defined;
+- [x] full migration CI green on Moscow;
+- [x] browser/build work respects `dev-heavy`;
+- [x] normal GitHub-hosted compute removed from project CI;
+- [x] GitHub Artifacts removed from normal CI/deploy path;
+- [x] local Moscow diagnostics used;
+- [x] Vercel production release verified from exact green SHA;
+- [x] public production URL verified without login;
+- [x] final architecture documented;
+- [x] migration checkpoint recorded in `history.md` as closeout requirement.
 
-- [x] waves 1–2 → `DAWN`;
-- [x] waves 3–4 → `OVERCAST`;
-- [x] waves 5–6 → `DUSK`;
-- [x] wave 7+ → `BLOOD_MOON`;
-- [x] debug override `?atmosphere=dawn|overcast|dusk|blood-moon`.
-
-## 5.4 Silent-Hill-style fog without mobile volumetrics
-
-- [x] dynamic `FogExp2` density/color by preset;
-- [x] cheap ground haze only inside mobile budget;
-- [x] smooth phase interpolation;
-- [x] no heavy new multi-pass volumetric chain.
-
-## 5.5 Night enemy visibility falloff
-
-- [x] near zone ~0–6 m readable;
-- [x] mid zone 6–12 m blends stronger with fog/background;
-- [x] far zone 12+ m darker/less contrast;
-- [x] presentation LOD cadence, no heavy material cloning each frame;
-- [x] hit proxies/raycast/damage semantics unchanged;
-- [x] close attacker remains readable.
-
-## 5.6 Weather controls
-
-- [x] `RainField.setIntensity(0..1)` without particle-buffer recreation;
-- [x] `StormSystem.setEnabled()` / intensity policy;
-- [x] no large resource allocation per wave transition;
-- [x] debug overlay exposes atmosphere preset.
-
-## 5.7 Automated evidence
-
-- [x] wave → atmosphere mapping;
-- [x] preset parameter sanity;
-- [x] night visibility curve monotonic;
-- [x] near-night visibility floor playable;
-- [x] no gameplay text selection regression;
-- [x] force each atmosphere preset and assert world state;
-- [x] Blood Moon screenshot TOP;
-- [x] Blood Moon screenshot 3RD;
-- [x] overcast/rain screenshot;
-- [x] no page errors;
-- [x] existing aim/face/family/Recast tests remain green.
+**Result:** section unlocked. We now continue gameplay strictly step by step.
 
 ---
 
-# 6. MIGRATION GATE — Moscow Development Platform
+# 6. Step 1 — Third-person Aim/Camera correctness
 
-**Status: ACTIVE — highest priority.**
+**STATUS: ACTIVE. Highest gameplay priority.**
 
-**No gameplay changes are allowed until section 6 is COMPLETE.**
+User-visible defect: в 3RD крестик/reticle может визуально находиться на заражённом, но реальный выстрел идёт не по той же линии.
 
-Current known mismatch in repository before migration:
+## 6.1 Audit — COMPLETE
 
-- current `engine-next-ci.yml` uses `runs-on: ubuntu-latest`;
-- current CI installs Chromium on GitHub-hosted runner;
-- current CI uploads visual screenshots to GitHub Artifacts;
-- current CI uploads deploy bundle to GitHub Artifacts;
-- current CI publishes `engine-next-preview` branch itself;
-- this is legacy relative to the new `server-control-ru` development standard.
+Current chain was inspected across:
 
-Target: move the development loop to **GitHub + Moscow self-hosted compute + local Moscow diagnostics + Vercel deploy** while preserving game behavior.
+- `src/aim/AimController.ts`;
+- `src/aim/AimAssist.ts`;
+- `src/camera/CameraDirector.ts`;
+- `src/camera/ThirdPersonCamera.ts`;
+- `src/app/GameApp.ts`;
+- `src/app/CombatRuntime.ts`.
 
-## 6.0 Freeze / migration discipline
+Root cause found:
 
-- [x] declare infrastructure migration as the only active next stage in `dev.md`;
-- [x] preserve 0.17.0 as the current gameplay checkpoint;
-- [x] explicitly prohibit new gameplay work until migration DoD;
-- [ ] create dedicated migration branch before infrastructure changes;
-- [ ] snapshot current main SHA / working Vercel URL / last known CI behavior in migration notes;
-- [ ] do not modify gameplay source files during infrastructure migration unless required solely to keep tests runnable, and document any such exception.
+1. `AimController` correctly converts the visible reticle NDC into a camera ray and calculates a world aim direction.
+2. `AimAssist` moves that same reticle in screen space.
+3. In TOP, `GameApp.updateAim()` rotates `player.facing` toward the calculated aim direction, so firing via facing approximately agrees with the reticle.
+4. In 3RD, `GameApp.updateAim()` intentionally returns before this TOP-only facing alignment.
+5. **But player firing still calls `WeaponSystem.fire(..., this.player.facing)`**.
+6. `CombatRuntime` then faithfully uses the supplied `ShotEvent.direction` for real hitscan/projectile behavior.
 
-**Exit:** migration has a clean baseline and can be rolled back to the exact pre-migration checkpoint.
+Therefore the current contract is internally inconsistent: **3RD reticle direction is calculated, but the actual shot uses body facing.** This directly explains the observed mismatch.
 
-## 6.1 Register Game in Moscow platform
+- [x] audit reticle → camera ray → aim direction → weapon/fire chain;
+- [x] locate ownership mismatch;
+- [x] confirm TOP behavior must remain separate from shot-direction authority;
+- [x] confirm `CombatRuntime` is not the bug; it consumes the direction it is given.
 
-Canonical identity:
+## 6.2 Implementation contract
+
+Goal: separate **body facing** from **authoritative shot direction**.
+
+Required:
+
+- [ ] expose one explicit authoritative shot direction from aim layer;
+- [ ] fire player weapons using that direction rather than unconditional `player.facing`;
+- [ ] in 3RD preserve vertical component from reticle/camera ray;
+- [ ] keep TOP movement/facing presentation behavior intact;
+- [ ] keep aim-assist policy intact unless a test proves it contributes to error;
+- [ ] keep muzzle as physical shot origin;
+- [ ] no changes to enemy hit-zone semantics, world occlusion or damage math;
+- [ ] no hidden second aim point in HUD/camera/combat code.
+
+Preferred boundary:
 
 ```text
-slug: game
-repository: ptaskaev91-glitch/facefall-survivor
-runner label: moscow-game
-profile: node
-Moscow VPS: 72.56.14.168
+screen reticle NDC
+      ↓
+AimController
+      ↓
+authoritative camera ray / world aim point
+      ↓
+authoritative shot direction from muzzle
+      ↓
+WeaponSystem.fire
+      ↓
+ShotEvent.direction
+      ↓
+CombatRuntime
 ```
 
-Required:
+`player.facing` remains body/animation orientation, not the universal definition of where a 3RD shot goes.
 
-- [ ] create/register `game` in `/etc/dev-platform/projects.d`;
-- [ ] create canonical project directories;
-- [ ] install/register dedicated self-hosted runner;
-- [ ] runner expected name: `moscow-game-01`;
-- [ ] labels include `self-hosted`, `linux`, `x64`, `moscow-game`;
-- [ ] runner systemd service active;
-- [ ] verify runner is visible/online in GitHub repository settings;
-- [ ] verify runner user has access to shared Moscow npm/browser caches;
-- [ ] verify project has no unrestricted root access.
+## 6.3 Regression tests
 
-**Exit:** `moscow-game-01` is online and can accept a trivial repository job.
+- [ ] center reticle → shot direction matches center ray;
+- [ ] off-axis reticle → shot direction follows off-axis reticle, not stale body facing;
+- [ ] vertical 3RD reticle offset → shot direction retains Y component;
+- [ ] no-target / no-assist path remains deterministic;
+- [ ] nearby target does not create pathological muzzle-to-ray inversion;
+- [ ] world collision still blocks enemy hit behind cover;
+- [ ] TOP existing auto-aim tests remain green;
+- [ ] existing 3RD auto-aim tests updated to assert **real shot semantics**, not only reticle movement.
 
-## 6.2 Project metadata alignment
+## 6.4 Browser / Android evidence
 
-Goal: repository documentation explicitly knows where and how it is developed.
+- [ ] Moscow Playwright smoke green;
+- [ ] 3RD visual checkpoint with reticle on target;
+- [ ] actual hit/shot assertion agrees with reticle;
+- [ ] TOP visual/gameplay regression green;
+- [ ] real Android 3RD verification by user after production deploy.
 
-Required during migration:
-
-- [ ] add/align `PROJECT.md` with repository, production URL, runtime, deploy, Moscow runner label, external services, current version/status;
-- [ ] add/align `ARCHITECTURE.md` if absent;
-- [ ] preserve and align existing `README.md`, `dev.md`, `history.md`, `structure.md` rather than replacing useful project-specific documentation;
-- [ ] document Moscow/Vercel responsibility boundary;
-- [ ] document where CI diagnostics live;
-- [ ] document that Netherlands VPS is outside normal Game CI/runtime.
-
-**Exit:** a new session can reconstruct the project lifecycle from repository documentation without relying on chat memory.
-
-## 6.3 Rewrite CI for Moscow runner
-
-Current workflow: `.github/workflows/engine-next-ci.yml`.
-
-Target requirements:
-
-- [ ] change штатный CI to `runs-on: [self-hosted, linux, x64, moscow-game]`;
-- [ ] keep `concurrency` + `cancel-in-progress: true`;
-- [ ] preserve locked dependency installation;
-- [ ] preserve TypeScript typecheck;
-- [ ] preserve unit tests;
-- [ ] preserve browser smoke/visual coverage;
-- [ ] preserve production bundle build verification;
-- [ ] use Moscow-local npm cache;
-- [ ] use shared/preinstalled browser cache where practical;
-- [ ] run heavy Playwright/browser phase through `dev-heavy`;
-- [ ] remove штатную dependency on GitHub-hosted Actions compute;
-- [ ] remove heavy `actions/upload-artifact` usage;
-- [ ] write Playwright screenshots/reports/logs to `/var/lib/dev-platform/artifacts/game/${GITHUB_RUN_ID}`;
-- [ ] keep diagnostics even when browser tests fail;
-- [ ] never print secrets into logs/reports.
-
-**Exit:** pull-request CI executes fully on Moscow VPS and produces all required evidence locally.
-
-## 6.4 Separate CI from deploy
-
-New rule:
-
-```text
-Moscow = validate/build/test
-Vercel = preview/production web deploy
-GitHub = source/history/events
-```
-
-Required:
-
-- [ ] remove GitHub Artifact bundle as deploy hand-off;
-- [ ] review whether `engine-next-preview` branch is still necessary;
-- [ ] eliminate legacy preview-branch publishing if Vercel Git integration fully replaces it;
-- [ ] confirm feature branch → Vercel Preview behavior;
-- [ ] confirm main → Vercel Production behavior;
-- [ ] verify deploy does not require a GitHub-hosted Actions job;
-- [ ] keep Vercel config compatible with current `dist-next` deployment root or intentionally document any changed deployment contract.
-
-**Exit:** deploy is independent from GitHub-hosted compute and succeeds from the canonical GitHub/Vercel lifecycle.
-
-## 6.5 Local diagnostics / retention
-
-Required:
-
-- [ ] Game diagnostics root exists: `/var/lib/dev-platform/artifacts/game`;
-- [ ] CI creates per-run subdirectory;
-- [ ] Playwright screenshots saved there;
-- [ ] test/browser reports saved there;
-- [ ] optional build diagnostics saved there when useful;
-- [ ] project logs use `/var/lib/dev-platform/logs/game` where applicable;
-- [ ] diagnostics follow platform retention policy (7 days unless Game needs explicit override);
-- [ ] no project state is accidentally subject to generic artifact cleanup;
-- [ ] GitHub artifact storage is effectively zero for normal Game development.
-
-**Exit:** failed and successful CI runs are diagnosable from Moscow without GitHub Artifacts.
-
-## 6.6 End-to-end migration verification
-
-Run the complete development lifecycle with **documentation/CI-only migration change**, not a new game feature.
-
-Required evidence:
-
-- [ ] migration branch push triggers Moscow runner;
-- [ ] typecheck green;
-- [ ] unit tests green;
-- [ ] Playwright/browser smoke green;
-- [ ] build green;
-- [ ] deployment-root verification green;
-- [ ] diagnostics visible on Moscow VPS;
-- [ ] PR can be reviewed normally in GitHub;
-- [ ] merge to main triggers Moscow main CI;
-- [ ] main CI green;
-- [ ] Vercel production deploy succeeds;
-- [ ] deployed game opens;
-- [ ] basic TOP smoke passes;
-- [ ] basic 3RD smoke passes;
-- [ ] existing 0.17 atmosphere behavior is intact;
-- [ ] no regression in Face/Family/Recast baseline;
-- [ ] no GitHub-hosted runner required for the normal path;
-- [ ] no heavy GitHub Artifact required for the normal path.
-
-### Migration Gate Definition of Done
-
-Migration Gate becomes **COMPLETE** only when all are true:
-
-- [ ] `moscow-game-01` online;
-- [ ] `game` registered in Moscow project registry;
-- [ ] canonical directories exist;
-- [ ] Game CI runs on `moscow-game`;
-- [ ] heavy browser work respects `dev-heavy`;
-- [ ] diagnostics are local on Moscow;
-- [ ] GitHub-hosted runner removed from normal Game CI path;
-- [ ] GitHub Artifacts removed from normal Game CI/deploy path;
-- [ ] Vercel Preview/Production lifecycle verified;
-- [ ] full CI green on migration branch;
-- [ ] full CI green on main after merge;
-- [ ] production smoke green;
-- [ ] documentation reflects the final architecture;
-- [ ] `history.md` records the migration checkpoint.
-
-> **Only after every Migration Gate blocking item is complete do we unlock section 7.**
+**Exit:** when the 3RD crosshair is on a hittable enemy, the actual shot semantics agree with what the player sees.
 
 ---
 
-# 7. Post-migration implementation — strict step-by-step order
+# 7. Step 2 — Runtime Aim/Camera debug gizmo
 
-**Status: BLOCKED BY SECTION 6.**
+**BLOCKED until Step 1 contract is implemented.**
 
-After migration we do not start several large feature streams in parallel. One step → tests/evidence → checkpoint → next step.
+Dev/debug-only visual diagnostic:
 
-## Step 1 — Third-person Aim/Camera correctness
+- [ ] camera forward ray;
+- [ ] reticle camera ray;
+- [ ] authoritative world aim point;
+- [ ] muzzle → shot direction;
+- [ ] actual hit/intersection point where applicable;
+- [ ] optional body-facing vector for comparison;
+- [ ] zero normal-mode visibility/cost;
+- [ ] useful future camera regression evidence.
 
-Highest gameplay priority after migration.
+Exit: aim/camera mismatch can be diagnosed visually without guessing from screenshots.
 
-Problem: in third-person the visual crosshair/reticle can disagree with the real target/shooting direction.
+---
 
-Goal: one explicit reusable aim/camera contract for third-person.
-
-Required:
-
-- [ ] audit current 3RD screen reticle → camera ray → aim point → weapon/fire direction chain;
-- [ ] define one authoritative aim point;
-- [ ] ensure reticle corresponds to actual gameplay ray/hit semantics;
-- [ ] separate reusable camera/aim ownership from unrelated gameplay code;
-- [ ] preserve TOP camera behavior;
-- [ ] preserve aim-assist policy intentionally;
-- [ ] regression tests for center target / near target / off-axis target / no target;
-- [ ] real Android 3RD verification.
-
-**Exit:** when crosshair is on a hittable enemy, the actual shot semantics agree with what the player sees.
-
-## Step 2 — Runtime Aim/Camera debug gizmo
-
-Only after Step 1 contract is clear.
-
-- [ ] dev/debug-only visual gizmo;
-- [ ] show camera forward ray;
-- [ ] show authoritative aim point;
-- [ ] show weapon/fire direction;
-- [ ] show hit/intersection point where applicable;
-- [ ] zero normal-mode cost/visibility;
-- [ ] useful for future camera regression diagnosis.
-
-**Exit:** third-person aim errors can be diagnosed visually without guessing from screenshots.
-
-## Step 3 — Android profiling with 0.17 atmosphere
+# 8. Step 3 — Android profiling with 0.17 atmosphere
 
 - [ ] TOP profile under low/medium/high enemy pressure;
 - [ ] 3RD profile under low/medium/high enemy pressure;
@@ -550,9 +503,11 @@ Only after Step 1 contract is clear.
 - [ ] inspect Blood Moon / Overcast cost;
 - [ ] record actual real-device evidence.
 
-**Exit:** we have measured budgets, not assumptions.
+Exit: measured budgets exist before tuning.
 
-## Step 4 — Adaptive mobile budgets
+---
+
+# 9. Step 4 — Adaptive mobile budgets
 
 Tune only from Step 3 evidence:
 
@@ -560,34 +515,34 @@ Tune only from Step 3 evidence:
 - [ ] shadow policy;
 - [ ] FX budgets;
 - [ ] enemy caps if required;
-- [ ] atmosphere density/cost if required;
+- [ ] atmosphere cost if required;
 - [ ] LOS/NAV cadence if required;
-- [ ] avoid visual downgrade unless measurement justifies it.
+- [ ] no visual downgrade without measurement.
 
-**Exit:** stable mobile target established and documented.
+---
 
-## Step 5 — HUD cleanup
+# 10. Step 5 — HUD cleanup
 
 - [ ] shorten/clean build badge;
 - [ ] reduce normal debug/status noise;
 - [ ] safe-area polish;
-- [ ] replace temporary textual controls with final icon-first action button art where appropriate;
-- [ ] preserve accessibility labels/semantics;
+- [ ] final icon-first action art where needed;
+- [ ] preserve accessibility semantics;
 - [ ] Android long-press regression remains fixed.
 
-**Exit:** gameplay HUD looks intentional and production-like on phone.
+---
 
-## Step 6 — Navigation/debug visualization if still needed
-
-Optional and evidence-driven.
+# 11. Step 6 — Navigation/debug visualization if evidence requires it
 
 - [ ] only implement if profiling/debugging demonstrates value;
-- [ ] keep debug-only;
-- [ ] no normal runtime cost.
+- [ ] debug-only;
+- [ ] zero normal runtime cost.
 
-## Step 7 — Progression / special infected
+---
 
-Blocked until visual + performance + aiming foundation is stable.
+# 12. Step 7 — Progression / special infected
+
+Blocked until aiming + performance + HUD foundation is stable.
 
 Candidate work:
 
@@ -597,27 +552,25 @@ Candidate work:
 - [ ] difficulty pacing;
 - [ ] rewards/upgrades.
 
-Exact feature selection is decided only when Steps 1–6 are complete.
+Exact selection is decided after Steps 1–6.
 
 ---
 
-# 8. Working rule for every future step
-
-For each step after migration:
+# 13. Working rule for every future implementation step
 
 ```text
-1. Read current main + dev.md + relevant architecture/history
+1. Read current main + dev.md + relevant history/architecture
 2. Create focused feature branch
 3. Implement one bounded step
 4. Add/update tests
 5. Push
-6. Moscow self-hosted CI
-7. Inspect local Moscow diagnostics/screenshots when relevant
-8. PR/diff/review
+6. Moscow self-hosted CI (`moscow-game`)
+7. Inspect Moscow-local diagnostics/screenshots when relevant
+8. PR / diff / review
 9. Merge only after green evidence
-10. Moscow main CI
-11. Vercel deploy
-12. Smoke test
+10. Revalidate release SHA
+11. Vercel production release from that exact green SHA
+12. Public production smoke
 13. Update history.md/dev.md/structure.md when checkpoint requires it
 14. Move to next step
 ```
@@ -627,27 +580,26 @@ Rules:
 - one major implementation step at a time;
 - infrastructure regressions block gameplay work;
 - no simultaneous unrelated refactors;
-- completed/partial/pending must reflect factual state;
-- visual claims require screenshot/device evidence;
-- real-device claims require actual real-device evidence;
-- preserve rollback point at every major checkpoint.
+- completed/partial/pending reflects factual state only;
+- visual claims require screenshot/browser evidence;
+- real-device claims require actual device evidence;
+- preserve rollback point at every major checkpoint;
+- do not request manual server/Vercel work from the user when connected tooling can perform it.
 
 ---
 
-# 9. Immediate next action
+# 14. Immediate next action
 
-**The next action is NOT gameplay development.**
+Migration Gate is complete. Next implementation sequence:
 
-Immediate sequence:
-
-1. create migration branch;
-2. register Game on Moscow Development Platform;
-3. bring `moscow-game-01` online;
-4. rewrite Game CI for Moscow runner + local diagnostics;
-5. separate CI from Vercel deploy;
-6. execute end-to-end migration verification;
-7. merge/document migration only after green evidence;
-8. mark Migration Gate COMPLETE;
-9. only then start **Step 1 — Third-person Aim/Camera correctness**.
-
-Until points 1–8 are complete, all gameplay roadmap work is **BLOCKED**.
+1. branch from current `main` for **Third-person Aim/Camera correctness**;
+2. formalize authoritative shot direction in aim layer;
+3. switch player firing from unconditional `player.facing` to that direction;
+4. add center/off-axis/vertical/no-target regression coverage;
+5. add live 3RD shot-vs-reticle Playwright assertion;
+6. run full Moscow CI;
+7. inspect evidence;
+8. merge;
+9. deploy exact green SHA to `https://super-makar-live.vercel.app`;
+10. public smoke;
+11. then Step 2 debug gizmo.
