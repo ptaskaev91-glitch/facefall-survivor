@@ -12,30 +12,23 @@ jobs:
     # One-time temporary external HTTP probe. This branch/PR is never merged;
     # the canonical Engine Next CI in main remains Moscow self-hosted only.
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 2
     steps:
-      - name: Verify public Vercel production deployment
+      - name: Inspect public Vercel production deployment
         shell: bash
         env:
           URL: https://super-makar-live-r0phch0w1-pavels-projects-0b29bb12.vercel.app
         run: |
           set -u
-          echo "Waiting for public Super Makar production: $URL"
-          for i in $(seq 1 36); do
-            code="$(curl -L -sS -D /tmp/headers.txt -o /tmp/super-makar.html -w '%{http_code}' --connect-timeout 10 --max-time 45 "$URL" || true)"
-            echo "attempt=$i http=$code"
-            if [ "$code" = "200" ] && grep -qi '<title>Супер Макар</title>' /tmp/super-makar.html; then
-              echo "Production HTML is public and identifies Super Makar."
-              grep -o '<title>[^<]*</title>' /tmp/super-makar.html | head -1
-              exit 0
-            fi
-            if grep -qi 'vercel.com/sso-api\|/login?next=' /tmp/headers.txt /tmp/super-makar.html 2>/dev/null; then
-              echo "Deployment is still protected by Vercel Authentication."
-            fi
-            sleep 5
-          done
-          echo '--- final headers ---'
+          code="$(curl -L -sS -D /tmp/headers.txt -o /tmp/super-makar.html -w '%{http_code}' --connect-timeout 10 --max-time 45 "$URL" || true)"
+          echo "http=$code"
+          echo '--- headers ---'
           cat /tmp/headers.txt || true
-          echo '--- final response sample ---'
+          echo '--- response sample ---'
           head -c 1600 /tmp/super-makar.html || true
+          echo
+          if [ "$code" = "200" ] && grep -qi '<title>Супер Макар</title>' /tmp/super-makar.html; then
+            echo "Production HTML is public and identifies Super Makar."
+            exit 0
+          fi
           exit 1
