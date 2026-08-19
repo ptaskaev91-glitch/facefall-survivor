@@ -8,27 +8,22 @@ permissions:
   contents: read
 
 jobs:
-  smoke:
-    # One-time temporary external HTTP probe. This branch/PR is never merged;
-    # the canonical Engine Next CI in main remains Moscow self-hosted only.
+  credentials:
+    # Temporary same-repo PR diagnostic. Only boolean presence is printed; no secret value is exposed.
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Inspect public Vercel production deployment
+      - name: Check Vercel secret presence
         shell: bash
         env:
-          URL: https://super-makar-live-r0phch0w1-pavels-projects-0b29bb12.vercel.app
+          VERCEL_TOKEN_VALUE: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID_VALUE: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID_VALUE: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_AUTOMATION_BYPASS_SECRET_VALUE: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
-          set -u
-          code="$(curl -L -sS -D /tmp/headers.txt -o /tmp/super-makar.html -w '%{http_code}' --connect-timeout 10 --max-time 45 "$URL" || true)"
-          echo "http=$code"
-          echo '--- headers ---'
-          cat /tmp/headers.txt || true
-          echo '--- response sample ---'
-          head -c 1600 /tmp/super-makar.html || true
-          echo
-          if [ "$code" = "200" ] && grep -qi '<title>Супер Макар</title>' /tmp/super-makar.html; then
-            echo "Production HTML is public and identifies Super Makar."
-            exit 0
-          fi
-          exit 1
+          set -euo pipefail
+          present() { if [ -n "$2" ]; then echo "$1=true"; else echo "$1=false"; fi; }
+          present VERCEL_TOKEN "$VERCEL_TOKEN_VALUE"
+          present VERCEL_ORG_ID "$VERCEL_ORG_ID_VALUE"
+          present VERCEL_PROJECT_ID "$VERCEL_PROJECT_ID_VALUE"
+          present VERCEL_AUTOMATION_BYPASS_SECRET "$VERCEL_AUTOMATION_BYPASS_SECRET_VALUE"
