@@ -8,22 +8,26 @@ permissions:
   contents: read
 
 jobs:
-  credentials:
-    # Temporary same-repo PR diagnostic. Only boolean presence is printed; no secret value is exposed.
+  probe:
+    # Temporary external no-auth check; never merged.
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Check Vercel secret presence
+      - name: Check no-team-id Vercel deployment
         shell: bash
         env:
-          VERCEL_TOKEN_VALUE: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID_VALUE: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID_VALUE: ${{ secrets.VERCEL_PROJECT_ID }}
-          VERCEL_AUTOMATION_BYPASS_SECRET_VALUE: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          URL: https://super-makar-public-probe-o6u7c9zv2-pavels-projects-0b29bb12.vercel.app
         run: |
-          set -euo pipefail
-          present() { if [ -n "$2" ]; then echo "$1=true"; else echo "$1=false"; fi; }
-          present VERCEL_TOKEN "$VERCEL_TOKEN_VALUE"
-          present VERCEL_ORG_ID "$VERCEL_ORG_ID_VALUE"
-          present VERCEL_PROJECT_ID "$VERCEL_PROJECT_ID_VALUE"
-          present VERCEL_AUTOMATION_BYPASS_SECRET "$VERCEL_AUTOMATION_BYPASS_SECRET_VALUE"
+          set -u
+          code="$(curl -sS -D /tmp/headers.txt -o /tmp/body.txt -w '%{http_code}' --connect-timeout 10 --max-time 30 "$URL" || true)"
+          echo "http=$code"
+          cat /tmp/headers.txt
+          echo '--- body ---'
+          head -c 800 /tmp/body.txt || true
+          echo
+          if [ "$code" = "200" ] && grep -q 'public-probe-2026-08-19' /tmp/body.txt; then
+            echo 'PUBLIC=true'
+            exit 0
+          fi
+          echo 'PUBLIC=false'
+          exit 1
