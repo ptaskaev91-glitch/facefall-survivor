@@ -3,7 +3,7 @@ name: Engine Next CI
 on:
   workflow_dispatch:
   push:
-    branches: [main, 'agent/**']
+    branches: [main]
     paths:
       - 'src/**'
       - 'public/**'
@@ -22,6 +22,7 @@ on:
       - 'dev.md'
       - '.github/workflows/engine-next-ci.yml'
   pull_request:
+    branches: [main]
     paths:
       - 'src/**'
       - 'public/**'
