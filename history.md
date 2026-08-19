@@ -1,6 +1,6 @@
 # Супер Макар — History
 
-Последняя актуализация: **2026-08-17**  
+Последняя актуализация: **2026-08-19**  
 Repository: `ptaskaev91-glitch/facefall-survivor`  
 Source of truth: `main`
 
@@ -8,7 +8,7 @@ Source of truth: `main`
 
 # 1. Назначение
 
-`history.md` хранит восстановимую историю проекта: требования пользователя, архитектурные решения, неудачные подходы, audits, PR/checkpoints и причины изменения приоритетов.
+`history.md` хранит восстановимую историю проекта: требования пользователя, архитектурные решения, неудачные подходы, audits, PR/checkpoints, CI/device evidence и причины изменения приоритетов.
 
 Это проектная память, а не dump tool-calls или скрытых рассуждений.
 
@@ -16,39 +16,43 @@ Source of truth: `main`
 
 # 2. Исходная идея
 
-Проект начался как Facefall Survivor — browser survival shooter против заражённых; с checkpoint 0.12.0 продукт называется «Супер Макар».
+Проект начался как Facefall Survivor — browser survival shooter против заражённых; с checkpoint 0.12.0 продукт называется **«Супер Макар»**.
 
 Ключевая продуктовая идея:
 
 > пользователь загружает фотографию и видит своё лицо на игровом герое.
 
-Базовые требования постепенно закрепились как:
+Базовые требования закрепились как:
 
 - TOP / Diablo-survivor gameplay;
 - полноценный third-person over-the-shoulder режим;
 - pistol / shotgun / bow;
 - Walker / Runner / Brute;
 - mobile-first управление;
-- Android как обязательная тестовая платформа;
+- Android как обязательная real-device платформа;
+- authored 3D world;
+- family survival — Макар / Супермама / Суперпапа;
 - переход от prototype к атмосферной полноценной 3D-игре.
 
-Создан публичный GitHub repository `ptaskaev91-glitch/facefall-survivor`; `main` выбран source-of-truth.
+Создан публичный GitHub repository `ptaskaev91-glitch/facefall-survivor`; `main` выбран source of truth.
 
 ---
 
-# 3. Hosting — GitHub Pages → Vercel
+# 3. Hosting evolution
 
-Ранний GitHub Pages путь оказался лишним/ненадёжным.
+## Early
 
-Принято решение:
+Ранний GitHub Pages путь оказался лишним/ненадёжным. Затем production был перенесён на Vercel, а GitHub оставлен source repository.
 
-- GitHub хранит source;
-- Vercel — единственный production hosting target;
-- GitHub Pages не используется.
+Ранее использовавшиеся Vercel deployment URLs считаются историческими и не являются текущим production contract.
 
-Основной production URL:
+## Current production contract — 2026-08-19
 
-`https://facefall-survivor-pavels-projects-0b29bb12.vercel.app`
+Canonical public production:
+
+`https://super-makar-live.vercel.app`
+
+GitHub хранит source; Moscow Development Platform валидирует build/test; Vercel публикует production из точного green Git SHA.
 
 ---
 
@@ -67,126 +71,73 @@ Source of truth: `main`
 - mobile controls;
 - Walker/Runner/Brute.
 
-Важные ранние ошибки:
+Ключевые ранние ошибки: initialization order rain/fog, lighting compositing, слишком тесная связь UI и engine initialization.
 
-- initialization order rain/fog;
-- lighting compositing;
-- слишком тесная связь UI и engine initialization.
-
-Урок: большой monolithic runtime быстро становится хрупким.
+Урок: monolithic runtime быстро становится хрупким.
 
 ---
 
 # 5. 0.4–0.5 — Three.js dual-camera generation
 
-Проект перешёл на Three.js 3D и получил:
+Проект перешёл на Three.js 3D и получил TOP + third-person cameras, procedural terrain/grass/road/rain, 3D player/enemies, weapons и touch controls.
 
-- TOP и third-person cameras;
-- procedural terrain/grass/road/rain;
-- 3D player/enemies;
-- weapons;
-- touch controls.
+На Android выявились startup-проблемы:
 
-На Android выявились критические startup проблемы:
+- UI мог перестать работать, если engine initialization падал до binding;
+- dynamic CDN import Three.js мог зависнуть;
+- внешние runtime imports создавали точку отказа.
 
-- кнопки могли не работать, если engine initialization падал раньше UI binding;
-- dynamic CDN import Three.js мог зависнуть без timeout;
-- внешние CDN/runtime imports создавали ненужную точку отказа.
+Несколько safe/legacy runtime вариантов помогли стабилизировать prototype, но позднее стали technical debt.
 
-Были созданы несколько safe/legacy runtime вариантов. Они помогли стабилизировать prototype, но позже стали техническим долгом.
-
-0.5 Character Pass впервые проверил GLB/AnimationMixer pipeline на временной Three.js Soldier model. Это был proof-of-concept, не production asset.
+0.5 Character Pass проверил GLB/AnimationMixer pipeline на временной модели; это был proof-of-concept, не production asset.
 
 ---
 
-# 6. `dev.md` и переход к архитектурному плану
+# 6. `dev.md` и архитектурный переход
 
-После визуального аудита prototype было зафиксировано:
+После visual audit зафиксировано:
 
 - процедурные Box/Sphere/Capsule модели достигли потолка качества;
-- нужен настоящий hero/infected/weapon GLB pipeline;
+- нужен production GLB pipeline;
 - нужна authored локация;
-- нельзя продолжать наращивать один большой JS-файл.
+- нельзя дальше растить один большой JS runtime.
 
-Создан `dev.md` и начался переход к модульной архитектуре.
-
----
-
-# 7. Аудит №1 — `ivanoskov/shooter`
-
-Главная польза:
-
-- TypeScript;
-- Vite/npm Three.js;
-- GLB level loading;
-- static Octree;
-- Capsule player collider;
-- quality profiles/debug tooling.
-
-Не переносились 1:1:
-
-- desktop-only FPS input;
-- двойной physics update;
-- questionable sensitivity math;
-- dynamic Octree as crowd system.
-
-Вывод: использовать как browser-foundation reference.
-
-Отдельные permissive MIT patterns позже адаптированы с attribution:
-
-- Capsule/Octree collision response;
-- GLTF load/traverse preparation.
+Создан `dev.md`; начался переход к TypeScript/Vite/module ownership.
 
 ---
 
-# 8. Аудит №2 — `Unvanquished`
+# 7. External architecture audits
 
-Главная польза:
+## `ivanoskov/shooter`
 
-- simulation vs presentation separation;
-- data-driven weapons/entities;
-- Damage/Hit/Kill pipeline;
-- CombatFeedback separation;
-- projectile abstraction;
-- Recast/Detour navigation;
-- behavior/state architecture;
-- animation blending philosophy.
+Полезные идеи: TypeScript, Vite/npm Three.js, GLB loading, static Octree, Capsule player collider, quality/debug tooling.
 
-GPL game code напрямую не переносится.
+Не переносились 1:1 desktop-only FPS input, questionable sensitivity/physics patterns, dynamic Octree as crowd system.
 
-Вывод: использовать как gameplay-architecture reference.
+## `Unvanquished`
 
----
+Полезные идеи: simulation/presentation separation, data-driven weapons/entities, Damage/Hit/Kill pipeline, projectile abstraction, Recast/Detour, behavior/state architecture, animation blending philosophy.
 
-# 9. Аудит №3 — `Red Eclipse`
+GPL game code напрямую не переносился.
 
-Главная польза:
+## `Red Eclipse`
 
-- weapon states/recoil/spread;
-- hit zones;
-- composable FX;
-- bounded decals/stains;
-- grass budgets/culling;
-- wind impulses;
-- level entities/markers.
+Полезные идеи: weapon states/recoil/spread, hit zones, composable FX, bounded decals, grass budgets/culling, wind impulses, level entities/markers.
 
-Вывод: использовать как combat-feel / FX / environment reference.
+Финальная формула:
 
-Финальная формула после трёх аудитов:
-
-> browser foundation + structured gameplay architecture + readable combat/FX + собственный mobile-first control layer.
+> browser foundation + structured gameplay architecture + readable combat/FX + own mobile-first controls.
 
 ---
 
-# 10. 0.5A — Engine Next foundation
+# 8. Engine Next foundation — 0.5A–0.7
 
-Создан параллельный TypeScript/Vite runtime без немедленного переключения production.
+Создан TypeScript/Vite runtime, позднее ставший production root.
 
 Появились:
 
 - strict TypeScript;
 - npm Three.js;
-- Vite;
 - fixed GameLoop;
 - typed EventBus;
 - Octree/Capsule collision;
@@ -197,414 +148,383 @@ GPL game code напрямую не переносится.
 - quality profiles;
 - pooled FX;
 - camera modules;
-- AssetManager/LevelManifest boundaries.
-
-Позже Vite engine-next достиг parity и стал production root.
-
----
-
-# 11. 0.5B–0.7 — functional parity and gameplay
-
-Engine-next получил:
-
-- menu/product flow;
-- local face persistence;
-- player HP;
-- enemy melee damage;
+- AssetManager/LevelManifest boundaries;
 - WaveDirector;
-- score/kills/game-over/restart;
-- pickups;
 - EnemyBrain;
 - SpatialHash + LocalAvoidance;
 - NavigationQuery abstraction;
-- obstacle-aware fallback navigation;
 - Playwright browser smoke;
-- package lock / `npm ci`.
+- package lock / reproducible `npm ci`.
 
 ---
 
-# 12. Mobile aiming evolution
+# 9. Mobile aiming evolution — 0.8.x
 
-Управление несколько раз менялось после реального Android-теста.
+Управление несколько раз менялось после Android-тестов.
 
-## Early
+TOP постепенно пришёл к full auto-aim + automatic hero turn + dynamic touch joystick + manual FIRE.
 
-Статический/двигающийся reticle оказался непонятным и расходился с ожиданиями пользователя.
+3RD получил over-the-shoulder camera, сначала fixed-center crosshair, затем X/Y aim assist. Камера была поднята/отодвинута после реального feedback.
 
-## 0.8.1
+0.8.4 добавил stronger 3RD auto-aim, pistol deviation, shotgun pellet spread, readable tracers/impacts и humanoid infected presentation.
 
-- TOP пробовал faint laser/manual direction;
-- 3RD fixed-center crosshair;
-- low-poly human player вместо capsule pillar;
-- photo mapped onto actual head face rather than floating plane.
-
-## 0.8.2
-
-По референсам mobile survivor управление было переработано:
-
-TOP:
-
-- full auto-aim;
-- hero automatically turns to target;
-- joystick appears under first gameplay touch;
-- FIRE remains manual.
-
-3RD:
-
-- fixed-center crosshair;
-- horizontal yaw only;
-- horizontal auto-aim;
-- no vertical manual aiming.
-
-Добавлен mobile touch smoke test.
-
-## 0.8.3
-
-3RD camera поднята и немного отодвинута после Android feedback.
+Важный будущий долг, проявившийся позже: screen reticle и actual fire direction не имели одного явно закреплённого authoritative contract.
 
 ---
 
-# 13. 0.8.4 — readable combat + humanoid infected
+# 10. Repository hardening — 0.8.5–0.8.7
 
-PR #18 merged to `main`, checkpoint `795e1086b408fae832f0e0817978f62d93514bf4`.
+Проведён внешний audit и подтверждены проблемы: большой `GameApp`, отсутствие focused unit baseline, stale metadata/legacy runtimes, stale Vercel rewrites.
 
-Реализовано:
-
-- stronger 3RD auto-aim centering;
-- pistol small natural random deviation;
-- movement still reduces accuracy;
-- shotgun 8-pellet spread;
-- visible physical-looking tracer layer for pistol/shotgun;
-- exact hit-point impact feedback;
-- separate readable shotgun pellet impacts;
-- capsule infected replaced with low-poly humanoid Walker/Runner/Brute visuals;
-- simple procedural gait;
-- per-part hit metadata foundation.
-
-Damage for pistol/shotgun intentionally remains hitscan for responsiveness; tracers are presentation.
-
-CI passed locked install, strict TS, desktop/mobile browser smoke and production build.
-
----
-
-# 14. External codebase audit reconciliation
-
-Пользователь принёс внешний аудит Facefall.
-
-Подтверждено:
-
-- `GameApp.ts` was ~31,998 bytes and effectively a God Object;
-- focused unit tests were absent;
-- README/package metadata were stale;
-- repository had no project LICENSE;
-- four legacy runtime JS files remained;
-- stale Vercel CDN/model rewrites remained.
-
-Важная корректировка:
-
-- `threejs.org/examples/.../Soldier.glb` was **not** the active engine-next production hero;
-- it was a stale legacy Vercel rewrite from the old prototype pipeline.
-
-Decision:
+Решения:
 
 1. hygiene;
 2. tests;
 3. GameApp decomposition;
-4. only then heavy GLB/animation integration.
+4. только затем heavy GLB/animation integration.
 
-ESLint intentionally not treated as P0 because strict TypeScript + tests + browser CI provide higher current value.
+В 0.8.5:
 
----
+- README/metadata обновлены;
+- old CDN/model rewrites убраны;
+- legacy runtime JS removed;
+- production root стал одним compiled Vite app;
+- rollback переведён на Git history + immutable deployments.
 
-# 15. 0.8.5 — repository hygiene
+В 0.8.6 добавлен Node `node:test` baseline для Health/Damage/Weapon/Enemy/Wave/SpatialHash/LocalAvoidance/GameState. Tests выявили лишнюю dependency `WeaponSystem` → global AimController; она была удалена.
 
-Large hardening PR #19 started on branch `engine-next/0.8.5-0.8.7-hardening`.
-
-Completed in branch:
-
-- README rewritten for Engine Next 0.8.x;
-- package version advanced to 0.8.5 development generation;
-- `vercel.json` stripped to bundled build/output only;
-- old Three/GLTFLoader CDN rewrites removed;
-- stale Soldier model rewrite removed;
-- old `game.js`, `game-safe.js`, `game-safe2.js`, `game-v050.js` removed;
-- old legacy stylesheet/source index removed;
-- `copy-legacy.mjs` removed;
-- new `promote-engine-next.mjs` makes one compiled Vite app the production root;
-- `/legacy/` no longer shipped with every deployment.
-
-Rollback strategy becomes Git history + immutable Vercel deployments rather than dead code in the repository.
-
-Project source LICENSE remains an intentional unresolved product/legal choice; no license is guessed automatically.
+В 0.8.7 ownership вынесен в `WorldRuntime`, `PlayerRuntime`, `GameHud`. `GameApp` оставлен orchestrator, а не принудительно раздроблен на десятки абстракций.
 
 ---
 
-# 16. 0.8.6 — focused unit-test baseline
+# 11. Production hero / combat vertical slice — 0.9.x
 
-A zero-extra-framework unit suite was added using TypeScript + Node built-in `node:test`.
+В production hero pipeline вошли verified CC0 Quaternius character/animation assets.
 
-Covered:
+`CharacterModel` получил GLTFLoader/SkeletonUtils/AnimationMixer, locomotion blending, face shell на real `Head` bone и weapon socket.
 
-- Health;
-- DamageSystem;
-- WeaponSystem;
-- EnemyBrain;
-- WaveDirector;
-- SpatialHash;
-- LocalAvoidance;
-- GameStateController.
+Pistol muzzle стал физическим origin для gameplay fire. Visual CI поймал неверный масштаб раннего pistol prototype и исправил его.
 
-Important result: the first unit run exposed that `WeaponSystem` directly depended on global `AimController`, dragging camera/physics dependencies into pure gameplay tests.
-
-Fix:
-
-- global AimController import removed from WeaponSystem;
-- player aim is now optional injected direction/fallback;
-- WeaponSystem is independently testable.
-
-This is an example of tests finding architecture coupling rather than only checking arithmetic.
+Далее combat events были связаны с fire/reload animation overlays; production root assertions стали version-independent.
 
 ---
 
-# 17. 0.8.7 — first GameApp decomposition pass
+# 12. 0.10.0 — Production Core
 
-The God Object was reduced by moving real ownership, not by making cosmetic helper files.
+PR #27 закрыл архитектурный и visual vertical slice core:
 
-Created `WorldRuntime`:
+- `CombatRuntime` extracted from `GameApp`;
+- `RunSession` extracted;
+- no service locator / DI framework;
+- shotgun + bow production visuals/animations;
+- shared CC0 zombie GLB reused by Walker/Runner/Brute;
+- skeletal hit proxies;
+- distance presentation LOD;
+- asset byte budgets;
+- expanded Playwright visual gates.
 
-- renderer;
-- scene;
-- camera/camera collision;
-- collision world;
-- procedural fallback environment;
-- grass/rain/storm;
-- manifest loading/fallback;
-- manifest lights;
-- render/resize/dispose.
-
-Created `PlayerRuntime`:
-
-- player transform;
-- PlayerCapsule;
-- movement/facing;
-- spawn/reset;
-- muzzle transform;
-- FaceSystem and player visual lifecycle.
-
-Created `GameHud`:
-
-- HP/wave/kills/score;
-- debug status;
-- last-event presentation;
-- game-over summary.
-
-`GameApp` remains orchestration plus combat/enemy/wave/session wiring. Future CombatRuntime/RunSession extraction is allowed only when it reduces actual growth/coupling.
+Design rule: shared assets + data-driven archetype presentation; runtime extraction только при реальном ownership pressure.
 
 ---
 
-# 18. Visual CI checkpoints
+# 13. 0.11.0 — Abandoned Outskirts
 
-User explicitly allowed the assistant to generate and inspect screenshots independently.
+PR #28 перевёл production на authored GLB level с structural collision и gameplay manifest при сохранении procedural fallback.
 
-Added Playwright mobile screenshot test:
-
-- `mobile-top.png`;
-- `mobile-third.png`.
-
-CI uploads them as `facefall-visual-checkpoints`.
-
-The first hardening screenshots were downloaded and manually inspected before merge:
-
-- TOP rendered successfully;
-- 3RD rendered successfully;
-- controls/HUD remained visible;
-- camera layout did not regress due to decomposition;
-- long dev build badge is visibly cramped against camera buttons on narrow mobile — recorded for HUD cleanup, not mixed into architecture refactor.
+`LevelLoader` отделяет decorative meshes от collision; visual CI получил authored-level checkpoint.
 
 ---
 
-# 19. Current direction after hardening
+# 14. 0.12.0 — «Супер Макар» Family Survival
 
-Once PR #19 is green and merged, the next high-impact line is the visual vertical slice:
+Checkpoint 2026-08-14:
 
-1. production hero GLB behind PlayerRuntime;
-2. CharacterModel + AnimationMixer idle/walk/run;
-3. real weapon socket + pistol animation;
-4. shotgun/bow assets;
-5. production Walker/Runner/Brute models/animation;
-6. authored Abandoned Outskirts level GLB through WorldRuntime;
-7. offline Recast navmesh;
-8. Face System 2.0 on production head;
-9. final HUD;
-10. Android performance profiling/asset optimization.
-
-Broad new gameplay mechanics remain lower priority until the game visually stops looking like an engine prototype.
-
----
-
-# 20. 0.9.0 — production hero vertical slice
-
-PR #20 on `visual/0.9.0-hero-glb-spike` moved Facefall from the procedural player body to a real rigged hero pipeline behind `PlayerRuntime`.
-
-- Quaternius Universal Base Characters Standard and Universal Animation Library Standard were obtained from official free-download paths and verified as CC0; original licenses/provenance are retained.
-- ambiguous derivative character files found elsewhere were rejected.
-- `CharacterModel` now owns `GLTFLoader`, `SkeletonUtils`, `AnimationMixer`, scaling, grounding and cleanup.
-- locomotion uses idle/walk/run crossfades with rotation-only retargeting so animation translation/scale tracks cannot distort the base rig.
-- the uploaded photo becomes a feathered curved shell attached to the real `Head` bone.
-- visual facing was corrected by 180° to match Facefall gameplay aim.
-- production pistol position follows animated `hand_r`; its muzzle is the actual origin used by `WeaponSystem.fire`.
-- the first 43 cm pistol prototype was caught by visual CI and resized to a realistic ~21 cm silhouette.
-- procedural player rendering remains an automatic fallback if production GLTF loading fails.
-
-Visual CI now captures TOP, 3RD and `mobile-face-front.png` with a synthetic uploaded face. These checkpoints caught rig-proportion, scale and facing defects that status-only CI did not.
-
-Next: pistol fire/reload animation integration, then shotgun/bow production visuals and production infected.
+- игра переименована в «Супер Макар»;
+- три независимых local portraits;
+- Супермама присоединяется с wave 4;
+- Суперпапа — с wave 7;
+- allies follow + shoot infected;
+- difficulty scales with wave/hero count;
+- zombie WebAudio;
+- coins/rewards;
+- shotgun/bow shop;
+- `FamilyCompanionSystem`, `CoinSystem`;
+- family Playwright visual regression.
 
 ---
 
-# 21. 0.9.1 — pistol combat animation integration
+# 15. 0.13.0 — Offline Recast navigation
 
-PR #21 on `visual/0.9.1-pistol-animation` connected the production hero animation layer to actual combat events instead of decorative playback.
+Development PR #32.
 
-Implemented:
-
-- `CharacterModel` gained temporary one-shot animation overrides above locomotion and clean return to the current idle/walk/run state;
-- actual player `shot` events trigger the pistol fire clip;
-- actual `weaponReload` events trigger the pistol reload clip;
-- a GLB asset-contract unit test reads the vendored `UAL1_Standard.glb` and verifies compatible pistol fire/reload clips exist;
-- `PlayerRuntime` tracks the active weapon, hides the pistol when shotgun/bow is selected and uses production muzzle position only for pistol;
-- mobile visual smoke now models FIRE as a true held pointer action (`pointerdown` across fixed updates) and validates ammo consumption, cooldown, reload state and animation screenshots;
-- the test found that instantaneous synthetic `tap()` is not equivalent to Facefall's held FIRE semantics; the test was corrected rather than weakening production input behavior;
-- stale build text in `Bootstrap.markBuildUi()` was fixed so runtime no longer rewrites the UI back to 0.8.5;
-- deployment-root CI was made version-independent: production `index.html` must be byte-identical to the compiled `engine-lab.html`, instead of grepping for a hard-coded 0.8 string.
-
-Visual review confirmed distinct pistol fire and reload poses while the uploaded face remains attached to the animated head.
-
-Next ordered work: shotgun production visual/socket + animation, then bow draw/release, then production infected.
+- `RecastNavigationQuery` behind existing abstraction;
+- per-enemy path caching/repath throttling;
+- Node/build-time navmesh bake from authored level;
+- browser imports baked binary only — no phone navmesh generation;
+- authored spawn → player path validation;
+- collision fallback preserved;
+- HUD exposes navigation mode;
+- unit + browser Recast regression.
 
 ---
 
-# 22. How to continue this file
+# 16. 0.14.0 — Infected perception + AI LOD
+
+Development PR #34.
+
+- LOS wired to actual authored/static collision;
+- eye-to-torso LOS;
+- last-seen memory + sticky chase;
+- weapon hearing hierarchy;
+- walking/sprinting/family fire noise;
+- distance-based LOS/nav/SpatialHash cadence;
+- behavior regression hidden → heard → visible → sticky → investigate.
+
+---
+
+# 17. 0.15.0 — Face System 2.0
+
+Development PR #35.
+
+- `FaceImageProcessor` client boundary;
+- portraits normalized to 512×640 / 4:5;
+- native `FaceDetector` when available;
+- deterministic fallback;
+- family-specific crop profiles;
+- compact local JPEG storage + v1→v2 migration;
+- no server photo upload;
+- curved face shell stays on real Head bone;
+- unit + mobile browser coverage.
+
+---
+
+# 18. 0.16.0 — Debug/performance overlay
+
+Development PR #36.
+
+- opt-in `?debug=1` overlay;
+- FPS / frame time / draw calls / triangles / DPR;
+- active infected + intent distribution;
+- LOS/s + blocked share;
+- NAV/s + active navigation mode;
+- SpatialHash cells + quality profile;
+- normal mode verified without debug panel/instrumentation UI.
+
+---
+
+# 19. 0.17.0 — Blood Moon / Weather Pass
+
+PR #38, 2026-08-17.
+
+Android feedback showed long-press on textual action controls could invoke browser/system selection UI. Mobile action controls were made icon-first with aria semantics and stronger selection/context/touch-callout suppression.
+
+Environment progression became deterministic by wave:
+
+- 1–2 dawn;
+- 3–4 rainy overcast;
+- 5–6 dusk;
+- 7+ Blood Moon.
+
+`AtmosphereSystem` owned by `WorldRuntime` blends background, `FogExp2`, lighting, exposure, rain, storm and low haze. Heavy volumetric post-processing was deliberately rejected until Android profiling proves budget.
+
+Blood Moon distance visibility is presentation-only; infected LOS/hearing/Recast/damage semantics do not receive artificial night blindness.
+
+Unit and mobile Playwright coverage includes all four states, icon controls, TOP/3RD screenshots and debug atmosphere id.
+
+0.17.0 became the gameplay checkpoint frozen during the following infrastructure migration.
+
+---
+
+# 20. 2026-08-19 — Moscow Development Platform Migration
+
+## User requirement
+
+Пользователь зафиксировал строгий порядок:
+
+> сначала полностью перейти на новую development technology из `server-control-ru`; только после этого продолжать игру step by step.
+
+Gameplay work был заморожен до закрытия Migration Gate.
+
+## Baseline / rollback
+
+Pre-migration `main`:
+
+`5f2c4751c2813970924e17fd3b7bb3aa6b1476c2`
+
+Gameplay baseline оставался 0.17.0; gameplay source в процессе migration не менялся.
+
+## PR #39 — Moscow migration
+
+Создан migration branch и PR #39 `Migrate Super Makar development to Moscow platform`.
+
+Изменения:
+
+- добавлены `PROJECT.md` / `ARCHITECTURE.md`;
+- Engine Next CI переведён с `ubuntu-latest` на `[self-hosted, linux, x64, moscow-game]`;
+- GitHub Artifact transport removed;
+- legacy `engine-next-preview` publishing removed;
+- Moscow npm/Playwright caches;
+- heavy browser/build через `dev-heavy`;
+- local diagnostics instead of GitHub Artifacts.
+
+## Dedicated runner
+
+На Moscow VPS `72.56.14.168` установлен repo-scoped runner через canonical `server-control-ru` installer.
+
+Фактическая identity:
+
+```text
+project slug: game
+runner: moscow-game-01
+label: moscow-game
+user: github-runner-game
+```
+
+Canonical registration is produced by `dev-platform-register-project game ...`, therefore paths are:
+
+```text
+/srv/dev-platform/workspaces/game
+/srv/dev-platform/services/game
+/var/lib/dev-platform/artifacts/game
+/var/lib/dev-platform/logs/game
+/var/lib/dev-platform/state/game
+/etc/dev-platform/projects.d/game.conf
+```
+
+Ранние docs/CI mistakenly used `super-makar` as infrastructure slug; closeout explicitly corrected this to `game`.
+
+## Migration failures that were useful
+
+### Node PATH
+
+Первый repository job дошёл до Moscow runner, но новый service user не видел `npm`. Решение: Node 20 explicitly provisioned with `actions/setup-node@v6` inside workflow. Compute remained on Moscow self-hosted runner.
+
+### Chromium runtime libraries
+
+Следующий run прошёл `npm ci`, typecheck и **39/39 unit tests**, но Chromium crashed on missing `libnspr4.so` / related Linux runtime dependencies.
+
+Playwright/Chromium system libraries were installed on Moscow host. After that browser smoke and deploy build completed successfully.
+
+Это подтвердило, что проблемы были platform/bootstrap issues, а не gameplay regressions.
+
+## Green evidence
+
+Final migration PR run on `moscow-game-01`:
+
+- locked install — green;
+- typecheck — green;
+- 39/39 unit tests — green;
+- Chromium — green;
+- Playwright/browser smoke — green;
+- `npm run build:deploy` — green;
+- deployment-root assertions — green;
+- local diagnostics — green.
+
+PR #39 merged to `main`:
+
+`90a394b4242a91f0d6efdae8975f4c0d843bea4b`
+
+## `server-control-ru` hardening discovered during Game onboarding
+
+`bootstrap-moscow.sh` was adjusted to include `github-runner-*` service users in the platform group so new dedicated runners follow the same standard automatically.
+
+Game runner remains restricted by canonical project sudo boundary rather than receiving unrestricted root shell.
+
+---
+
+# 21. 2026-08-19 — Vercel production closeout
+
+## Problem
+
+Connected Vercel account initially exposed only another project (`Projekt_B` / `projekt_b`), not Facefall.
+
+The Vercel MCP connector can deploy files and create a project, but does not expose Git repository import/link or project-protection mutation. No `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` or automation bypass secret existed in Game GitHub Secrets.
+
+## Chosen release method
+
+A small Vercel deployment bootstrap was created programmatically. It:
+
+1. checks out an **exact known green Git SHA** from the public repository;
+2. runs locked `npm ci`;
+3. runs `npm run build:deploy`;
+4. publishes `dist-next`.
+
+For the migration checkpoint the pinned SHA was the merged migration commit:
+
+`90a394b4242a91f0d6efdae8975f4c0d843bea4b`
+
+This keeps source/release identity deterministic even without Vercel Git Integration.
+
+## Vercel Authentication investigation
+
+Generated deployment URLs and team-qualified aliases returned a 302 to `vercel.com/sso-api` / Vercel login. Passing `ssoProtection: null` at deploy creation did not override the account's protection behavior for those technical URLs.
+
+A temporary diagnostic draft PR #40 was created only to issue independent no-auth HTTP probes. It was **closed without merge** after evidence collection.
+
+Critical finding:
+
+- technical/team URL → Vercel SSO;
+- **short production alias `https://super-makar-live.vercel.app` → public HTTP 200 and real `<title>Супер Макар</title>`**.
+
+Therefore the short domain is the only canonical public production URL. Technical deployment aliases are not part of the product contract.
+
+## Final release architecture
+
+```text
+GitHub source of truth
+      ↓
+Moscow CI / Playwright / build validation
+      ↓
+exact green SHA
+      ↓
+Vercel SHA-pinned production build
+      ↓
+https://super-makar-live.vercel.app
+```
+
+Normal Game CI no longer depends on GitHub-hosted compute or GitHub Artifact transport.
+
+---
+
+# 22. Post-migration Step 1 audit — Third-person aim root cause
+
+While migration was being closed, current aim/camera code was inspected without changing gameplay.
+
+Files inspected:
+
+- `src/aim/AimController.ts`;
+- `src/aim/AimAssist.ts`;
+- `src/camera/CameraDirector.ts`;
+- `src/camera/ThirdPersonCamera.ts`;
+- `src/app/GameApp.ts`;
+- `src/app/CombatRuntime.ts`.
+
+Root cause:
+
+- `AimController` calculates a correct screen-reticle camera ray/world aim direction;
+- `AimAssist` moves the screen reticle;
+- TOP mode rotates `player.facing` toward that direction;
+- 3RD intentionally does not perform the TOP facing alignment;
+- but player fire still calls `WeaponSystem.fire(..., player.facing)`;
+- `CombatRuntime` correctly uses the direction it receives.
+
+So 3RD had two competing truths: visible reticle direction and body facing. The actual shot used body facing. This explains the user's screenshot where the crosshair does not represent the real target line.
+
+Next mandatory implementation: make the aim layer provide one authoritative shot direction from the visible reticle/camera ray and use it for player fire while preserving body facing as presentation/orientation.
+
+Only after that Step 1 passes Moscow CI + production evidence do we implement the debug aim/camera gizmo.
+
+---
+
+# 23. How to continue this file
 
 At every major checkpoint record:
 
 - user request/feedback that caused the change;
 - architecture decision;
-- PR/merge checkpoint;
-- what failed and what tests found;
-- CI/device evidence;
+- branch/PR/merge SHA;
+- what failed and why;
+- CI/browser/device evidence;
+- deployment evidence;
+- rollback point;
 - next ordered milestone.
-
-
----
-
-# 0.10.0 — Production Core milestone
-
-PR #27 closes the remaining architecture + Visual Vertical Slice checklist items from sections 6 and 8 without forcing optional abstractions.
-
-Implemented:
-
-- `CombatRuntime` extracted from `GameApp` for combat events and hitscan resolution;
-- `RunSession` extracted for kills/score/reset accounting;
-- explicit decision not to create `EnemyRuntime` / `PresentationRuntime` until real ownership pressure appears;
-- no service locator or DI framework;
-- hero shotgun aim/fire/reload, bow draw/release, hit and death skeletal overlays;
-- real generated shotgun GLB and bow+arrow GLB, lazy-loaded on first selection;
-- one cached CC0 Mesh2Motion zombie GLB reused for Walker / Runner / Brute;
-- distinct infected scale/silhouette/gait plus attack/stagger/death reactions;
-- invisible hit proxies attached to real skeleton bones; presentation skin no longer determines gameplay hit zone;
-- far infected LOD removes decorative wounds/dynamic shadows while preserving hit proxies;
-- byte-budget unit tests and expanded Playwright production visual gates.
-
-Design rule reinforced: prefer shared assets + archetype presentation profiles over duplicated binaries, and extract runtimes only when they reduce actual coupling.
-
-
----
-
-# 0.11.0 — Abandoned Outskirts authored level
-
-PR #28 replaces the active procedural environment with an authored GLB level while retaining fallback safety. `LevelLoader` separates decorative `decor-*` meshes from collision, and the manifest remains the gameplay marker source. Visual CI adds a dedicated authored-level checkpoint.
-
----
-
-## 0.12.0 — «Супер Макар» family survival checkpoint (2026-08-14)
-
-- Игра переименована в **«Супер Макар»**.
-- Три независимых локальных фото: Супер Макар, Супермама, Суперпапа.
-- Фото персонажа отображается на увеличенной голове спереди и сзади для быстрой идентификации в TOP/3RD.
-- Супермама присоединяется после завершения 3-й волны (активна с wave 4), Суперпапа — после завершения 6-й (активен с wave 7).
-- Союзники следуют за Макаром, автоматически выбирают заражённых и ведут огонь.
-- Супермама получила отдельный процедурный силуэт/причёску; Суперпапа — отличимый масштаб корпуса. Новых внешних character assets для этого не добавлено.
-- Сложность масштабируется по номеру волны и количеству активных героев.
-- Добавлены zombie groan / pain / death WebAudio-эффекты.
-- За убийства выпадают монеты; монеты подбираются игроком. Награда: walker 2, runner 3, brute 5.
-- Магазин оружия: дробовик 20 монет, лук 30; до покупки оружие заблокировано.
-- Добавлены `FamilyCompanionSystem`, `CoinSystem`, семейный HUD/menu и regression coverage.
-- Семейный Playwright smoke загружает три разные тестовые фотографии, проверяет unlock/markers/shop и создаёт `mobile-super-makar-family.png`.
-- Финальный релизный gate: TypeScript strict, unit tests, Playwright browser/visual smoke, deploy build и sole deployment-root assertion.
-- Canonical source после merge: `main`. Продолжение разработки планируется отдельным этапом/перепиской.
-
-## 0.13.0 — Offline Recast navigation (2026-08-14)
-
-- Continued from the stable 0.12.0 «Супер Макар» checkpoint on `main`.
-- Added `RecastNavigationQuery` as a mobile-safe adapter behind the existing navigation abstraction.
-- Added per-enemy path caching/repath throttling so Detour is not queried for every infected every frame.
-- Added Node/build-time navmesh baking from `public/assets/levels/abandoned-outskirts/level.glb`.
-- Browser runtime imports the baked binary and runs path queries only; navmesh generation never runs per phone.
-- Authored north/west enemy spawn → player-start traversability is validated during the bake.
-- `GameApp` switches infected navigation to Recast only after successful authored-level/navmesh load and otherwise preserves `CollisionNavigationQuery`.
-- HUD exposes `nav=recast` / `nav=collision` for smoke/debug verification.
-- Added unit and Playwright regression coverage; browser smoke has verified real Recast activation.
-- Added pinned `recast-navigation@0.43.1` and `@recast-navigation/three@0.43.1` plus MIT notice.
-- Development PR: #32.
-
-## 0.14.0 — Infected perception + AI LOD (2026-08-17)
-
-- Continued from the stable 0.13.0 Recast checkpoint.
-- Wired infected LOS to the authored/static `CollisionWorld`; the previous default-visible path is no longer used by `GameApp`.
-- Added eye-to-torso LOS sampling, last-seen target memory and a short 0.65s sticky chase before investigate fallback.
-- Hidden player movement is no longer read as the pursuit target after LOS breaks; infected pursue the last actually seen/heard point.
-- Added distinct hearing radii for shotgun, pistol and bow plus walking/sprinting noise.
-- Supermama/Superpapa pistol fire now wakes nearby infected too.
-- Added distance-based cadence for LOS and nav/SpatialHash/local-avoidance steering while preserving fixed-step movement/animation.
-- Added unit and live Playwright behavior coverage for perception transitions and LOD policy.
-- Development PR: #34.
-
-## 0.15.0 — Face System 2.0 (2026-08-17)
-
-- Continued from the stable 0.14.0 infected-perception checkpoint.
-- Added FaceImageProcessor as the client-side preprocessing boundary for family portraits.
-- Portraits are normalized to 512×640 / 4:5 before entering FaceStore or CharacterModel.
-- Native FaceDetector is used when available to follow the largest off-center face; unsupported/failing browsers fall back safely.
-- Added family-specific crop profiles for Makar, Mama and Papa.
-- FaceStore moved to v2 compact JPEG entries and locally migrates existing v1 portraits.
-- No photo network transfer was introduced; the complete pipeline remains on-device/browser-local.
-- Existing curved face shell on the real Head bone remains the production 3D fitting approach.
-- Added unit and live mobile browser coverage for the new preprocessing path.
-- Development PR: #35.
-
-## 0.16.0 — debug/performance overlay (2026-08-17)
-
-- Continued from the stable 0.15.0 Face System 2.0 checkpoint.
-- Added an opt-in `DebugPerformanceOverlay` activated only by `?debug=1`.
-- Added FPS, average/max frame time, draw calls, triangles and DPR from the live Three.js renderer.
-- Added active infected and AI intent distribution to the panel.
-- Counted LOS and navigation requests at their existing runtime boundaries without changing EnemySystem decision semantics.
-- The navigation counter follows collision → Recast runtime switching and reports active navigation mode.
-- Added SpatialHash occupied-cell and quality-profile visibility for mobile tuning.
-- Added regression coverage proving normal runs have no debug panel and debug runs produce non-zero renderer/LOS/Recast-nav metrics.
-- Development PR: #36.
-
-# 0.17.0 — Blood Moon / Weather Pass (2026-08-17)
-
-Real-device Android feedback showed that the touch action labels could be treated as ordinary selectable text: a long press on FIRE opened the browser/system selection/search UI. The fix was intentionally stronger than CSS alone: the mobile action cluster became icon-only SVG controls with accessible aria labels, and gameplay controls also suppress selectstart/contextmenu/touch callout behavior. External OS-level OCR cannot be controlled by the web app, but there is no longer ordinary visible FIRE / R / WEAP / CAM text in the action buttons.
-
-The same checkpoint introduced the requested environment cycle. The production policy is deterministic by survival wave rather than tied to the phone clock: waves 1–2 use dawn, 3–4 a gloomy rainy day, 5–6 dusk, and wave 7+ Blood Moon. This makes the progression reproducible in CI and means Supermama enters during the rainy phase while Superpapa arrives as Blood Moon begins.
-
-`AtmosphereSystem` is owned by `WorldRuntime`. It blends scene background, `FogExp2`, hemisphere/key lighting, directional-light angle, renderer exposure, rain, storm activity and low haze. A small generated sprite provides the Blood Moon. Rain can change active draw count without reallocating its buffer, and low haze stays one draw call. Heavy volumetric fog/post-processing was deliberately rejected until real Android profiling proves a budget for it.
-
-Night visibility is presentation-only. Dense red-black exponential fog and low exposure remove distant detail, while a short-range no-shadow light follows the player to preserve close combat readability. The AI still uses the same authored collision LOS, hearing, target memory, Recast pathfinding and damage semantics; night does not give infected artificial blindness.
-
-The debug profiler was extended with the active atmosphere id. Unit tests cover wave/preset/visibility policy. Mobile Playwright covers non-selectable icon controls and all four states, with explicit dawn, overcast-rain, dusk, Blood Moon TOP and Blood Moon 3RD screenshots. The screenshots were inspected and used to brighten the overcast day, soften near-player night lighting, and fully frame the Blood Moon on narrow mobile screens.
-
-PR #38: `feat: add 0.17 blood moon weather pass`.
