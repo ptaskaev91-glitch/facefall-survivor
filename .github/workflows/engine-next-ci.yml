@@ -47,9 +47,7 @@ permissions:
   contents: read
 
 concurrency:
-  # v2 intentionally isolates current runs from the one historical orphaned
-  # pre-recovery execution while retaining cancel-in-progress per ref going forward.
-  group: engine-next-v2-${{ github.workflow }}-${{ github.ref }}
+  group: engine-next-v4-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -64,6 +62,17 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 1
+
+      - name: Verify Moscow resource guard before any browser work
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v dev-heavy
+          grep -Fq 'MIN_AVAILABLE_MB' /usr/local/bin/dev-heavy
+          echo '=== HOST PRECHECK ==='
+          free -h
+          uptime
+          echo 'RESOURCE_GUARD_PRESENT'
 
       - name: Provision Node.js on Moscow runner
         uses: actions/setup-node@v6
@@ -94,6 +103,14 @@ jobs:
             cmp -s dist-next/index.html dist-next/engine-lab.html
             test ! -e dist-next/legacy
           '
+
+      - name: Verify browser cleanup
+        if: always()
+        shell: bash
+        run: |
+          set -u
+          sleep 1
+          pgrep -a -u "$(id -un)" -f '(^|/)(chromium|chrome)( |$)|playwright' || true
 
       - name: Store diagnostics locally on Moscow
         if: always()
