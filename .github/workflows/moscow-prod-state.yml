@@ -12,7 +12,7 @@ permissions:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 2
     steps:
       - name: Probe Moscow Game production externally
         shell: bash
@@ -20,10 +20,10 @@ jobs:
           set -euo pipefail
           domain=super-makar.72-56-14-168.sslip.io
           echo '=== DNS ==='; getent ahostsv4 "$domain" || true
-          echo '=== HTTP HEALTH ==='; curl -v --max-time 15 "http://$domain/health" || true
-          echo '=== HTTPS HEALTH ==='; curl -vk --max-time 20 "https://$domain/health" || true
-          echo '=== HTTPS GAME ==='
-          html="$(curl -kfsS --max-time 25 "https://$domain/" || true)"
-          printf '%s\n' "$html" | head -c 1000
+          echo '=== HTTP ==='; curl -sS -D- --max-time 6 "http://$domain/health" || true
+          echo '=== HTTPS ==='; curl -k -sS -D- --max-time 8 "https://$domain/health" || true
+          echo '=== GAME ==='
+          html="$(curl -kfsS --max-time 10 "https://$domain/" || true)"
+          printf '%s\n' "$html" | head -c 500
           grep -F '<title>Супер Макар</title>' <<<"$html" >/dev/null
           echo "MOSCOW_GAME_EXTERNAL_OK https://$domain/"
