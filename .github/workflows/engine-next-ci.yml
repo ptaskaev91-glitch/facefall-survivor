@@ -1,9 +1,11 @@
 name: Engine Next CI
 
+# Feature branches are validated once through pull_request. Only main receives
+# push validation, preventing duplicate full Playwright jobs on moscow-game-01.
 on:
   workflow_dispatch:
   push:
-    branches: [main, 'agent/**']
+    branches: [main]
     paths:
       - 'src/**'
       - 'public/**'
@@ -22,6 +24,7 @@ on:
       - 'dev.md'
       - '.github/workflows/engine-next-ci.yml'
   pull_request:
+    branches: [main]
     paths:
       - 'src/**'
       - 'public/**'
@@ -44,7 +47,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: engine-next-${{ github.workflow }}-${{ github.ref }}
+  # v2 intentionally isolates current runs from the one historical orphaned
+  # pre-recovery execution while retaining cancel-in-progress per ref going forward.
+  group: engine-next-v2-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -95,7 +100,7 @@ jobs:
         shell: bash
         run: |
           set -u
-          dst="/var/lib/dev-platform/artifacts/super-makar/${GITHUB_RUN_ID}"
+          dst="/var/lib/dev-platform/artifacts/game/${GITHUB_RUN_ID}"
           mkdir -p "$dst"
           cp -a test-artifacts "$dst/" 2>/dev/null || true
           cp -a reports "$dst/" 2>/dev/null || true
