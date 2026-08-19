@@ -11,21 +11,19 @@ permissions:
 
 jobs:
   inspect:
-    runs-on: [self-hosted, linux, x64, moscow-game]
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Inspect host and Game production
+      - name: Probe Moscow Game production externally
         shell: bash
         run: |
           set -euo pipefail
-          echo '=== TIME ==='; date -Is
-          echo '=== LOAD ==='; uptime
-          echo '=== MEMORY ==='; free -h
-          echo '=== RUNNER WORKERS ==='
-          ps -eo pid,ppid,user,etime,%cpu,%mem,args --sort=-%cpu | grep -E 'Runner.Worker|dev-heavy|npm run build:deploy|certbot|nginx|super-makar' | grep -v grep | head -n 120 || true
-          echo '=== NGINX CONFIG ==='
-          test -e /etc/nginx/sites-enabled/super-makar && ls -l /etc/nginx/sites-enabled/super-makar || true
-          echo '=== LOCAL HTTP ==='
-          curl -sS -D- --max-time 10 -H 'Host: super-makar.72-56-14-168.sslip.io' http://127.0.0.1/health || true
-          echo '=== PUBLIC HTTPS ==='
-          curl -sS -D- --max-time 15 https://super-makar.72-56-14-168.sslip.io/health || true
+          domain=super-makar.72-56-14-168.sslip.io
+          echo '=== DNS ==='; getent ahostsv4 "$domain" || true
+          echo '=== HTTP HEALTH ==='; curl -v --max-time 15 "http://$domain/health" || true
+          echo '=== HTTPS HEALTH ==='; curl -vk --max-time 20 "https://$domain/health" || true
+          echo '=== HTTPS GAME ==='
+          html="$(curl -kfsS --max-time 25 "https://$domain/" || true)"
+          printf '%s\n' "$html" | head -c 1000
+          grep -F '<title>Супер Макар</title>' <<<"$html" >/dev/null
+          echo "MOSCOW_GAME_EXTERNAL_OK https://$domain/"
