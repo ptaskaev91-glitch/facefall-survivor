@@ -8,29 +8,79 @@ permissions:
   contents: read
 
 jobs:
-  probe:
-    # Temporary external no-auth check; never merged.
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
+  production-browser-smoke:
+    # Temporary Migration Gate evidence only; this PR is never merged.
+    runs-on: [self-hosted, linux, x64, moscow-game]
+    timeout-minutes: 12
+    env:
+      NPM_CONFIG_CACHE: /var/cache/dev-platform/npm
+      PLAYWRIGHT_BROWSERS_PATH: /var/cache/dev-platform/browsers
+      PROD_URL: https://super-makar-live.vercel.app/
     steps:
-      - name: Check production aliases
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Provision Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund --cache "$NPM_CONFIG_CACHE"
+
+      - name: Ensure Chromium exists
+        run: PLAYWRIGHT_BROWSERS_PATH="$PLAYWRIGHT_BROWSERS_PATH" npx playwright install chromium
+
+      - name: Run TOP and 3RD production smoke
         shell: bash
         run: |
-          set -u
-          check() {
-            label="$1"; url="$2"; expected="$3"
-            code="$(curl -sS -D "/tmp/${label}.headers" -o "/tmp/${label}.body" -w '%{http_code}' --connect-timeout 10 --max-time 30 "$url" || true)"
-            echo "${label}_http=$code"
-            grep -iE '^(location:|server:|x-vercel-id:)' "/tmp/${label}.headers" || true
-            if [ "$code" = "200" ] && grep -qi "$expected" "/tmp/${label}.body"; then
-              echo "${label}_PUBLIC=true"
-              return 0
-            fi
-            echo "${label}_PUBLIC=false"
-            return 1
-          }
+          set -euo pipefail
+          diag="/var/lib/dev-platform/artifacts/super-makar/production-smoke-${GITHUB_RUN_ID}"
+          mkdir -p "$diag"
+          cat > .ci-production-smoke.mjs <<'NODE'
+          import { chromium } from '@playwright/test';
+          import { mkdir } from 'node:fs/promises';
 
-          ok=0
-          check live_alias 'https://super-makar-live-pavels-projects-0b29bb12.vercel.app' '<title>Супер Макар</title>' && ok=1
-          check live_short 'https://super-makar-live.vercel.app' '<title>Супер Макар</title>' && ok=1
-          exit $((1-ok))
+          const base = process.env.PROD_URL;
+          const diag = process.env.PROD_DIAG;
+          await mkdir(diag, { recursive: true });
+          const browser = await chromium.launch({
+            headless: true,
+            args: ['--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist']
+          });
+          const context = await browser.newContext({
+            viewport: { width: 390, height: 844 },
+            isMobile: true,
+            hasTouch: true,
+            deviceScaleFactor: 1
+          });
+          const page = await context.newPage();
+          const pageErrors = [];
+          page.on('pageerror', (error) => pageErrors.push(error.message));
+
+          await page.goto(`${base}?atmosphere=blood-moon`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+          const title = await page.title();
+          if (title !== 'Супер Макар') throw new Error(`Unexpected title: ${title}`);
+          if (await page.locator('#productMenu').getAttribute('data-visible') !== 'true') throw new Error('Product menu not visible');
+          await page.locator('#startGame').click();
+          await page.locator('#productMenu[data-visible="false"]').waitFor({ timeout: 30_000 });
+          await page.locator('#app canvas').waitFor({ state: 'visible', timeout: 30_000 });
+          await page.locator('#status').waitFor({ state: 'visible' });
+          await page.waitForFunction(() => document.querySelector('#status')?.textContent?.includes('state=playing'), null, { timeout: 30_000 });
+          await page.screenshot({ path: `${diag}/production-top.png`, fullPage: true });
+
+          await page.locator('#camThird').click();
+          await page.waitForFunction(() => document.querySelector('#status')?.textContent?.includes('camera=third'), null, { timeout: 15_000 });
+          if (await page.locator('#camThird').getAttribute('data-active') !== 'true') throw new Error('3RD camera button did not activate');
+          await page.screenshot({ path: `${diag}/production-third.png`, fullPage: true });
+
+          if (pageErrors.length) throw new Error(`Fatal page errors: ${pageErrors.join(' | ')}`);
+          console.log('PRODUCTION_SMOKE=green');
+          console.log(`TITLE=${title}`);
+          console.log(`URL=${page.url()}`);
+          await browser.close();
+          NODE
+          PROD_DIAG="$diag" dev-heavy node .ci-production-smoke.mjs
+          rm -f .ci-production-smoke.mjs
+          printf 'url=%s\nstatus=green\n' "$PROD_URL" > "$diag/status.txt"
