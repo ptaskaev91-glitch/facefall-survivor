@@ -3,6 +3,8 @@ name: Vercel Production Smoke
 on:
   push:
     branches: ['agent/vercel-production-smoke']
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
