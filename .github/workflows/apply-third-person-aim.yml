@@ -5,6 +5,10 @@ on:
     branches: [agent/third-person-aim-correctness]
     paths:
       - '.github/workflows/apply-third-person-aim.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-third-person-aim.yml'
 
 permissions:
   contents: write
