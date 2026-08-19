@@ -33,6 +33,14 @@ test('third-person shot converges from physical muzzle to camera aim point', () 
   assert.ok(direction.dot(new Vector3(1, 0, 0)) < 0.9);
 });
 
+test('third-person shot uses deterministic fallback when muzzle equals aim point', () => {
+  const point = new Vector3(2, 1, -3);
+  const fallback = new Vector3(0.2, 0.4, -1).normalize();
+  const direction = resolveThirdPersonShotDirection(point, point, fallback, new Vector3());
+
+  assert.ok(direction.distanceTo(fallback) < 1e-10);
+});
+
 test('WeaponSystem passes the exact physical muzzle origin into player aim resolver', () => {
   const events = new EventBus<FacefallEvents>();
   const muzzle = new Vector3(3, 1.2, -2);
