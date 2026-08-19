@@ -5,7 +5,7 @@ import type { FacefallEvents, WeaponId } from './types';
 
 export type WeaponState = 'idle' | 'cooldown' | 'reloading';
 export interface WeaponRuntime { id: WeaponId; magazine: number; reserve: number; state: WeaponState; stateTime: number; }
-export type PlayerAimResolver = (out: Vector3) => Vector3;
+export type PlayerAimResolver = (out: Vector3, origin: Vector3) => Vector3;
 
 export class WeaponSystem {
   readonly runtimes = new Map<WeaponId, WeaponRuntime>();
@@ -36,7 +36,7 @@ export class WeaponSystem {
     const definition = this.definition(); const runtime = this.runtime();
     if (runtime.state !== 'idle' || runtime.magazine <= 0) return false;
     runtime.magazine--; runtime.state = 'cooldown'; runtime.stateTime = definition.fireInterval;
-    const direction = sourceId === 'player' && this.resolvePlayerAim ? this.resolvePlayerAim(this.resolvedDirection) : this.resolvedDirection.copy(fallbackDirection);
+    const direction = sourceId === 'player' && this.resolvePlayerAim ? this.resolvePlayerAim(this.resolvedDirection, origin) : this.resolvedDirection.copy(fallbackDirection);
     if (direction.lengthSq() <= 1e-6) direction.copy(fallbackDirection);
     this.events.emit('shot', { weaponId: definition.id, sourceId, origin: origin.clone(), direction: direction.clone().normalize() }); return true;
   }
