@@ -47,7 +47,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: engine-next-${{ github.workflow }}-${{ github.ref }}
+  # v2 intentionally isolates current runs from the one historical orphaned
+  # pre-recovery execution while retaining cancel-in-progress per ref going forward.
+  group: engine-next-v2-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
