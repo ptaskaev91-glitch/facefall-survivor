@@ -1,5 +1,7 @@
 name: Engine Next CI
 
+# Feature branches are validated once through pull_request. Only main receives
+# push validation, preventing duplicate full Playwright jobs on moscow-game-01.
 on:
   workflow_dispatch:
   push:
